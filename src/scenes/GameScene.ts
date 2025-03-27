@@ -1,11 +1,9 @@
 import { BaseScene } from "@/scenes/BaseScene";
-import { Player } from "@/components/Player";
-import { UI } from "@/components/UI";
 
 export class GameScene extends BaseScene {
-	private background: Phaser.GameObjects.Image;
-	private player: Player;
-	private ui: UI;
+	private gridGraphics: Phaser.GameObjects.Graphics;
+	private pathGraphics: Phaser.GameObjects.Graphics;
+	private circles: { [id: number]: Circle };
 
 	constructor() {
 		super({ key: "GameScene" });
@@ -13,57 +11,120 @@ export class GameScene extends BaseScene {
 
 	create(): void {
 		this.fade(false, 200, 0x000000);
+		this.cameras.main.setBackgroundColor(0xffffff);
 
-		this.background = this.add.image(0, 0, "background");
-		this.background.setOrigin(0);
-		this.fitToScreen(this.background);
+		this.gridGraphics = this.add.graphics();
+		this.pathGraphics = this.add.graphics();
+		this.circles = {};
 
-		this.player = new Player(this, this.CX, this.CY);
-		this.player.on("action", () => {
-			this.player.doABarrelRoll();
-		});
-
-		this.ui = new UI(this);
-
-		this.initTouchControls();
+		this.drawBackground();
+		this.initSocket();
 	}
 
-	update(time: number, delta: number) {
-		this.player.update(time, delta);
+	drawBackground() {
+		this.gridGraphics.lineStyle(1, 0x000000, 0.2);
+		for (let x = 0; x <= this.W; x += 120) {
+			this.gridGraphics.moveTo(x, 0);
+			this.gridGraphics.lineTo(x, this.H);
+		}
+		for (let y = 0; y <= this.H; y += 120) {
+			this.gridGraphics.moveTo(0, y);
+			this.gridGraphics.lineTo(this.W, y);
+		}
+		this.gridGraphics.strokePath();
 	}
 
+	initSocket() {
+		const socket = new WebSocket("ws://localhost:8765");
+		socket.onopen = () => {};
+		socket.onmessage = (event) => {
+			const message = JSON.parse(event.data);
+			console.log(message);
 
-	initTouchControls() {
-		this.input.addPointer(2);
-
-		// let touchArea = this.add.rectangle(0, 0, this.W, this.H, 0xFFFFFF).setOrigin(0).setAlpha(0.001);
-		// touchArea.setInteractive({ useHandCursor: true, draggable: true });
-
-		let touchId: number = -1;
-		let touchButton: number = -1;
-
-		this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-			if (!this.player.isTouched) {
-				this.player.touchStart(pointer.x, pointer.y);
-				touchId = pointer.id;
-				touchButton = pointer.button;
+			switch (message.event) {
+				case "add":
+					this.addCircle(message.id);
+					break;
+				case "update":
+					this.updateCircle(message.id, message.x, message.y);
+					break;
+				case "remove":
+					this.removeCircle(message.id);
+					break;
 			}
-			else if (this.player.isTouched && !this.player.isTapped) { // Use second touch point as a trigger
-				this.player.doABarrelRoll();
-			}
-		});
+		};
+	}
 
-		this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
-			if (touchId == pointer.id) {
-				this.player.touchDrag(pointer.x, pointer.y);
-			}
-		});
+	addCircle(id: number): void {
+		if (!this.circles[id]) {
+			const circle = new Circle(this, -1000, -1000, 20, 0x000000);
+			this.add.existing(circle);
+			this.circles[id] = circle;
+			this.drawLines();
+		}
+	}
 
-		this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
-			if (touchId == pointer.id && touchButton == pointer.button) {
-				// this.ui.debug.setText(`${new Date().getTime()} - id:${pointer.id} button:${pointer.button}`);
-				this.player.touchEnd(pointer.x, pointer.y);
+	updateCircle(id: number, x: number, y: number): void {
+		const circle = this.circles[id];
+		if (circle) {
+			circle.setPosition(x * this.W, y * this.H);
+			circle.addPoint(x * this.W, y * this.H);
+			this.drawLines();
+		}
+	}
+
+	removeCircle(id: number): void {
+		const circle = this.circles[id];
+		if (circle) {
+			circle.destroy();
+			delete this.circles[id];
+			this.drawLines();
+		}
+	}
+
+	drawLines() {
+		this.pathGraphics.clear();
+		this.pathGraphics.lineStyle(4, 0x000000, 1);
+
+		for (const id in this.circles) {
+			const points = this.circles[id].points;
+
+			if (points.length > 0) {
+				this.pathGraphics.beginPath();
+				this.pathGraphics.moveTo(points[0].x, points[0].y);
+
+				for (let i = 1; i < points.length; i++) {
+					this.pathGraphics.lineTo(points[i].x, points[i].y);
+				}
+
+				this.pathGraphics.strokePath();
 			}
-		});
+		}
+	}
+
+	update(time: number, delta: number) {}
+}
+
+class Circle extends Phaser.GameObjects.Ellipse {
+	public points: Phaser.Math.Vector2[];
+
+	constructor(
+		scene: Phaser.Scene,
+		x: number,
+		y: number,
+		radius: number,
+		color: number
+	) {
+		super(scene, x, y, radius * 2, radius * 2, color);
+		this.setOrigin(0.5, 0.5);
+
+		this.points = [];
+	}
+
+	addPoint(x: number, y: number): void {
+		this.points.push(new Phaser.Math.Vector2(x, y));
+		if (this.points.length > 100) {
+			this.points.shift();
+		}
 	}
 }

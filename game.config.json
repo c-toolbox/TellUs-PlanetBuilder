@@ -1,9 +1,9 @@
 {
-  "team": "Visualiseringscenter C",
-  "title": "Tellus Demo",
-  "description": "Web based demo for Tellus project",
-  "neutralino": {
-    "allow": ["app.exit", "window.center", "storage.*"],
-    "window": {}
-  }
+	"team": "Visualiseringscenter C",
+	"title": "Tellus Demo",
+	"description": "Web based demo for Tellus project",
+	"neutralino": {
+		"allow": ["app.exit", "window.center", "storage.*"],
+		"window": {}
+	}
 }

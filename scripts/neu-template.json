@@ -16,11 +16,11 @@
 	"modes": {
 		"window": {
 			"title": "Tellus Demo",
-			"width": 1440,
-			"height": 845,
-			"minWidth": 960,
-			"minHeight": 570,
-			"fullScreen": false,
+			"width": 3840,
+			"height": 2400,
+			"minWidth": 1920,
+			"minHeight": 1080,
+			"fullScreen": true,
 			"alwaysOnTop": false,
 			"icon": "/src/public/icon.png",
 			"enableInspector": false,
@@ -36,9 +36,9 @@
 		"binaryName": "tellus-demo",
 		"resourcesPath": "/dist/",
 		"frontendLibrary": {
-		  "patchFile": "/src/index.html",
-		  "devUrl": "http://localhost:5173",
-		  "projectPath": "/"
+			"patchFile": "/src/index.html",
+			"devUrl": "http://localhost:5173",
+			"projectPath": "/"
 		}
 	}
 }
