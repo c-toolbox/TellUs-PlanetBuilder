@@ -23,8 +23,8 @@ body {
 	position: relative;
 	margin: 0;
 	padding: 0;
-	background: black;
-	color: #eee;
+	background: #ddd;
+	color: black;
 }
 
 .fontPreloader {
@@ -42,4 +42,11 @@ body {
 
 body:has(canvas) .fontPreloader {
 	visibility: hidden;
+}
+
+#placeholder {
+	/* width: 500px; */
+	/* height: 500px; */
+	height: 100%;
+	aspect-ratio: 1 / 1;
 }
