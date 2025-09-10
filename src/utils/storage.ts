@@ -1,5 +1,5 @@
 import { storage } from "@neutralinojs/lib";
-import { isNeutralino } from "@/util/neu";
+import { isNeutralino } from "@/utils/neu";
 
 type AppStorage = {
   readonly length: number;

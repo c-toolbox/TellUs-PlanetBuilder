@@ -23,8 +23,8 @@ body {
 	position: relative;
 	margin: 0;
 	padding: 0;
-	background: #ddd;
-	color: black;
+	background: black;
+	color: white;
 }
 
 .fontPreloader {
