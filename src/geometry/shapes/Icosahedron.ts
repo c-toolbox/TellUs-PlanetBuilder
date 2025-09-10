@@ -12,7 +12,6 @@ export class TruncatedIcosahedron extends BaseSolid {
 	constructor() {
 		super();
 
-		// Test
 		this.vertices = this.generateVerticesAndEdges();
 
 		//
