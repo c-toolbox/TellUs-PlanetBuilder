@@ -4,46 +4,54 @@ import { createNoise3D } from "simplex-noise";
 
 import circle from "@/assets/circle.png";
 
-// import tileBeach from "@/assets/tile_beach.png";
-// import tileDesert from "@/assets/tile_desert.png";
-// import tileForest from "@/assets/tile_forest.png";
-// import tileMountain from "@/assets/tile_mountain.png";
-// import tileOcean from "@/assets/tile_ocean.png";
-// import tileRainforest from "@/assets/tile_rainforest.png";
-// import tileSea from "@/assets/tile_sea.png";
-// import tileSnow from "@/assets/tile_snow.png";
+import tileBeach from "@/assets/tile_beach.png";
+import tileDesert from "@/assets/tile_desert.png";
+import tileForest from "@/assets/tile_forest.png";
+import tileMountain from "@/assets/tile_mountain.png";
+import tileOcean from "@/assets/tile_ocean.png";
+import tileRainforest from "@/assets/tile_rainforest.png";
+import tileSnow from "@/assets/tile_snow.png";
+import tileSea from "@/assets/tile_sea.png";
 // import tileWheat from "@/assets/tile_wheat.png";
 // import arrow from "@/assets/arrow1.png";
-import tileForest from "@/assets/ai_forest.png";
-import tileOcean from "@/assets/ai_ocean.png";
+
+// import tileDesert from "@/assets/ai_desert.png";
+// import tileForest from "@/assets/ai_forest.png";
+// import tileRainforest from "@/assets/ai_spruce.png";
+// import tileOcean from "@/assets/ai_ocean.png";
+// import tileSnow from "@/assets/ai_snow.png";
+// import tileMountain from "@/assets/ai_mountain.jpg";
+
+import fish from "@/assets/fish.png";
 
 const tiles = [
-	tileForest,
-	tileOcean,
-	// arrow,
-	// tileBeach,
-	// tileDesert,
 	// tileForest,
-	// tileMountain,
 	// tileOcean,
-	// tileRainforest,
-	// tileSea,
-	// tileSnow,
+	// arrow,
+
+	tileSnow,
+	tileOcean,
+	tileSea,
+	tileBeach,
+	tileForest,
+	tileRainforest,
+	tileMountain,
+	tileDesert,
+
 	// tileWheat,
 ];
 
-const VERTEX_RADIUS = 0.01;
-const VERTEX_COLOR = 0xff0000;
-const VERTEX_OFFSET = -0.005;
+const VERTEX_SIZE = 0.01;
+const VERTEX_COLOR = 0x000000;
+const VERTEX_DISTANCE = 1.0;
 
-const EDGE_RADIUS = 0.005;
-const EDGE_COLOR = 0xffff00;
-const EDGE_OFFSET = 0.0;
+const EDGE_SIZE = 0.003;
+const EDGE_COLOR = 0x000000;
+const EDGE_DISTANCE = 1.25;
 
-const FACE_COLOR = 0xffffff;
-const FACE_OFFSET = 1.0;
+const FACE_DISTANCE = 1.5;
 
-const TEXTURE_SCALE = 1.0;
+const TEXTURE_SCALE = 0.7;
 
 export class Polyhedra {
 	private vertices: THREE.Vector3[];
@@ -53,6 +61,7 @@ export class Polyhedra {
 	public vertexGroup: THREE.Group;
 	public edgeGroup: THREE.Group;
 	public faceGroup: THREE.Group;
+	public animalGroup: THREE.Group;
 
 	constructor({
 		vertices,
@@ -70,37 +79,33 @@ export class Polyhedra {
 		this.vertexGroup = new THREE.Group();
 		this.edgeGroup = new THREE.Group();
 		this.faceGroup = new THREE.Group();
+		this.animalGroup = new THREE.Group();
 
 		this.initVertices();
 		this.initEdges();
 		this.initFaces();
+		this.initAnimals();
 	}
 
 	// Create a sphere on every vertex
 	initVertices() {
 		const textureLoader = new THREE.TextureLoader();
-		const circleTexture = textureLoader.load(circle); // your drawn circle texture
+		const circleTexture = textureLoader.load(circle);
 
 		const material = new THREE.SpriteMaterial({
 			map: circleTexture,
 			color: VERTEX_COLOR,
-			transparent: true,
-			// depthWrite: false,
+			premultipliedAlpha: true,
 		});
 
 		for (const vertex of this.vertices) {
 			const sprite = new THREE.Sprite(material);
 
-			// offset so the billboard is pushed away from the vertex
-			const offsetDir = vertex
-				.clone()
-				.normalize()
-				.multiplyScalar(VERTEX_OFFSET * 10);
+			sprite.scale.setScalar(VERTEX_SIZE * 1.0);
 
-			sprite.position.copy(vertex).add(offsetDir);
-
-			// scale the sprite so it looks like the sphere would
-			sprite.scale.setScalar(VERTEX_RADIUS * 2);
+			sprite.position.copy(vertex);
+			sprite.position.setLength(VERTEX_DISTANCE);
+			sprite.scale.multiplyScalar(VERTEX_DISTANCE);
 
 			this.vertexGroup.add(sprite);
 		}
@@ -112,8 +117,8 @@ export class Polyhedra {
 			const vector = new THREE.Vector3().subVectors(b, a);
 			const length = vector.length();
 			const geometry = new THREE.CylinderGeometry(
-				EDGE_RADIUS,
-				EDGE_RADIUS,
+				EDGE_SIZE / 2,
+				EDGE_SIZE / 2,
 				length,
 				4
 			);
@@ -122,8 +127,9 @@ export class Polyhedra {
 
 			const mid = new THREE.Vector3().addVectors(a, b).multiplyScalar(0.5);
 
-			const offsetDir = mid.clone().normalize().multiplyScalar(EDGE_OFFSET);
-			mesh.position.copy(mid).add(offsetDir);
+			mesh.position.copy(mid);
+			mesh.position.setLength(EDGE_DISTANCE);
+			mesh.scale.multiplyScalar(EDGE_DISTANCE);
 
 			mesh.quaternion.setFromUnitVectors(
 				new THREE.Vector3(0, 1, 0),
@@ -141,6 +147,18 @@ export class Polyhedra {
 
 	// Create textured polygons for every face
 	initFaces() {
+		function getTile(temperature: number, height: number) {
+			if (temperature < 0.25) return tileSnow;
+			if (height < 0.01) return tileOcean;
+			// if (height < 0.4) return tileSea;
+			// if (height < 0.4) return tileBeach;
+			if (temperature < 0.5) return tileMountain;
+			if (height < 0.6) return tileRainforest;
+			if (temperature < 0.5) return tileRainforest;
+			if (temperature < 0.95) return tileForest;
+			return tileDesert;
+		}
+
 		const worldUp = new THREE.Vector3(0, 1, 0);
 
 		const tileTextures: { [key: string]: THREE.Texture } = {};
@@ -152,32 +170,63 @@ export class Polyhedra {
 		});
 
 		const noise3D = createNoise3D();
+		let heights: number[] = [];
+		let temperatures: number[] = [];
 
 		for (const face of this.faces) {
 			const faceVerts = face.map((i) => this.vertices[i]);
 
-			const tile = tiles[Math.floor(Math.random() * tiles.length)];
-
 			const material = new THREE.MeshBasicMaterial({
-				map: tileTextures[tile],
-				// color: 0xff0000,
+				// map: tileTextures[tile],
+				color: 0xffffff,
 				side: THREE.DoubleSide,
 				transparent: true,
-				opacity: 1,
+				opacity: 1.0,
 			});
 
 			const mesh = this.createMesh(faceVerts, material);
 
-			// const c = new THREE.Vector3();
-			// mesh.geometry.computeBoundingBox();
-			// mesh.geometry.boundingBox!.getCenter(c);
-			// c.normalize();
-			// const value = 0.5 + 0.5 * noise3D(c.x, c.y, c.z);
-			// const color = new THREE.Color(value, value, value);
-			// material.color = color;
+			const c = new THREE.Vector3();
+			mesh.geometry.computeBoundingBox();
+			mesh.geometry.boundingBox!.getCenter(c);
+			c.normalize();
+
+			const pitch =
+				(2 * Math.atan2(c.y, Math.sqrt(c.x * c.x + c.z * c.z))) / Math.PI;
+			const n = noise3D(3 * c.x + 3.33, 3 * c.y + 3.33, 3 * c.z + 3.33);
+			const temperature = 1 - Math.abs(pitch) + 0.1 * n;
+			// material.color.setHex(0x0000ff);
+			// material.color.lerp(new THREE.Color(0xff0000), temperature);
+
+			const k1 = 0.8;
+			const k2 = 4.0;
+			let height =
+				0.8 * noise3D(k1 * c.x, k1 * c.y, k1 * c.z) +
+				0.2 * noise3D(k2 * c.x+2.22, k2 * c.y+2.22, k2 * c.z+2.22);
+			// height = 2 * (height - 0.8 + 0.6 * temperature);
+
+			temperatures.push(temperature);
+			heights.push(height);
+
+			// const noise = temperature;
+			// material.map = tileTextures[tiles[Math.floor(noise * tiles.length)]];
+
+			const tile = getTile(temperature, height);
+			material.map = tileTextures[tile];
 
 			this.faceGroup.add(mesh);
 		}
+
+		console.log(
+			`Temperature: ${Math.min(...temperatures).toFixed(2)} -> ${Math.max(
+				...temperatures
+			).toFixed(2)}`
+		);
+		console.log(
+			`Height: ${Math.min(...heights).toFixed(2)} -> ${Math.max(
+				...heights
+			).toFixed(2)}`
+		);
 	}
 
 	createMesh(vertices: THREE.Vector3[], material: THREE.Material): THREE.Mesh {
@@ -292,8 +341,46 @@ export class Polyhedra {
 
 		// Step 7: Create mesh
 		const mesh = new THREE.Mesh(geometry, material);
-		mesh.position.add(normal.clone().negate().multiplyScalar(FACE_OFFSET));
+		// mesh.position.copy(normal);
+		mesh.position.setLength(FACE_DISTANCE);
+		mesh.scale.multiplyScalar(FACE_DISTANCE);
+		// mesh.position.add(normal.clone().negate().multiplyScalar(FACE_OFFSET));
 
 		return mesh;
+	}
+
+	// Create animal sprites
+	initAnimals() {
+		const textureLoader = new THREE.TextureLoader();
+		const animalTexture = textureLoader.load(fish);
+
+		const points: THREE.Vector3[] = [];
+		for (let i = 0; i < 100; i++) {
+			points.push(
+				new THREE.Vector3(
+					1 - 2 * Math.random(),
+					1 - 2 * Math.random(),
+					1 - 2 * Math.random()
+				).normalize()
+			);
+		}
+
+		for (const vertex of points) {
+			const material = new THREE.SpriteMaterial({
+				map: animalTexture,
+				color: Math.random() * 0xffffff,
+				premultipliedAlpha: true,
+			});
+
+			const sprite = new THREE.Sprite(material);
+
+			sprite.scale.setScalar(0.1);
+
+			sprite.position.copy(vertex);
+			sprite.position.setLength(0.8 * VERTEX_DISTANCE);
+			sprite.scale.multiplyScalar(0.8 * VERTEX_DISTANCE);
+
+			this.animalGroup.add(sprite);
+		}
 	}
 }

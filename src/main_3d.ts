@@ -5,7 +5,6 @@ import { Polyhedra } from "./geometry/Polyhedra";
 
 import model from "@/geometry/models/goldberg492.json";
 
-
 /* Setup */
 
 const placeholder = document.getElementById("placeholder");
@@ -29,12 +28,12 @@ const projectionScene = new ProjectionScene();
 
 const mySolid = new Polyhedra(model);
 worldScene.add(mySolid.vertexGroup);
-worldScene.add(mySolid.edgeGroup);
-// worldScene.add(mySolid.faceGroup);
+// worldScene.add(mySolid.edgeGroup);
+worldScene.add(mySolid.faceGroup);
+worldScene.add(mySolid.animalGroup);
 
 const clickableObjects: THREE.Object3D[] = [];
 mySolid.faceGroup.children.forEach((c) => clickableObjects.push(c));
-
 
 //
 // Drag to rotate camera orientation (keeps camera at origin)
@@ -43,7 +42,8 @@ let isDragging = false,
 	lastX = 0,
 	lastY = 0,
 	yaw = Math.PI / 2,
-	pitch = -Math.PI / 2;
+	pitch = -Math.PI / 2,
+	zoom = 1.9;
 const ROT_SPEED = 0.005;
 
 renderer.domElement.addEventListener("pointerdown", (e: PointerEvent) => {
@@ -62,10 +62,13 @@ renderer.domElement.addEventListener("pointermove", (e: PointerEvent) => {
 		dy = e.clientY - lastY;
 	lastX = e.clientX;
 	lastY = e.clientY;
-	yaw -= dx * ROT_SPEED;
-	pitch -= dy * ROT_SPEED;
+	yaw += dx * ROT_SPEED;
+	pitch += dy * ROT_SPEED;
 	const maxPitch = Math.PI / 2 - 0.001;
 	pitch = Math.max(-maxPitch, Math.min(maxPitch, pitch));
+});
+renderer.domElement.addEventListener("wheel", (e: WheelEvent) => {
+	zoom = Math.max(zoom + e.deltaY / 2000, 0.001);
 });
 
 window.addEventListener("resize", () => {
@@ -77,7 +80,7 @@ window.addEventListener("resize", () => {
 });
 
 // Toggle debug
-let debugMode = true;
+let debugMode = false;
 window.addEventListener("keydown", (e) => {
 	if (e.key === " ") {
 		debugMode = !debugMode;
@@ -101,10 +104,9 @@ function animate() {
 	qTmp.copy(qYaw).multiply(qPitch);
 	worldScene.camera.quaternion.copy(qTmp);
 
-	const radius = 1.9;
-	worldScene.debugCamera.position.x = radius * Math.cos(yaw) * Math.cos(pitch);
-	worldScene.debugCamera.position.y = radius * Math.sin(pitch);
-	worldScene.debugCamera.position.z = radius * Math.sin(yaw) * Math.cos(pitch);
+	worldScene.debugCamera.position.x = zoom * Math.cos(yaw) * Math.cos(pitch);
+	worldScene.debugCamera.position.y = zoom * Math.sin(pitch);
+	worldScene.debugCamera.position.z = zoom * Math.sin(yaw) * Math.cos(pitch);
 	worldScene.debugCamera.lookAt(new THREE.Vector3(0, 0, 0));
 
 	if (debugMode) {

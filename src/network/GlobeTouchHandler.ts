@@ -6,7 +6,7 @@ import { TouchId } from "@/network/tuioProtocol";
 import circleTexture from "@/assets/circle.png";
 
 const ORIGIN = new THREE.Vector3(0, 0, 0);
-const TOUCH_RADIUS = 0.1;
+const TOUCH_RADIUS = 0.05;
 
 export class GlobeTouchHandler extends EventEmitter {
 	public touchGroup: THREE.Group;
@@ -47,20 +47,26 @@ export class GlobeTouchHandler extends EventEmitter {
 			const direction = this.dirFromPitchYaw(pitch, yaw);
 			this.handleRayFromPitchYaw(direction);
 		});
+
+		let points: [number, number][] = [];
+		for (let i = 0; i < 36; i++) {
+			points.push([(i / 36) * 2 * Math.PI, 0]);
+			points.push([(i / 36) * 2 * Math.PI, Math.PI / 2]);
+			points.push([0, (i / 36) * 2 * Math.PI]);
+		}
+		points.forEach(([p, y], i) => {
+			// this.addTouch(i);
+			// this.updateTouch(i, p, y);
+		});
 	}
 
 	addTouch(id: TouchId) {
-		// const touchSphereGeometry = new THREE.SphereGeometry(0.1, 12, 10);
-		// const touchSphereMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-		// const sphere = new THREE.Mesh(touchSphereGeometry, touchSphereMat.clone());
-		// this.touchMap.set(id, sphere);
-		// this.emit("add", sphere);
-
-		const object = new THREE.Sprite(this.touchMaterial);
+		const mat = this.touchMaterial.clone();
+		mat.color = new THREE.Color(Math.random() * 0xffffff);
+		const object = new THREE.Sprite(mat);
 		object.scale.setScalar(TOUCH_RADIUS);
 		this.touchGroup.add(object);
 		this.touchMap.set(id, object);
-		// this.emit("add", object);
 	}
 
 	updateTouch(id: TouchId, pitch: number, yaw: number) {
@@ -69,10 +75,8 @@ export class GlobeTouchHandler extends EventEmitter {
 
 		// Convert pitch/yaw to direction
 		const dir = this.dirFromPitchYaw(pitch, yaw);
-		const desiredRadius = 2;
-		object.position.copy(dir).multiplyScalar(desiredRadius / 2); // place on polyhedron radius
-
-		console.log("Move", id, object.position);
+		const radius = 0.9;
+		object.position.copy(dir).multiplyScalar(radius); // place on polyhedron radius
 
 		// const direction = dirFromPitchYaw(pitch, yaw);
 		// handleRayFromPitchYaw(direction);
@@ -84,7 +88,6 @@ export class GlobeTouchHandler extends EventEmitter {
 
 		this.touchMap.delete(id);
 		this.touchGroup.remove(object);
-		// this.emit("remove", object);
 	}
 
 	dirFromPitchYaw(pitch: number, yaw: number): THREE.Vector3 {
