@@ -1,3 +1,4 @@
+import * as THREE from "three";
 import { Color } from "./colors";
 
 /**
@@ -66,4 +67,18 @@ export function getNextColor() {
 	const color = colorCycle[currentColorIndex % colorCycle.length];
 	currentColorIndex++;
 	return color;
+}
+
+// Returns the center of a mesh
+export function getCenterOfMesh(mesh: THREE.Mesh) {
+	const c = new THREE.Vector3();
+	mesh.geometry.computeBoundingBox();
+	mesh.geometry.boundingBox!.getCenter(c);
+	return c;
+}
+
+// Returns the pitch of a vector
+export function getPitchFromVector(vector: THREE.Vector3): number {
+	const { x, y, z } = vector.clone().normalize();
+	return (2 * Math.atan2(y, Math.sqrt(x * x + z * z)));
 }

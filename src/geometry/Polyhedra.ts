@@ -1,57 +1,24 @@
 import * as THREE from "three";
 import earcut from "earcut";
-import { createNoise3D } from "simplex-noise";
 
 import circle from "@/assets/circle.png";
-
-import tileBeach from "@/assets/tile_beach.png";
-import tileDesert from "@/assets/tile_desert.png";
-import tileForest from "@/assets/tile_forest.png";
-import tileMountain from "@/assets/tile_mountain.png";
-import tileOcean from "@/assets/tile_ocean.png";
-import tileRainforest from "@/assets/tile_rainforest.png";
-import tileSnow from "@/assets/tile_snow.png";
-import tileSea from "@/assets/tile_sea.png";
-// import tileWheat from "@/assets/tile_wheat.png";
-// import arrow from "@/assets/arrow1.png";
-
-// import tileDesert from "@/assets/ai_desert.png";
-// import tileForest from "@/assets/ai_forest.png";
-// import tileRainforest from "@/assets/ai_spruce.png";
-// import tileOcean from "@/assets/ai_ocean.png";
-// import tileSnow from "@/assets/ai_snow.png";
-// import tileMountain from "@/assets/ai_mountain.jpg";
-
 import fish from "@/assets/fish.png";
+import { getCenterOfMesh, getPitchFromVector } from "@/utils/functions";
+import { Tile, tileManager } from "./TileMap";
 
-const tiles = [
-	// tileForest,
-	// tileOcean,
-	// arrow,
-
-	tileSnow,
-	tileOcean,
-	tileSea,
-	tileBeach,
-	tileForest,
-	tileRainforest,
-	tileMountain,
-	tileDesert,
-
-	// tileWheat,
-];
-
-const VERTEX_SIZE = 0.01;
-const VERTEX_COLOR = 0x000000;
-const VERTEX_DISTANCE = 1.0;
-
-const EDGE_SIZE = 0.003;
-const EDGE_COLOR = 0x000000;
-const EDGE_DISTANCE = 1.25;
-
-const FACE_DISTANCE = 1.5;
-
-const TEXTURE_SCALE = 0.7;
+import {
+	VERTEX_SIZE,
+	VERTEX_COLOR,
+	VERTEX_DISTANCE,
+	EDGE_SIZE,
+	EDGE_COLOR,
+	EDGE_DISTANCE,
+	FACE_DISTANCE,
+	TEXTURE_SCALE,
+	DOUBLE_SIDE,
+	FACE_OPACITY,
+} from "@/constants";
+import { TileMesh } from "./TileMesh";
 
 export class Polyhedra {
 	private vertices: THREE.Vector3[];
@@ -91,145 +58,125 @@ export class Polyhedra {
 	initVertices() {
 		const textureLoader = new THREE.TextureLoader();
 		const circleTexture = textureLoader.load(circle);
-
-		const material = new THREE.SpriteMaterial({
+		const material = new THREE.MeshBasicMaterial({
 			map: circleTexture,
 			color: VERTEX_COLOR,
+			transparent: true,
 			premultipliedAlpha: true,
+			depthWrite: false, // keeps edges from z-fighting
+			side: DOUBLE_SIDE ? THREE.DoubleSide : THREE.FrontSide,
 		});
 
+		const geometry = new THREE.PlaneGeometry(1, 1);
+
 		for (const vertex of this.vertices) {
-			const sprite = new THREE.Sprite(material);
+			const mesh = new THREE.Mesh(geometry, material);
 
-			sprite.scale.setScalar(VERTEX_SIZE * 1.0);
+			// Position on sphere
+			const pos = vertex.clone().setLength(VERTEX_DISTANCE);
+			mesh.position.copy(pos);
 
-			sprite.position.copy(vertex);
-			sprite.position.setLength(VERTEX_DISTANCE);
-			sprite.scale.multiplyScalar(VERTEX_DISTANCE);
+			// Make it face origin
+			mesh.lookAt(new THREE.Vector3(0, 0, 0));
 
-			this.vertexGroup.add(sprite);
+			// Scale with distance so angular size is constant
+			mesh.scale.setScalar(VERTEX_SIZE * VERTEX_DISTANCE);
+
+			this.vertexGroup.add(mesh);
 		}
 	}
 
 	// Create a cylinder on every edge
+	// Create billboarded quads for edges (always face the origin)
 	initEdges() {
-		function createEdgeCylinder(a: THREE.Vector3, b: THREE.Vector3) {
-			const vector = new THREE.Vector3().subVectors(b, a);
-			const length = vector.length();
-			const geometry = new THREE.CylinderGeometry(
-				EDGE_SIZE / 2,
-				EDGE_SIZE / 2,
-				length,
-				4
+		const material = new THREE.MeshBasicMaterial({
+			color: EDGE_COLOR,
+			depthWrite: true,
+			side: DOUBLE_SIDE ? THREE.DoubleSide : THREE.FrontSide,
+		});
+
+		const quad = new THREE.PlaneGeometry(1, 1);
+		const instanced = new THREE.InstancedMesh(
+			quad,
+			material,
+			this.edges.length
+		);
+
+		const tmp = new THREE.Object3D();
+
+		for (let i = 0; i < this.edges.length; i++) {
+			const [ia, ib] = this.edges[i];
+
+			// Place endpoints on the sphere of radius EDGE_DISTANCE
+			const a = this.vertices[ia].clone().setLength(EDGE_DISTANCE);
+			const b = this.vertices[ib].clone().setLength(EDGE_DISTANCE);
+
+			// Midpoint in world space
+			const mid = a.clone().add(b).multiplyScalar(0.5);
+
+			// Vector along the edge
+			const edgeDir = b.clone().sub(a);
+			const length = edgeDir.length();
+			if (length === 0) continue;
+
+			// Radial direction (outward from origin)
+			const radial = mid.clone().normalize();
+
+			// Project edge direction into tangent plane at midpoint
+			let tangent = edgeDir.clone().projectOnPlane(radial);
+			if (tangent.lengthSq() < 1e-10) {
+				// Fallback if edge is nearly radial
+				tangent = new THREE.Vector3(1, 0, 0).projectOnPlane(radial);
+				if (tangent.lengthSq() < 1e-10) {
+					tangent = new THREE.Vector3(0, 1, 0).projectOnPlane(radial);
+				}
+			}
+			tangent.normalize();
+
+			// Construct an orthonormal basis:
+			const x = tangent;
+			const z = radial.clone().negate();
+			const y = new THREE.Vector3().crossVectors(z, x).normalize();
+
+			// Fix x = y × z to ensure orthogonality
+			x.copy(new THREE.Vector3().crossVectors(y, z).normalize());
+
+			// Apply transform to temp object
+			tmp.position.copy(mid);
+			tmp.quaternion.setFromRotationMatrix(
+				new THREE.Matrix4().makeBasis(x, y, z)
 			);
-			const material = new THREE.MeshBasicMaterial({ color: EDGE_COLOR });
-			const mesh = new THREE.Mesh(geometry, material);
 
-			const mid = new THREE.Vector3().addVectors(a, b).multiplyScalar(0.5);
+			// Scale: width = edge length, height = angular thickness
+			const thickness = EDGE_SIZE * EDGE_DISTANCE;
+			tmp.scale.set(length, thickness, 1);
 
-			mesh.position.copy(mid);
-			mesh.position.setLength(EDGE_DISTANCE);
-			mesh.scale.multiplyScalar(EDGE_DISTANCE);
-
-			mesh.quaternion.setFromUnitVectors(
-				new THREE.Vector3(0, 1, 0),
-				vector.clone().normalize()
-			);
-
-			return mesh;
+			tmp.updateMatrix();
+			instanced.setMatrixAt(i, tmp.matrix);
 		}
 
-		for (const [ia, ib] of this.edges) {
-			const cylinder = createEdgeCylinder(this.vertices[ia], this.vertices[ib]);
-			this.edgeGroup.add(cylinder);
-		}
+		instanced.instanceMatrix.needsUpdate = true;
+		this.edgeGroup.add(instanced);
 	}
 
 	// Create textured polygons for every face
 	initFaces() {
-		function getTile(temperature: number, height: number) {
-			if (temperature < 0.25) return tileSnow;
-			if (height < 0.01) return tileOcean;
-			// if (height < 0.4) return tileSea;
-			// if (height < 0.4) return tileBeach;
-			if (temperature < 0.5) return tileMountain;
-			if (height < 0.6) return tileRainforest;
-			if (temperature < 0.5) return tileRainforest;
-			if (temperature < 0.95) return tileForest;
-			return tileDesert;
-		}
-
 		const worldUp = new THREE.Vector3(0, 1, 0);
 
-		const tileTextures: { [key: string]: THREE.Texture } = {};
-		tiles.forEach((tile) => {
-			const texture = new THREE.TextureLoader().load(tile);
-			texture.wrapS = THREE.ClampToEdgeWrapping;
-			texture.wrapT = THREE.ClampToEdgeWrapping;
-			tileTextures[tile] = texture;
-		});
-
-		const noise3D = createNoise3D();
-		let heights: number[] = [];
-		let temperatures: number[] = [];
-
 		for (const face of this.faces) {
-			const faceVerts = face.map((i) => this.vertices[i]);
+			const vertices = face.map((i) => this.vertices[i]);
 
-			const material = new THREE.MeshBasicMaterial({
-				// map: tileTextures[tile],
-				color: 0xffffff,
-				side: THREE.DoubleSide,
-				transparent: true,
-				opacity: 1.0,
-			});
+			const mesh = this.createMesh(vertices);
 
-			const mesh = this.createMesh(faceVerts, material);
-
-			const c = new THREE.Vector3();
-			mesh.geometry.computeBoundingBox();
-			mesh.geometry.boundingBox!.getCenter(c);
-			c.normalize();
-
-			const pitch =
-				(2 * Math.atan2(c.y, Math.sqrt(c.x * c.x + c.z * c.z))) / Math.PI;
-			const n = noise3D(3 * c.x + 3.33, 3 * c.y + 3.33, 3 * c.z + 3.33);
-			const temperature = 1 - Math.abs(pitch) + 0.1 * n;
-			// material.color.setHex(0x0000ff);
-			// material.color.lerp(new THREE.Color(0xff0000), temperature);
-
-			const k1 = 0.8;
-			const k2 = 4.0;
-			let height =
-				0.8 * noise3D(k1 * c.x, k1 * c.y, k1 * c.z) +
-				0.2 * noise3D(k2 * c.x+2.22, k2 * c.y+2.22, k2 * c.z+2.22);
-			// height = 2 * (height - 0.8 + 0.6 * temperature);
-
-			temperatures.push(temperature);
-			heights.push(height);
-
-			// const noise = temperature;
-			// material.map = tileTextures[tiles[Math.floor(noise * tiles.length)]];
-
-			const tile = getTile(temperature, height);
-			material.map = tileTextures[tile];
+			const center = getCenterOfMesh(mesh);
+			const tile = tileManager.getTileAt(center);
+			mesh.setTile(tile);
 
 			this.faceGroup.add(mesh);
 		}
-
-		console.log(
-			`Temperature: ${Math.min(...temperatures).toFixed(2)} -> ${Math.max(
-				...temperatures
-			).toFixed(2)}`
-		);
-		console.log(
-			`Height: ${Math.min(...heights).toFixed(2)} -> ${Math.max(
-				...heights
-			).toFixed(2)}`
-		);
 	}
 
-	createMesh(vertices: THREE.Vector3[], material: THREE.Material): THREE.Mesh {
+	createMesh(vertices: THREE.Vector3[]): TileMesh {
 		if (vertices.length < 3)
 			throw new Error("At least 3 vertices are required.");
 
@@ -340,11 +287,14 @@ export class Polyhedra {
 		geometry.computeVertexNormals();
 
 		// Step 7: Create mesh
-		const mesh = new THREE.Mesh(geometry, material);
-		// mesh.position.copy(normal);
+		const material = new THREE.MeshBasicMaterial({
+			transparent: true,
+			opacity: FACE_OPACITY,
+			side: DOUBLE_SIDE ? THREE.DoubleSide : THREE.FrontSide,
+		});
+		const mesh = new TileMesh(geometry, material);
 		mesh.position.setLength(FACE_DISTANCE);
 		mesh.scale.multiplyScalar(FACE_DISTANCE);
-		// mesh.position.add(normal.clone().negate().multiplyScalar(FACE_OFFSET));
 
 		return mesh;
 	}

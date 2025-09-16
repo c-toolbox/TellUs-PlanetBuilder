@@ -3,7 +3,44 @@ import { ProjectionScene } from "./scenes/ProjectionScene";
 import { WorldScene } from "./scenes/WorldScene";
 import { Polyhedra } from "./geometry/Polyhedra";
 
+// https://en.wikipedia.org/wiki/List_of_geodesic_polyhedra_and_Goldberg_polyhedra
+
+// import model from "@/geometry/models/geodesic20.json"
+// import model from "@/geometry/models/geodesic60.json"
+// import model from "@/geometry/models/geodesic80.json"
+// import model from "@/geometry/models/geodesic140.json"
+// import model from "@/geometry/models/geodesic180.json"
+// import model from "@/geometry/models/geodesic240.json"
+// import model from "@/geometry/models/geodesic320.json"
+// import model from "@/geometry/models/geodesic420.json"
+// import model from "@/geometry/models/geodesic500.json"
+// import model from "@/geometry/models/geodesic540.json"
+
+// import model from "@/geometry/models/goldberg12.json"
+// import model from "@/geometry/models/goldberg32.json"
+// import model from "@/geometry/models/goldberg42.json"
+// import model from "@/geometry/models/goldberg72.json"
+// import model from "@/geometry/models/goldberg92.json"
+// import model from "@/geometry/models/goldberg122.json"
+// import model from "@/geometry/models/goldberg162.json"
+// import model from "@/geometry/models/goldberg212.json"
+// import model from "@/geometry/models/goldberg252.json"
+// import model from "@/geometry/models/goldberg272.json"
+// import model from "@/geometry/models/goldberg282.json"
+// import model from "@/geometry/models/goldberg363.json"
+// import model from "@/geometry/models/goldberg482.json"
 import model from "@/geometry/models/goldberg492.json";
+// import model from "@/geometry/models/goldberg1002.json"
+
+// import model from "@/geometry/models/octahedral56.json"
+// import model from "@/geometry/models/tetrahedral28.json"
+
+import {
+	SHOW_ANIMALS,
+	SHOW_EDGES,
+	SHOW_FACES,
+	SHOW_VERTICES,
+} from "./constants";
 
 /* Setup */
 
@@ -26,14 +63,13 @@ placeholder.appendChild(renderer.domElement);
 const worldScene = new WorldScene();
 const projectionScene = new ProjectionScene();
 
-const mySolid = new Polyhedra(model);
-worldScene.add(mySolid.vertexGroup);
-// worldScene.add(mySolid.edgeGroup);
-worldScene.add(mySolid.faceGroup);
-worldScene.add(mySolid.animalGroup);
+const globe = new Polyhedra(model);
+if (SHOW_VERTICES) worldScene.add(globe.vertexGroup);
+if (SHOW_EDGES) worldScene.add(globe.edgeGroup);
+if (SHOW_FACES) worldScene.add(globe.faceGroup);
+if (SHOW_ANIMALS) worldScene.add(globe.animalGroup);
 
-const clickableObjects: THREE.Object3D[] = [];
-mySolid.faceGroup.children.forEach((c) => clickableObjects.push(c));
+worldScene.makeClickable(globe.faceGroup);
 
 //
 // Drag to rotate camera orientation (keeps camera at origin)
@@ -97,7 +133,7 @@ const qYaw = new THREE.Quaternion(),
 function animate() {
 	requestAnimationFrame(animate);
 
-	yaw += 0.002;
+	// yaw += 0.0005;
 
 	qYaw.setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
 	qPitch.setFromAxisAngle(new THREE.Vector3(1, 0, 0), pitch);

@@ -1,10 +1,18 @@
 import * as THREE from "three";
-
-import worldTexUrl from "@/assets/world_standard.jpg";
 import { GlobeTouchHandler } from "@/network/GlobeTouchHandler";
+
+import worldTexUrl from "@/assets/backgrounds/globe/black_and_white.jpeg";
+import { ORIGIN } from "@/constants";
+import { TileMesh } from "@/geometry/TileMesh";
+import { TouchId } from "@/network/tuioProtocol";
+import { Tile, tileManager } from "@/geometry/TileMap";
+// import worldTexUrl from "@/assets/backgrounds/globe/black_and_white.jpeg";
+// import worldTexUrl from "@/assets/backgrounds/numbers.jpeg";
 
 export class WorldScene extends THREE.Scene {
 	private touchHandler: GlobeTouchHandler;
+	private raycaster: THREE.Raycaster;
+	private clickable: THREE.Object3D[];
 
 	public camera: THREE.PerspectiveCamera;
 	public debugCamera: THREE.PerspectiveCamera;
@@ -35,19 +43,19 @@ export class WorldScene extends THREE.Scene {
 		this.add(dir);
 
 		// Fog
-		this.fog = new THREE.Fog(0x000000, 2, 3);
+		// this.fog = new THREE.Fog(0x000000, 2, 3);
 	}
 
 	private initGlobeTouchHandler() {
 		this.touchHandler = new GlobeTouchHandler();
 		this.add(this.touchHandler.touchGroup);
 
-		this.touchHandler.on("add", (object: THREE.Object3D) => {
-			this.add(object);
+		this.touchHandler.on("touch", (touchId: TouchId, vector: THREE.Vector3) => {
+			this.handleRaycast(touchId, vector);
 		});
-		this.touchHandler.on("delete", (object: THREE.Object3D) => {
-			this.remove(object);
-		});
+
+		this.raycaster = new THREE.Raycaster();
+		this.clickable = [];
 	}
 
 	private addBackground() {
@@ -63,5 +71,34 @@ export class WorldScene extends THREE.Scene {
 			const sphere = new THREE.Mesh(geometry, material);
 			this.add(sphere);
 		});
+	}
+
+	makeClickable(group: THREE.Group) {
+		group.children.forEach((mesh) => this.clickable.push(mesh));
+	}
+
+	private handleRaycast(touchId: TouchId, vector: THREE.Vector3) {
+		this.raycaster.set(ORIGIN, vector);
+
+		const touchPoint = this.touchHandler.getTouchPoint(touchId);
+		if (!touchPoint) return;
+
+		const intersects = this.raycaster.intersectObjects(this.clickable, true);
+		if (intersects.length > 0) {
+			const tileMesh = intersects[0].object as TileMesh;
+			if (tileMesh) {
+				if (touchPoint.tile == Tile.None) {
+					touchPoint.setTile(tileManager.getNextTile(tileMesh.tile));
+					console.log(
+						"touch has no tile, so set it to",
+						tileMesh.tile,
+						"->",
+						touchPoint.tile
+					);
+				}
+
+				tileMesh.setTile(touchPoint.tile);
+			}
+		}
 	}
 }
