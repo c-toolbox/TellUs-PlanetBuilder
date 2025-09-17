@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { Tile, tileManager } from "@/geometry/TileMap";
+import { Tile, tileManager } from "@/geometry/TileManager";
 
 export class TouchPoint extends THREE.Mesh {
 	public material: THREE.MeshBasicMaterial;

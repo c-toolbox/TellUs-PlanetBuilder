@@ -1,7 +1,12 @@
 import * as THREE from "three";
 import { createNoise3D, NoiseFunction3D } from "simplex-noise";
 import { getPitchFromVector } from "@/utils/functions";
-import { USE_AI_TEXTURES } from "@/constants";
+import {
+	DEFAULT_BIOME,
+	GENERATE_BIOMES,
+	SIMPLIFY_BIOMES,
+	USE_AI_TEXTURES,
+} from "@/constants";
 
 export enum Tile {
 	None = "",
@@ -27,13 +32,13 @@ import assetSea from "@/assets/colors/sea.png";
 import assetSnow from "@/assets/colors/snow.png";
 
 import assetAiBeach from "@/assets/ai/beach.png";
-import assetAiDesert from "@/assets/ai/desert.png";
-import assetAiForest from "@/assets/ai/forest.png";
+import assetAiDesert from "@/assets/ai/desert.jpg";
+import assetAiForest from "@/assets/ai/forest.jpg";
 import assetAiMountain from "@/assets/ai/mountain.jpg";
-import assetAiOcean from "@/assets/ai/ocean.png";
-import assetAiSpruce from "@/assets/ai/spruce.png";
+import assetAiOcean from "@/assets/ai/ocean.jpg";
+import assetAiSpruce from "@/assets/ai/spruce.jpg";
 import assetAiSea from "@/assets/ai/sea.png";
-import assetAiSnow from "@/assets/ai/snow.png";
+import assetAiSnow from "@/assets/ai/snow.jpg";
 
 const tileAssets = {
 	[Tile.None]: assetSquare,
@@ -78,23 +83,37 @@ class TileManager {
 
 	getTileAt(position: THREE.Vector3): Tile {
 		function get(temperature: number, height: number) {
-			// Water
-			if (temperature < -0.4) return Tile.Snow;
-			if (temperature < -0.1) return Tile.Ocean;
+			if (GENERATE_BIOMES) {
+				if (SIMPLIFY_BIOMES) {
+					if (temperature < -0.4) return Tile.Snow;
+					if (temperature < -0.0) return Tile.Ocean;
 
-			if (height < -0.3) return Tile.Ocean;
-			if (height < -0.1) return Tile.Sea;
+					if (height < -0.1) return Tile.Ocean;
 
-			if (height > 0.6) return Tile.Mountain;
-			if (height > 0.1 && height < 0.5 && temperature > 0.85)
-				return Tile.Desert;
+					if (height > 0.1 && temperature > 0.8) return Tile.Desert;
 
-			if (temperature < 0.4) return Tile.Spruce;
-			return Tile.Forest;
+					return Tile.Forest;
+				} else {
+					if (temperature < -0.4) return Tile.Snow;
+					if (temperature < -0.0) return Tile.Ocean;
+
+					if (height < -0.3) return Tile.Ocean;
+					if (height < -0.1) return Tile.Ocean; // Sea
+
+					if (height > 0.6) return Tile.Mountain;
+					if (height > 0.1 && height < 0.5 && temperature > 0.85)
+						return Tile.Desert;
+
+					if (temperature < 0.4) return Tile.Spruce;
+					return Tile.Forest;
+				}
+			}
+
+			return Tile[DEFAULT_BIOME];
 		}
 
 		const k1 = 2.0;
-		const k2 = 0.6;
+		const k2 = 0.8;
 		const k3 = 2.0;
 
 		const { x, y, z } = position;
@@ -110,24 +129,41 @@ class TileManager {
 	}
 
 	getNextTile(tile: Tile) {
-		switch (tile) {
-			case Tile.None:
-				return Tile.Snow;
-			case Tile.Snow:
-				return Tile.Ocean;
-			case Tile.Ocean:
-				return Tile.Sea;
-			case Tile.Sea:
-				return Tile.Spruce;
-			case Tile.Spruce:
-				return Tile.Forest;
-			case Tile.Forest:
-				return Tile.Desert;
-			case Tile.Desert:
-				return Tile.Snow;
+		if (SIMPLIFY_BIOMES) {
+			switch (tile) {
+				case Tile.None:
+				case Tile.Snow:
+					return Tile.Ocean;
+				case Tile.Ocean:
+					return Tile.Forest;
+				case Tile.Forest:
+					return Tile.Desert;
+				case Tile.Desert:
+					return Tile.Snow;
 
-			default:
-				return tile;
+				default:
+					return tile;
+			}
+		} else {
+			switch (tile) {
+				case Tile.None:
+					return Tile.Snow;
+				case Tile.Snow:
+					return Tile.Ocean;
+				case Tile.Ocean:
+					return Tile.Sea;
+				case Tile.Sea:
+					return Tile.Spruce;
+				case Tile.Spruce:
+					return Tile.Forest;
+				case Tile.Forest:
+					return Tile.Desert;
+				case Tile.Desert:
+					return Tile.Snow;
+
+				default:
+					return tile;
+			}
 		}
 	}
 }

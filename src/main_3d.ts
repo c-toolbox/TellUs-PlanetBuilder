@@ -22,21 +22,26 @@ import { Polyhedra } from "./geometry/Polyhedra";
 // import model from "@/geometry/models/goldberg72.json"
 // import model from "@/geometry/models/goldberg92.json"
 // import model from "@/geometry/models/goldberg122.json"
-// import model from "@/geometry/models/goldberg162.json"
+import model from "@/geometry/models/goldberg162.json"
 // import model from "@/geometry/models/goldberg212.json"
 // import model from "@/geometry/models/goldberg252.json"
 // import model from "@/geometry/models/goldberg272.json"
 // import model from "@/geometry/models/goldberg282.json"
 // import model from "@/geometry/models/goldberg363.json"
 // import model from "@/geometry/models/goldberg482.json"
-import model from "@/geometry/models/goldberg492.json";
+// import model from "@/geometry/models/goldberg492.json";
 // import model from "@/geometry/models/goldberg1002.json"
+// import model from "@/geometry/models/goldberg1962.json"
+// import model from "@/geometry/models/goldberg2522.json"
+// import model from "@/geometry/models/goldberg4412.json"
+// import model from "@/geometry/models/goldberg5672.json"
+// import model from "@/geometry/models/goldberg7842.json"
+// import model from "@/geometry/models/goldberg10292.json"
 
 // import model from "@/geometry/models/octahedral56.json"
 // import model from "@/geometry/models/tetrahedral28.json"
 
 import {
-	SHOW_ANIMALS,
 	SHOW_EDGES,
 	SHOW_FACES,
 	SHOW_VERTICES,
@@ -67,7 +72,6 @@ const globe = new Polyhedra(model);
 if (SHOW_VERTICES) worldScene.add(globe.vertexGroup);
 if (SHOW_EDGES) worldScene.add(globe.edgeGroup);
 if (SHOW_FACES) worldScene.add(globe.faceGroup);
-if (SHOW_ANIMALS) worldScene.add(globe.animalGroup);
 
 worldScene.makeClickable(globe.faceGroup);
 
@@ -144,6 +148,8 @@ function animate() {
 	worldScene.debugCamera.position.y = zoom * Math.sin(pitch);
 	worldScene.debugCamera.position.z = zoom * Math.sin(yaw) * Math.cos(pitch);
 	worldScene.debugCamera.lookAt(new THREE.Vector3(0, 0, 0));
+
+	worldScene.update();
 
 	if (debugMode) {
 		// Just render the 3D world normally

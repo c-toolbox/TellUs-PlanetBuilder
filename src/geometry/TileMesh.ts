@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { Tile, tileManager } from "./TileMap";
+import { Tile, tileManager } from "./TileManager";
 
 export class TileMesh extends THREE.Mesh {
 	public material: THREE.MeshBasicMaterial;

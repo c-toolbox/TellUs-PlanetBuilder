@@ -2,9 +2,8 @@ import * as THREE from "three";
 import earcut from "earcut";
 
 import circle from "@/assets/circle.png";
-import fish from "@/assets/fish.png";
-import { getCenterOfMesh, getPitchFromVector } from "@/utils/functions";
-import { Tile, tileManager } from "./TileMap";
+import { getCenterOfMesh } from "@/utils/functions";
+import { tileManager } from "./TileManager";
 
 import {
 	VERTEX_SIZE,
@@ -28,7 +27,6 @@ export class Polyhedra {
 	public vertexGroup: THREE.Group;
 	public edgeGroup: THREE.Group;
 	public faceGroup: THREE.Group;
-	public animalGroup: THREE.Group;
 
 	constructor({
 		vertices,
@@ -46,12 +44,10 @@ export class Polyhedra {
 		this.vertexGroup = new THREE.Group();
 		this.edgeGroup = new THREE.Group();
 		this.faceGroup = new THREE.Group();
-		this.animalGroup = new THREE.Group();
 
 		this.initVertices();
 		this.initEdges();
 		this.initFaces();
-		this.initAnimals();
 	}
 
 	// Create a sphere on every vertex
@@ -297,40 +293,5 @@ export class Polyhedra {
 		mesh.scale.multiplyScalar(FACE_DISTANCE);
 
 		return mesh;
-	}
-
-	// Create animal sprites
-	initAnimals() {
-		const textureLoader = new THREE.TextureLoader();
-		const animalTexture = textureLoader.load(fish);
-
-		const points: THREE.Vector3[] = [];
-		for (let i = 0; i < 100; i++) {
-			points.push(
-				new THREE.Vector3(
-					1 - 2 * Math.random(),
-					1 - 2 * Math.random(),
-					1 - 2 * Math.random()
-				).normalize()
-			);
-		}
-
-		for (const vertex of points) {
-			const material = new THREE.SpriteMaterial({
-				map: animalTexture,
-				color: Math.random() * 0xffffff,
-				premultipliedAlpha: true,
-			});
-
-			const sprite = new THREE.Sprite(material);
-
-			sprite.scale.setScalar(0.1);
-
-			sprite.position.copy(vertex);
-			sprite.position.setLength(0.8 * VERTEX_DISTANCE);
-			sprite.scale.multiplyScalar(0.8 * VERTEX_DISTANCE);
-
-			this.animalGroup.add(sprite);
-		}
 	}
 }
