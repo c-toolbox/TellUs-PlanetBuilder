@@ -8,8 +8,6 @@ import preImageOptimizer from "./scripts/pre-image-optimizer";
 import neuBuild from "./scripts/neu-build";
 import neuInject from "./scripts/neu-inject";
 import bundleWinApp from "./scripts/win-bundle";
-import bundleMacApp from "./scripts/mac-bundle";
-import bundleLinuxApp from "./scripts/linux-bundle";
 import buildCleanup from "./scripts/build-cleanup";
 
 import { title, team, description, title_dashed } from "./scripts/constants";
@@ -32,22 +30,10 @@ export default () => {
       neuInject(),
       neuBuild(),
       bundleWinApp(),
-      bundleMacApp(),
-      bundleLinuxApp(),
-      zip({
-        inDir: "./dist/web",
-        outDir: "./dist",
-        outFileName: `${title_dashed}-web.zip`,
-      }),
       zip({
         inDir: `./dist/win`,
         outDir: "./dist",
         outFileName: `${title_dashed}-win.zip`,
-      }),
-      zip({
-        inDir: `./dist/linux`,
-        outDir: "./dist",
-        outFileName: `${title_dashed}-linux.zip`,
       }),
       buildCleanup(),
     ],
