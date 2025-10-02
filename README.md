@@ -1,6 +1,17 @@
 # Tellus Demo
 
-Work-in-progress web + desktop demo for the Tellus project. Uses Vite and Three.js for a 3D globe, Neutralino for desktop packaging, and a small Python TUIO→WebSocket proxy for touch input. Many features and models are experimental.
+<div style="display: flex; gap: 16px;">
+	<div>
+		<img src="./screenshots/demo_geodesic.jpg" alt="Geodesic Model" width="400">
+	</div>
+	<div>
+		<img src="./screenshots/demo_drawing.jpg" alt="Drawing Demo" width="400">
+	</div>
+</div>
+
+Tellus Demo is a work-in-progress web/desktop demo for the Tellus project. Many features and models are experimental.
+
+Contact: mans.gezelius@liu.se
 
 
 ## Installation
@@ -67,12 +78,18 @@ npm install
 npm run dev-neu
 ```
 
+Upon starting the application, minimize the debug console
+
 
 ---
 
-## Customize demo
+## Running the demo
 
-Once everything is up and running, you can modify the code live and tweak settings. Use any text-editor to open files in the project. If the application is running, any changes you make will appear immediately.
+Once everything is installed, you can run the demo and modify the code live to tweak settings. Use any text-editor and open files in the project. Any changes you make will appear immediately.
+
+- **Start the demo**: Open PowerShell in the demo folder and run `npm run dev-neu`
+- **Reset the demo**: Click the application and press F5
+- **Stop the demo**: Tab to PowerShell and press ctrl-C, or use alt-F4
 
 
 ### Switch between PlanetCreator and Drawing
