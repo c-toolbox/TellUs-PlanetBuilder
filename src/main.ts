@@ -1,4 +1,6 @@
 import "@/utils/neu";
 import "@/utils/storage";
 
-import './main_3d';
+import "./utils/proxy";
+
+import "./main_3d";

@@ -22,9 +22,9 @@ import { Polyhedra } from "./geometry/Polyhedra";
 // import model from "@/geometry/models/goldberg72.json"
 // import model from "@/geometry/models/goldberg92.json"
 // import model from "@/geometry/models/goldberg122.json"
-import model from "@/geometry/models/goldberg162.json"
+// import model from "@/geometry/models/goldberg162.json"
 // import model from "@/geometry/models/goldberg212.json"
-// import model from "@/geometry/models/goldberg252.json"
+import model from "@/geometry/models/goldberg252.json";
 // import model from "@/geometry/models/goldberg272.json"
 // import model from "@/geometry/models/goldberg282.json"
 // import model from "@/geometry/models/goldberg363.json"
@@ -40,12 +40,9 @@ import model from "@/geometry/models/goldberg162.json"
 
 // import model from "@/geometry/models/octahedral56.json"
 // import model from "@/geometry/models/tetrahedral28.json"
+// import model from "@/geometry/models/half_sphere_hexagon.json";
 
-import {
-	SHOW_EDGES,
-	SHOW_FACES,
-	SHOW_VERTICES,
-} from "./constants";
+import { SHOW_EDGES, SHOW_FACES, SHOW_VERTICES } from "./constants";
 
 /* Setup */
 
@@ -53,7 +50,7 @@ const placeholder = document.getElementById("placeholder");
 if (!placeholder) throw new Error("Placeholder div not found");
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(2.0);
+renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(
 	placeholder.clientWidth || window.innerWidth,
 	placeholder.clientHeight || window.innerHeight
@@ -134,10 +131,38 @@ window.addEventListener("keydown", (e) => {
 const qYaw = new THREE.Quaternion(),
 	qPitch = new THREE.Quaternion(),
 	qTmp = new THREE.Quaternion();
-function animate() {
+
+const FIXED_TIME_STEP = 1000 / 60; // 60 fps logic = ~16.67ms
+let last = performance.now();
+let accumulator = 0;
+
+function animate(now: number) {
 	requestAnimationFrame(animate);
 
+	let delta = now - last;
+	if (delta > 1000) delta = FIXED_TIME_STEP; // handle tab switch / pause
+	last = now;
+	accumulator += delta;
+
+	// Run updates in fixed steps
+	while (accumulator >= FIXED_TIME_STEP) {
+		update(FIXED_TIME_STEP / 1000); // pass seconds
+		accumulator -= FIXED_TIME_STEP;
+	}
+
+	// Render once per frame
+	render();
+}
+requestAnimationFrame(animate);
+
+function update(dt: number) {
+	// advance simulation with constant timestep
+	// e.g. camera motion, physics, animations
+
 	// yaw += 0.0005;
+}
+
+function render() {
 
 	qYaw.setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
 	qPitch.setFromAxisAngle(new THREE.Vector3(1, 0, 0), pitch);
@@ -152,10 +177,8 @@ function animate() {
 	worldScene.update();
 
 	if (debugMode) {
-		// Just render the 3D world normally
 		renderer.render(worldScene, worldScene.debugCamera);
 	} else {
-		// Original pipeline: cube render → quad shader
 		projectionScene.cubeCamera.position.set(0, 0, 0);
 		projectionScene.cubeCamera.quaternion.copy(worldScene.camera.quaternion);
 		projectionScene.cubeCamera.update(renderer, worldScene);
@@ -163,4 +186,3 @@ function animate() {
 		renderer.render(projectionScene, projectionScene.screenCamera);
 	}
 }
-animate();

@@ -22,9 +22,7 @@ export class TuioSocket extends EventEmitter {
 		this.socket.onclose = (event) => {
 			console.log("Socket Tuio closed");
 		};
-		this.socket.onerror = (event) => {
-			console.warn("Socket Tuio error", event);
-		};
+		this.socket.onerror = (event) => {};
 		this.socket.onmessage = (event) => {
 			this.onMessage(event.data);
 		};

@@ -155,12 +155,6 @@ export class WorldScene extends THREE.Scene {
 			if (tileMesh) {
 				if (touchPoint.tile == Tile.None) {
 					touchPoint.setTile(tileManager.getNextTile(tileMesh.tile));
-					console.log(
-						"touch has no tile, so set it to",
-						tileMesh.tile,
-						"->",
-						touchPoint.tile
-					);
 				}
 
 				tileMesh.setTile(touchPoint.tile);
