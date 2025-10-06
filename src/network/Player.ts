@@ -89,10 +89,10 @@ export class Player extends THREE.Mesh {
 		const spherical = new THREE.Spherical().setFromVector3(this.position);
 
 		// Adjust longitude (azimuthal angle) with x
-		spherical.theta -= this.velocity.x * 0.05; // tweak sensitivity as needed
+		spherical.theta += this.velocity.x * 0.01; // tweak sensitivity as needed
 
 		// Adjust latitude (polar angle) with y
-		spherical.phi -= this.velocity.y * 0.05; // tweak sensitivity as needed
+		spherical.phi -= this.velocity.y * 0.01; // tweak sensitivity as needed
 
 		// Clamp latitude so player never reaches poles (avoid gimbal lock)
 		const minPhi = Math.PI / 4;
