@@ -1,6 +1,7 @@
 // src/main.ts
 import * as THREE from "three";
 import { getNextColor } from "./utils/functions";
+import { PEN_SIZE } from "./constants";
 
 const placeholder = document.getElementById("placeholder");
 if (!placeholder) throw new Error("Placeholder div not found");
@@ -108,13 +109,13 @@ interface TouchState {
 	lastPosition: THREE.Vector3 | null;
 }
 const touchStates = new Map<number, TouchState>();
-const touchSphereGeo = new THREE.SphereGeometry(0.3, 12, 10);
+const touchSphereGeo = new THREE.SphereGeometry(PEN_SIZE, 12, 10);
 const touchSphereMat = new THREE.MeshBasicMaterial({
 	color: 0xffffff,
 	depthTest: false,
 	depthWrite: false,
 });
-const lineGeo = new THREE.CylinderGeometry(0.3, 0.3, 1, 8, 1);
+const lineGeo = new THREE.CylinderGeometry(PEN_SIZE, PEN_SIZE, 1, 8, 1);
 lineGeo.rotateX(Math.PI / 2); // Make cylinder align with Z axis
 const lineMeshes: THREE.Mesh[] = [];
 

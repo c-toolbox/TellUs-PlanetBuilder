@@ -6,7 +6,7 @@ export const ORIGIN = new THREE.Vector3(0, 0, 0);
 
 export const TOUCH_SIZE = 0.1;
 export const PLAYER_SIZE = 0.2;
-export const VERTEX_SIZE = 0.01;
+export const VERTEX_SIZE = 0.015;
 export const EDGE_SIZE = 0.004;
 
 export const TOUCH_DISTANCE = 0.8;
@@ -36,3 +36,7 @@ export const DOUBLE_SIDE = false;
 export const GENERATE_BIOMES = true;
 export const DEFAULT_BIOME = "Ocean";
 export const SIMPLIFY_BIOMES = false;
+
+/* Drawing */
+
+export const PEN_SIZE = 0.1;
