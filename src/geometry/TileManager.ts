@@ -159,6 +159,8 @@ class TileManager {
 				case Tile.Forest:
 					return Tile.Desert;
 				case Tile.Desert:
+					return Tile.Mountain;
+				case Tile.Mountain:
 					return Tile.Snow;
 
 				default:

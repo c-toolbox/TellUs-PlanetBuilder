@@ -40,3 +40,7 @@ export const SIMPLIFY_BIOMES = false;
 /* Drawing */
 
 export const PEN_SIZE = 0.1;
+
+/* Input */
+
+export const CLICK_DURATION = 250; // Milliseconds

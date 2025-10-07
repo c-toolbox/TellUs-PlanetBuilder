@@ -68,6 +68,11 @@ export class WorldScene extends THREE.Scene {
 
 		// Fog
 		// this.fog = new THREE.Fog(0x000000, 2, 3);
+
+		// Players
+		this.playerGroup = new THREE.Group();
+		this.add(this.playerGroup);
+		this.players = new Map<string, Player>();
 	}
 
 	private initGlobeTouchHandler() {
@@ -75,7 +80,10 @@ export class WorldScene extends THREE.Scene {
 		this.add(this.touchHandler.touchGroup);
 
 		this.touchHandler.on("touch", (touchId: TouchId, vector: THREE.Vector3) => {
-			this.handleRaycast(touchId, vector);
+			this.handleRaycast(touchId, vector, "touch");
+		});
+		this.touchHandler.on("click", (touchId: TouchId, vector: THREE.Vector3) => {
+			this.handleRaycast(touchId, vector, "click");
 		});
 
 		this.raycaster = new THREE.Raycaster();
@@ -116,12 +124,6 @@ export class WorldScene extends THREE.Scene {
 		});
 
 		this.omni.connect();
-
-		/* Players */
-
-		this.playerGroup = new THREE.Group();
-		this.add(this.playerGroup);
-		this.players = new Map<string, Player>();
 	}
 
 	private addBackground() {
@@ -143,7 +145,11 @@ export class WorldScene extends THREE.Scene {
 		group.children.forEach((mesh) => this.clickable.push(mesh));
 	}
 
-	private handleRaycast(touchId: TouchId, vector: THREE.Vector3) {
+	private handleRaycast(
+		touchId: TouchId,
+		vector: THREE.Vector3,
+		type: "touch" | "click"
+	) {
 		this.raycaster.set(ORIGIN, vector);
 
 		const touchPoint = this.touchHandler.getTouchPoint(touchId);
@@ -153,7 +159,9 @@ export class WorldScene extends THREE.Scene {
 		if (intersects.length > 0) {
 			const tileMesh = intersects[0].object as TileMesh;
 			if (tileMesh) {
-				if (touchPoint.tile == Tile.None) {
+				if (type == "touch" && touchPoint.tile == Tile.None) {
+					touchPoint.setTile(tileMesh.tile);
+				} else if (type == "click") {
 					touchPoint.setTile(tileManager.getNextTile(tileMesh.tile));
 				}
 

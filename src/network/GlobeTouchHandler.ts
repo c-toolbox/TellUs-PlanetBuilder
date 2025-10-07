@@ -41,9 +41,6 @@ export class GlobeTouchHandler extends EventEmitter {
 		});
 		tuioSocket.on("touchUpdate", (id: TouchId, pitch: number, yaw: number) => {
 			this.updateTouch(id, pitch, yaw);
-
-			const direction = this.dirFromPitchYaw(pitch, yaw);
-			this.emit("touch", id, direction);
 		});
 	}
 
@@ -53,7 +50,7 @@ export class GlobeTouchHandler extends EventEmitter {
 		const mesh = new TouchPoint(geometry, this.touchMaterial.clone());
 
 		// Scale with distance so angular size is constant
-		mesh.scale.setScalar(TOUCH_SIZE * TOUCH_DISTANCE);
+		mesh.scale.setScalar(TOUCH_SIZE * TOUCH_DISTANCE); // *400
 
 		this.touchGroup.add(mesh);
 		this.touchPoints.set(touchId, mesh);
@@ -64,15 +61,22 @@ export class GlobeTouchHandler extends EventEmitter {
 		if (!object) return console.warn("Unknown touch id:", touchId);
 
 		// Convert pitch/yaw to direction
-		const dir = this.dirFromPitchYaw(pitch, yaw);
-		const radius = 0.9;
-		object.position.copy(dir).multiplyScalar(radius);
+		const direction = this.dirFromPitchYaw(pitch, yaw);
+		const radius = 0.9; // *200
+		object.position.copy(direction).multiplyScalar(radius);
 		object.lookAt(new THREE.Vector3(0, 0, 0));
+
+		this.emit("touch", touchId, direction);
 	}
 
 	removeTouch(touchId: TouchId) {
 		const object = this.touchPoints.get(touchId);
 		if (!object) return console.warn("Unknown touch id:", touchId);
+
+		if (object.shouldRegisterAsClick) {
+			const direction = object.position.clone().normalize();
+			this.emit("click", touchId, direction);
+		}
 
 		this.touchPoints.delete(touchId);
 		this.touchGroup.remove(object);

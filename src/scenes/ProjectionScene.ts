@@ -44,11 +44,12 @@ export class ProjectionScene extends THREE.Scene {
 		super();
 
 		// Cube render target + cube camera for sampling into the AEP shader
-		const cubeRenderTarget = new THREE.WebGLCubeRenderTarget(1024, {
-			// format: THREE.RGBAFormat,
-			// generateMipmaps: true,
-			// minFilter: THREE.LinearMipmapLinearFilter,
-		});
+		const cubeRenderTarget = new THREE.WebGLCubeRenderTarget(1024);
+		// const cubeRenderTarget = new THREE.WebGLCubeRenderTarget(2 * 1024, {
+		// 	generateMipmaps: true,
+		// 	minFilter: THREE.LinearMipmapLinearFilter,
+		// 	// minFilter: THREE.LinearMipMapNearestFilter,
+		// });
 		this.cubeCamera = new THREE.CubeCamera(0.01, 1000, cubeRenderTarget);
 		this.cubeCamera.position.set(0, 0, 0);
 
