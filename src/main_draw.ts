@@ -14,10 +14,11 @@ const renderer = new THREE.WebGLRenderer({
 	// preserveDrawingBuffer: true,
 });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.setSize(
+const size = Math.min(
 	placeholder.clientWidth || window.innerWidth,
 	placeholder.clientHeight || window.innerHeight
 );
+renderer.setSize(size, size);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.NoToneMapping;
 renderer.autoClear = false;
