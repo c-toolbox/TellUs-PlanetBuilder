@@ -15,6 +15,7 @@ import {
 } from "@/network/OmniSocket";
 import Player from "@/network/Player";
 import { BACKGROUND_DISTANCE, ORIGIN } from "@/constants";
+import { Renderer } from "./Renderer";
 
 export default class BaseScene extends THREE.Scene {
 	protected touchHandler: GlobeTouchHandler;
@@ -39,6 +40,8 @@ export default class BaseScene extends THREE.Scene {
 		this.add(this.playerGroup);
 		this.players = new Map<string, Player>();
 	}
+
+	public setRendererSettings(renderer: Renderer) {}
 
 	/* Touch input */
 
@@ -145,5 +148,9 @@ export default class BaseScene extends THREE.Scene {
 		});
 	}
 
-	update() {}
+	update(delta: number) {}
+
+	updateFixed(delta: number) {}
+
+	postRender() {}
 }

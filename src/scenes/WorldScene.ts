@@ -6,8 +6,8 @@ import { TouchId } from "@/network/tuioProtocol";
 import { Tile, tileManager } from "@/geometry/TileManager";
 import BaseScene from "./BaseScene";
 
-import backgroundAsset from "@/assets/backgrounds/globe/black_and_white.jpeg";
 import { Polyhedra } from "@/geometry/Polyhedra";
+import backgroundAsset from "@/assets/backgrounds/globe/black_and_white.jpeg";
 // import backgroundAsset from "@/assets/backgrounds/globe/heightmap.png";
 // import backgroundAsset from "@/assets/backgrounds/globe/standard.jpg";
 // import backgroundAsset from "@/assets/backgrounds/globe/truecolor.png";
@@ -120,7 +120,7 @@ export class WorldScene extends BaseScene {
 		}
 	}
 
-	update() {
+	update(delta: number) {
 		this.players.forEach((player) => player.update());
 	}
 }

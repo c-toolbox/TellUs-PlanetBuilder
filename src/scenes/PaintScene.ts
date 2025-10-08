@@ -3,6 +3,7 @@ import BaseScene from "./BaseScene";
 import { TouchId } from "@/network/tuioProtocol";
 import { PEN_SIZE } from "@/constants";
 import { Color } from "@/utils/colors";
+import { Renderer } from "./Renderer";
 
 const colorCycle = [
 	Color.Red400,
@@ -31,7 +32,8 @@ export function getNextColor() {
 }
 
 interface TouchState {
-	sphere: THREE.Mesh;
+	sphereNow: THREE.Mesh;
+	spherePrev: THREE.Mesh;
 	lastPosition: THREE.Vector3 | null;
 }
 
@@ -58,7 +60,7 @@ export class PaintScene extends BaseScene {
 		].forEach((position) =>
 			this.addText({
 				text: "Touch to draw!",
-				color: 0x777777,
+				color: 0x444444,
 				position: new THREE.Vector3(...position),
 			})
 		);
@@ -66,6 +68,18 @@ export class PaintScene extends BaseScene {
 		this.touchHandler.on("touch", (touchId: TouchId, vector: THREE.Vector3) => {
 			this.updateTouchSphere(touchId, vector);
 		});
+		this.touchHandler.on("remove", (touchId: TouchId) => {
+			this.removeTouchSphere(touchId);
+			// this.clearLines();
+		});
+	}
+
+	public setRendererSettings(renderer: Renderer): void {
+		// renderer.setClearColor(new THREE.Color(255, 0, 0));
+		// renderer.clearColor();
+		renderer.outputColorSpace = THREE.SRGBColorSpace;
+		renderer.toneMapping = THREE.NoToneMapping;
+		renderer.autoClear = false;
 	}
 
 	init() {
@@ -89,21 +103,29 @@ export class PaintScene extends BaseScene {
 
 		let state = this.touchStates.get(id);
 		if (!state) {
-			const sphere = new THREE.Mesh(
+			const sphereNow = new THREE.Mesh(
 				this.touchSphereGeo,
 				this.touchSphereMat.clone()
 			);
-			state = { sphere, lastPosition: null };
+			this.add(sphereNow);
+			const spherePrev = new THREE.Mesh(
+				this.touchSphereGeo,
+				this.touchSphereMat.clone()
+			);
+			this.add(spherePrev);
+
+			state = { sphereNow, spherePrev, lastPosition: null };
 			this.touchStates.set(id, state);
-			this.add(sphere);
 		}
 
 		// Convert pitch/yaw to direction and get new position
 		const newPosition = vector.multiplyScalar(5);
-		state.sphere.position.copy(newPosition);
+		state.sphereNow.position.copy(newPosition);
 
 		// If we have a previous position, create a line between them
 		if (state.lastPosition) {
+			state.spherePrev.position.copy(state.lastPosition);
+
 			const line = this.createLine(state.lastPosition, newPosition);
 			this.add(line);
 			console.log("Add", line.position);
@@ -117,7 +139,8 @@ export class PaintScene extends BaseScene {
 	removeTouchSphere(id: number) {
 		const state = this.touchStates.get(id);
 		if (state) {
-			this.remove(state.sphere);
+			this.remove(state.sphereNow);
+			this.remove(state.spherePrev);
 			this.touchStates.delete(id);
 		}
 	}
@@ -141,5 +164,9 @@ export class PaintScene extends BaseScene {
 		line.scale.set(1, 1, length);
 
 		return line;
+	}
+
+	postRender() {
+		this.clearLines();
 	}
 }

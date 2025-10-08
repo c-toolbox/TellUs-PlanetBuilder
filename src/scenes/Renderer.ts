@@ -81,28 +81,25 @@ export class Renderer extends THREE.WebGLRenderer {
 
 			// Run updates in fixed steps
 			while (accumulator >= FIXED_TIME_STEP) {
-				update(FIXED_TIME_STEP / 1000); // pass seconds
+				this.updateFixed(FIXED_TIME_STEP / 1000); // pass seconds
 				accumulator -= FIXED_TIME_STEP;
 			}
 
 			// Render once per frame
-			this.update();
+			this.redraw(delta);
 		};
 		requestAnimationFrame(animate);
-
-		function update(dt: number) {
-			// advance simulation with constant timestep
-			// e.g. camera motion, physics, animations
-			// yaw += 0.0005;
-		}
 	}
 
 	setScene(scene: BaseScene) {
 		this.currentScene = scene;
+		this.currentScene.setRendererSettings(this);
 	}
 
-	update() {
+	redraw(delta: number) {
 		if (!this.currentScene) return;
+
+		this.currentScene.update(delta);
 
 		// Update TrackballControls (smooth camera movement)
 		this.controls.update();
@@ -110,21 +107,34 @@ export class Renderer extends THREE.WebGLRenderer {
 		// Sync centerCamera’s orientation to debugCamera’s orientation
 		this.centerCamera.quaternion.copy(this.debugCamera.quaternion);
 
-		this.currentScene.update();
+		if (this.debugMode)
+			this.renderDebug();
+		else
+			this.renderGlobe();
 
-		if (this.debugMode) {
-			// Render directly from the debug camera
-			this.render(this.currentScene, this.debugCamera);
-		} else {
-			// Update projection scene with the center camera's view direction
-			this.projectionScene.cubeCamera.position.set(0, 0, 0);
-			this.projectionScene.cubeCamera.quaternion.copy(
-				this.centerCamera.quaternion
-			);
-			this.projectionScene.cubeCamera.update(this, this.currentScene);
+		this.currentScene.postRender();
+	}
 
-			this.render(this.projectionScene, this.projectionScene.screenCamera);
-		}
+	renderGlobe() {
+		// Update projection scene with the center camera's view direction
+		this.projectionScene.cubeCamera.position.set(0, 0, 0);
+		this.projectionScene.cubeCamera.quaternion.copy(
+			this.centerCamera.quaternion
+		);
+		this.projectionScene.cubeCamera.update(this, this.currentScene);
+
+		this.render(this.projectionScene, this.projectionScene.screenCamera);
+	}
+
+	renderDebug() {
+		// Render directly from the debug camera
+		this.render(this.currentScene, this.debugCamera);
+	}
+
+	updateFixed(delta: number) {
+		if (!this.currentScene) return;
+
+		this.currentScene.updateFixed(delta);
 	}
 
 	resize() {

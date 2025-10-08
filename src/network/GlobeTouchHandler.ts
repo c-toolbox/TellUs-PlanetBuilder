@@ -61,7 +61,7 @@ export class GlobeTouchHandler extends EventEmitter {
 		let object = this.touchPoints.get(touchId);
 		if (!object) return console.warn("Unknown touch id:", touchId);
 
-		const direction = new THREE.Vector3().setFromSphericalCoords(1, pitch, yaw);
+		const direction = new THREE.Vector3().setFromSphericalCoords(1, pitch, -yaw-Math.PI/2);
 		object.position.copy(direction).multiplyScalar(TOUCH_DISTANCE); // 200
 		object.lookAt(ORIGIN);
 
@@ -79,6 +79,8 @@ export class GlobeTouchHandler extends EventEmitter {
 
 		this.touchPoints.delete(touchId);
 		this.touchGroup.remove(object);
+
+		this.emit("remove", touchId);
 	}
 
 	getTouchPoint(touchId: TouchId) {
