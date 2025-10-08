@@ -9,7 +9,8 @@
 			"storage.getKeys",
 			"storage.getData",
 			"storage.setData",
-			"os.execCommand"
+			"os.execCommand",
+			"os.spawnProcess"
 		],
 		"window": {}
 	}

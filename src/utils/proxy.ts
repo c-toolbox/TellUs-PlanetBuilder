@@ -1,52 +1,77 @@
 // Try to start the Python TUIO proxy when running inside Neutralino
 import { isNeutralino } from "@/utils/neu";
-import { os } from "@neutralinojs/lib";
+import { os, events } from "@neutralinojs/lib";
 
-if (isNeutralino) {
-	const proxyRelative = "proxy/proxy.py";
+const proxyRelative = "proxy/proxy.py";
 
-	async function startProxy() {
-		try {
-			// Try python executables in common virtualenv locations first (repo .venv and proxy/.venv),
-			// then fall back to system-wide python or py launcher.
-			const tryCommands = [
-				".\\.venv\\Scripts\\python.exe",
-				".\\.venv\\bin/python",
-				".\\proxy\\.venv\\Scripts\\python.exe",
-				".\\proxy\\.venv\\bin/python",
-				"python",
-				"py",
-			];
-			for (const cmd of tryCommands) {
-				try {
-					const result = await os.execCommand(`${cmd} "${proxyRelative}"`);
-					// Neutralino's execCommand resolves with an object even when the command returns a non-zero exit code.
-					if (result && typeof result.exitCode === "number") {
-						if (result.exitCode === 0) {
-							console.log("Started python proxy with", cmd, result);
-							return;
-						} else {
-							if (result.stdErr) console.error("stderr:", result.stdErr);
-							if (result.stdOut) console.error("stdout:", result.stdOut);
-							// try next command
-						}
-					} else {
-						// Unexpected shape; treat as failure and continue
-						console.warn("execCommand returned unexpected result:", result);
-					}
-				} catch (e) {
-					// try next command
-				}
-			}
-			console.warn(
-				"Could not start python proxy; ensure Python is installed and on PATH, and proxy/proxy.py exists relative to the app working directory."
-			);
-		} catch (err) {
-			console.error("Error attempting to start python proxy:", err);
-		}
+const w = window as any;
+
+// Remember across hot reloads
+if (!w._proxyStarted) {
+	w._proxyStarted = false;
+	w._proxyProcess = null;
+}
+
+async function startProxy() {
+	if (w._proxyStarted) {
+		console.log("Python proxy already started; skipping.");
+		return;
 	}
 
+	try {
+		const tryCommands = [
+			".\\.venv\\Scripts\\python.exe",
+			".\\.venv\\bin/python",
+			".\\proxy\\.venv\\Scripts\\python.exe",
+			".\\proxy\\.venv\\bin/python",
+			"python",
+			"py",
+		];
+
+		for (const cmd of tryCommands) {
+			try {
+				// Spawn process (non-blocking)
+				const proc = await os.spawnProcess(`${cmd} "${proxyRelative}"`);
+				if (proc && proc.id) {
+					console.log(`Proxy running`);
+					w._proxyStarted = true;
+					w._proxyProcess = proc;
+					break;
+				}
+			} catch (e: unknown) {
+				const err = e as Error;
+				console.warn(`Failed to start with ${cmd}:`, err.message);
+			}
+		}
+
+		if (!w._proxyStarted) {
+			console.warn(
+				"Could not start python proxy; ensure Python is installed and proxy/proxy.py exists."
+			);
+		}
+	} catch (err) {
+		console.error("Error attempting to start python proxy:", err);
+	}
+}
+
+if (isNeutralino) {
 	startProxy();
+
+	// Optional: handle cleanup on reload (during dev)
+	if (import.meta.hot) {
+		import.meta.hot.on("vite:beforeUpdate", async () => {
+			if (w._proxyProcess) {
+				try {
+					console.log("Stopping Python proxy before hot reload...");
+					await os.execCommand(`taskkill /PID ${w._proxyProcess.id} /F`);
+				} catch {
+					/* ignore */
+				}
+				w._proxyProcess = null;
+				w._proxyStarted = false;
+			}
+		});
+	}
 } else {
 	console.error("Not running inside Neutralino; cannot start python proxy");
 }
