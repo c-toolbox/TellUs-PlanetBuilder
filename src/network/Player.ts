@@ -25,7 +25,7 @@ const PLAYER_COLORS = [
 ];
 let playerIndex = 0;
 
-export class Player extends THREE.Mesh {
+export default class Player extends THREE.Mesh {
 	public userId: string;
 	public material: THREE.MeshBasicMaterial;
 

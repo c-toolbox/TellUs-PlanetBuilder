@@ -48,7 +48,7 @@ export class TuioSocket extends EventEmitter {
 
 	onUpdate(touch: TuioUpdateEvent) {
 		// Convert Tellus weird coordinate system
-		const pitch = (touch.y - 0.5) * Math.PI;
+		const pitch = touch.y * Math.PI;
 		const yaw = (1.5 - touch.x) * 2 * Math.PI;
 
 		this.emit("touchUpdate", touch.id, pitch, yaw);

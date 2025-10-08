@@ -14,6 +14,7 @@ export const PLAYER_DISTANCE = 0.9;
 export const VERTEX_DISTANCE = 1.0;
 export const EDGE_DISTANCE = 1.1;
 export const FACE_DISTANCE = 1.2;
+export const BACKGROUND_DISTANCE = 2.0;
 
 export const VERTEX_COLOR = 0x000000;
 export const EDGE_COLOR = 0x000000;

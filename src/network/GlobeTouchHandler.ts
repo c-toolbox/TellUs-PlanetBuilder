@@ -3,7 +3,7 @@ import { EventEmitter } from "events";
 import { TuioSocket } from "@/network/TuioSocket";
 import { TouchId } from "@/network/tuioProtocol";
 import { TouchPoint } from "./TouchPoint";
-import { TOUCH_DISTANCE, TOUCH_SIZE } from "@/constants";
+import { ORIGIN, TOUCH_DISTANCE, TOUCH_SIZE } from "@/constants";
 
 import circleAsset from "@/assets/circle.png";
 
@@ -28,6 +28,7 @@ export class GlobeTouchHandler extends EventEmitter {
 			// premultipliedAlpha: true,
 			side: THREE.DoubleSide,
 			depthWrite: true,
+			visible: false,
 		});
 
 		/* TuIO */
@@ -50,7 +51,7 @@ export class GlobeTouchHandler extends EventEmitter {
 		const mesh = new TouchPoint(geometry, this.touchMaterial.clone());
 
 		// Scale with distance so angular size is constant
-		mesh.scale.setScalar(TOUCH_SIZE * TOUCH_DISTANCE); // *400
+		mesh.scale.setScalar(TOUCH_SIZE * TOUCH_DISTANCE); // 400
 
 		this.touchGroup.add(mesh);
 		this.touchPoints.set(touchId, mesh);
@@ -60,11 +61,9 @@ export class GlobeTouchHandler extends EventEmitter {
 		let object = this.touchPoints.get(touchId);
 		if (!object) return console.warn("Unknown touch id:", touchId);
 
-		// Convert pitch/yaw to direction
-		const direction = this.dirFromPitchYaw(pitch, yaw);
-		const radius = 0.9; // *200
-		object.position.copy(direction).multiplyScalar(radius);
-		object.lookAt(new THREE.Vector3(0, 0, 0));
+		const direction = new THREE.Vector3().setFromSphericalCoords(1, pitch, yaw);
+		object.position.copy(direction).multiplyScalar(TOUCH_DISTANCE); // 200
+		object.lookAt(ORIGIN);
 
 		this.emit("touch", touchId, direction);
 	}
@@ -84,21 +83,5 @@ export class GlobeTouchHandler extends EventEmitter {
 
 	getTouchPoint(touchId: TouchId) {
 		return this.touchPoints.get(touchId);
-	}
-
-	dirFromPitchYaw(pitch: number, yaw: number): THREE.Vector3 {
-		// assume yaw = rotation about Y (horizontal), pitch = rotation about X (vertical)
-		// quaternion order matches camera's: q = yaw(Y) * pitch(X)
-		const qYaw = new THREE.Quaternion().setFromAxisAngle(
-			new THREE.Vector3(0, 1, 0),
-			yaw
-		);
-		const qPitch = new THREE.Quaternion().setFromAxisAngle(
-			new THREE.Vector3(1, 0, 0),
-			pitch
-		);
-		const q = qYaw.multiply(qPitch);
-		const forward = new THREE.Vector3(0, 0, 1);
-		return forward.applyQuaternion(q).normalize();
 	}
 }

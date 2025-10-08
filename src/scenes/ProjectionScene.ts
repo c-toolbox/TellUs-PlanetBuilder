@@ -22,12 +22,12 @@ void main() {
 		return;
 	}
 
-	float c = r * 3.141592653589793 * (320.0 / 360.0);
+	float c = r * 3.141592653589793 * (360.0 / 360.0);
 	float theta = atan(p.y, p.x);
 	float sin_c = sin(c);
 	float cos_c = cos(c);
 	vec3 dir = vec3(
-		sin_c * cos(theta),
+		-sin_c * cos(theta),
 		sin_c * sin(theta),
 		cos_c
 	);
@@ -51,7 +51,6 @@ export class ProjectionScene extends THREE.Scene {
 		// 	// minFilter: THREE.LinearMipMapNearestFilter,
 		// });
 		this.cubeCamera = new THREE.CubeCamera(0.01, 1000, cubeRenderTarget);
-		this.cubeCamera.position.set(0, 0, 0);
 
 		// AEP full-screen quad
 		this.screenCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);

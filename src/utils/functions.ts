@@ -1,5 +1,4 @@
 import * as THREE from "three";
-import { Color } from "./colors";
 
 /**
  * Converts an HSL color value to RGB. Conversion formula
@@ -41,32 +40,6 @@ function hslToRgb(h: number, s: number, l: number) {
 export function getRandomColor() {
 	const [r, g, b] = hslToRgb(Math.random(), 1, 0.5);
 	return (r << 16) | (g << 8) | b;
-}
-
-const colorCycle = [
-	Color.Red400,
-	Color.Orange400,
-	Color.Amber400,
-	Color.Yellow300,
-	Color.Lime400,
-	Color.Green400,
-	Color.Emerald400,
-	Color.Teal400,
-	Color.Cyan400,
-	Color.Sky400,
-	Color.Blue400,
-	Color.Indigo400,
-	Color.Violet400,
-	Color.Purple400,
-	Color.Fuchsia400,
-	Color.Pink400,
-	Color.Rose400,
-];
-let currentColorIndex = 0;
-export function getNextColor() {
-	const color = colorCycle[currentColorIndex % colorCycle.length];
-	currentColorIndex++;
-	return color;
 }
 
 // Returns the center of a mesh
