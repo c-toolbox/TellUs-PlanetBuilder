@@ -122,17 +122,19 @@ export default class BaseScene extends THREE.Scene {
 	protected addText({
 		text,
 		color = 0xffffff,
+		size = 0.1,
 		position,
 	}: {
 		text: string;
 		color?: number;
+		size?: number;
 		position: THREE.Vector3;
 	}) {
 		const loader = new FontLoader();
 		loader.load("../assets/fonts/Lato/Black.json", (font) => {
 			const material = new THREE.MeshBasicMaterial({ color: color });
 
-			const shapes = font.generateShapes(text, 0.1);
+			const shapes = font.generateShapes(text, size);
 			const geometry = new THREE.ShapeGeometry(shapes);
 
 			// Center text

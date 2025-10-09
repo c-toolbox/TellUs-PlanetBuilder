@@ -19,7 +19,7 @@ init();
 animate();
 
 function init(): void {
-	const container = document.getElementById("placeholder");
+	const container = document.getElementById("container");
 	if (!container) {
 		throw new Error("Container element #placeholder not found");
 	}
@@ -118,8 +118,8 @@ function simulateClickFromDirection(direction: THREE.Vector3): void {
 		const element = document.elementFromPoint(x, y);
 		if (element) {
 			element.dispatchEvent(
-				new PointerEvent("pointerdown", {
-					pointerId: 0,
+				new PointerEvent("touchdown", {
+					// pointerId: 0,
 					bubbles: true,
 					cancelable: true,
 					clientX: x,
