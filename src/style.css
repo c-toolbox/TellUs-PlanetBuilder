@@ -24,22 +24,6 @@ body {
 	font-family: sans-serif;
 }
 
-/* Status window */
-
-#status {
-	position: absolute;
-	top: 0.5em;
-	left: 0.5em;
-	background-color: #ffffff22;
-	padding: 1em;
-	border-radius: 0.25em;
-
-	display: grid;
-	grid-template-columns: 1fr 1fr;
-	flex-direction: column;
-	gap: 0.5em;
-}
-
 /* Custom */
 
 .element {

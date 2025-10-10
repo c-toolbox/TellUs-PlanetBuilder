@@ -1,12 +1,12 @@
 import * as THREE from "three";
 import { FontLoader } from "three/examples/jsm/loaders/FontLoader.js";
 
+import { Renderer } from "./Renderer";
+import { globalServices } from "@/network/GlobalServices";
 import { TouchId } from "@/network/tuioProtocol";
 import Player from "@/network/Player";
 import { BACKGROUND_DISTANCE, ORIGIN } from "@/constants";
-import { Renderer } from "./Renderer";
 
-import { globalServices } from "@/network/GlobalServices";
 
 export default class BaseScene extends THREE.Scene {
 	protected omniSocket = globalServices.omniSocket;

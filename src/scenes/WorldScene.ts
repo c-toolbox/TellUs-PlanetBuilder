@@ -6,6 +6,7 @@ import { TouchId } from "@/network/tuioProtocol";
 import { Tile, tileManager } from "@/geometry/TileManager";
 import BaseScene from "./BaseScene";
 
+import { Renderer } from "./Renderer";
 import { Polyhedra } from "@/geometry/Polyhedra";
 import backgroundAsset from "@/assets/backgrounds/globe/black_and_white.jpeg";
 // import backgroundAsset from "@/assets/backgrounds/globe/heightmap.png";
@@ -38,12 +39,11 @@ import backgroundAsset from "@/assets/backgrounds/globe/black_and_white.jpeg";
 // import model from "@/geometry/models/goldberg162.json"
 // import model from "@/geometry/models/goldberg212.json"
 import model from "@/geometry/models/goldberg252.json";
-import { Renderer } from "./Renderer";
 // import model from "@/geometry/models/goldberg272.json"
 // import model from "@/geometry/models/goldberg282.json"
 // import model from "@/geometry/models/goldberg363.json"
 // import model from "@/geometry/models/goldberg482.json"
-// import model from "@/geometry/models/goldberg492.json";
+// import model from "@/geometry/models/goldberg492.json"
 // import model from "@/geometry/models/goldberg1002.json"
 // import model from "@/geometry/models/goldberg1962.json"
 // import model from "@/geometry/models/goldberg2522.json"
@@ -56,7 +56,7 @@ import { Renderer } from "./Renderer";
 // import model from "@/geometry/models/tetrahedral28.json"
 // import model from "@/geometry/models/half_sphere_hexagon.json";
 
-export class WorldScene extends BaseScene {
+export default class WorldScene extends BaseScene {
 	constructor() {
 		super();
 

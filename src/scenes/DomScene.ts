@@ -6,7 +6,7 @@ import { Element } from "@/components/Element";
 import { ORIGIN } from "@/constants";
 import { Renderer } from "./Renderer";
 
-export class DomScene extends BaseScene {
+export default class DomScene extends BaseScene {
 	private cssRenderer: CSS3DRenderer;
 	private domGroup: THREE.Group;
 

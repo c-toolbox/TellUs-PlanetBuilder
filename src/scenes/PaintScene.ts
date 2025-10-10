@@ -1,13 +1,12 @@
 import * as THREE from "three";
 import BaseScene from "./BaseScene";
 import { TouchId } from "@/network/tuioProtocol";
-import { PEN_SIZE } from "@/constants";
-import { Color } from "@/utils/colors";
 import { Renderer } from "./Renderer";
 import { getNextColor } from "@/utils/functions";
 
 import vertexShader from "@/shaders/basic.vert?raw";
 import fragmentShader from "@/shaders/feedbackBlur.frag?raw";
+import { paintSettings } from "@/utils/gui";
 
 interface TouchState {
 	sphereNow: THREE.Mesh;
@@ -15,7 +14,7 @@ interface TouchState {
 	lastPosition: THREE.Vector3 | null;
 }
 
-export class PaintScene extends BaseScene {
+export default class PaintScene extends BaseScene {
 	// Drawing
 	private touchStates: Map<number, TouchState>;
 	private touchSphereGeo: THREE.SphereGeometry;
@@ -36,21 +35,21 @@ export class PaintScene extends BaseScene {
 
 		this.init();
 
-		// [
-		// 	[1, 0, 0],
-		// 	[-1, 0, 0],
-		// 	[0, 1, 0],
-		// 	[0, -1, 0],
-		// 	[0, 0, 1],
-		// 	[0, 0, -1],
-		// ].forEach((position) =>
-		// 	this.addText({
-		// 		text: "Touch to draw!",
-		// 		color: getNextColor(),
-		// 		size: 0.2,
-		// 		position: new THREE.Vector3(...position),
-		// 	})
-		// );
+		[
+			[1, 0, 0],
+			[-1, 0, 0],
+			[0, 1, 0],
+			[0, -1, 0],
+			[0, 0, 1],
+			[0, 0, -1],
+		].forEach((position) =>
+			this.addText({
+				text: "Touch to draw!",
+				color: getNextColor(),
+				size: 0.2,
+				position: new THREE.Vector3(...position),
+			})
+		);
 
 		this.touchHandler.on("touch", (touchId: TouchId, vector: THREE.Vector3) => {
 			this.updateTouchSphere(touchId, vector);
@@ -70,14 +69,16 @@ export class PaintScene extends BaseScene {
 	}
 
 	init() {
+		const penWidth = paintSettings.penWidth;
+
 		this.touchStates = new Map<number, TouchState>();
-		this.touchSphereGeo = new THREE.SphereGeometry(PEN_SIZE, 12, 10);
+		this.touchSphereGeo = new THREE.SphereGeometry(penWidth, 12, 10);
 		this.touchSphereMat = new THREE.MeshBasicMaterial({
 			color: 0xffffff,
 			depthTest: false,
 			depthWrite: false,
 		});
-		this.lineGeo = new THREE.CylinderGeometry(PEN_SIZE, PEN_SIZE, 1, 8, 1);
+		this.lineGeo = new THREE.CylinderGeometry(penWidth, penWidth, 1, 8, 1);
 		this.lineGeo.rotateX(Math.PI / 2); // Make cylinder align with Z axis
 		const lineMeshes: THREE.Mesh[] = [];
 
