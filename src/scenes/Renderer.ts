@@ -5,11 +5,11 @@ import BaseScene from "./BaseScene";
 
 export class Renderer extends THREE.WebGLRenderer {
 	public currentScene: BaseScene;
-	private projectionScene: ProjectionScene;
+	public projectionScene: ProjectionScene;
 
 	private controls: TrackballControls;
-	private centerCamera: THREE.PerspectiveCamera;
-	private debugCamera: THREE.PerspectiveCamera;
+	public centerCamera: THREE.PerspectiveCamera;
+	public debugCamera: THREE.PerspectiveCamera;
 
 	private debugMode: boolean;
 
@@ -25,12 +25,12 @@ export class Renderer extends THREE.WebGLRenderer {
 		/* Cameras */
 
 		// This camera stays at the origin, only its orientation matters
-		this.centerCamera = new THREE.PerspectiveCamera(75, 1.0, 0.01, 1000);
+		this.centerCamera = new THREE.PerspectiveCamera(75, 1.0, 0.01, 10000);
 		this.centerCamera.position.set(0, 0, 0);
 		this.centerCamera.lookAt(0, 0, 1);
 
 		// Debug camera, movable with TrackballControls
-		this.debugCamera = new THREE.PerspectiveCamera(75, 1.0, 0.01, 1000);
+		this.debugCamera = new THREE.PerspectiveCamera(75, 1.0, 0.01, 10000);
 		this.debugCamera.position.set(0, 2, 0);
 		this.debugCamera.up.set(0, 0, 1);
 		this.debugCamera.lookAt(0, 0, 0);
@@ -60,8 +60,6 @@ export class Renderer extends THREE.WebGLRenderer {
 				console.log("Debug mode:", this.debugMode);
 			}
 		});
-
-		/* */
 
 		//
 		// Animation loop: update camera orientation from yaw/pitch and render
@@ -107,17 +105,17 @@ export class Renderer extends THREE.WebGLRenderer {
 		// Sync centerCamera’s orientation to debugCamera’s orientation
 		this.centerCamera.quaternion.copy(this.debugCamera.quaternion);
 
-		if (this.debugMode)
+		if (this.debugMode) {
 			this.renderDebug();
-		else
+		} else {
 			this.renderGlobe();
+		}
 
 		this.currentScene.postRender();
 	}
 
 	renderGlobe() {
 		// Update projection scene with the center camera's view direction
-		this.projectionScene.cubeCamera.position.set(0, 0, 0);
 		this.projectionScene.cubeCamera.quaternion.copy(
 			this.centerCamera.quaternion
 		);

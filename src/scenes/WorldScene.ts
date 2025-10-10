@@ -60,11 +60,11 @@ export class WorldScene extends BaseScene {
 		super();
 
 		this.addBackground(backgroundAsset);
-		this.addText({
-			text: "Hello world!",
-			color: 0xff0000,
-			position: new THREE.Vector3(0, 1, 0),
-		});
+		// this.addText({
+		// 	text: "Hello world!",
+		// 	color: 0xff0000,
+		// 	position: new THREE.Vector3(0, 1, 0),
+		// });
 
 		// Lighting
 		const hemi = new THREE.HemisphereLight(0xffffff, 0x000000, 0.9);
