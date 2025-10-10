@@ -204,3 +204,37 @@ export class OmniSocket extends EventEmitter {
 		return this.socket && this.socket.readyState == WebSocket.OPEN;
 	}
 }
+
+/*
+this.omni = new OmniSocket();
+(window as any).omni = this.omni;
+
+this.omni.on("server_connect", (data: OmniConnect) => {});
+this.omni.on("server_disconnect", (data: OmniDisconnect) => {});
+this.omni.on("server_authorized", (data: OmniAuthorized) => {});
+this.omni.on("server_join", (data: OmniJoin) => {
+	if (data.role == "guest") {
+		const player = new Player(data.user);
+		this.playerGroup.add(player);
+		this.players.set(data.user, player);
+
+		this.omni.sendSetInput("joystick");
+	}
+});
+this.omni.on("server_leave", (data: OmniLeave) => {
+	const player = this.players.get(data.user);
+	if (player) {
+		this.players.delete(data.user);
+		this.playerGroup.remove(player);
+	}
+});
+this.omni.on("server_error", (data: OmniError) => {});
+this.omni.on("movement", (data: Movement) => {
+	let player = this.players.get(data.user);
+	if (player) {
+		player.move(data.x, data.y);
+	}
+});
+
+this.omni.connect();
+*/

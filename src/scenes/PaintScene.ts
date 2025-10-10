@@ -4,32 +4,10 @@ import { TouchId } from "@/network/tuioProtocol";
 import { PEN_SIZE } from "@/constants";
 import { Color } from "@/utils/colors";
 import { Renderer } from "./Renderer";
+import { getNextColor } from "@/utils/functions";
 
-const colorCycle = [
-	Color.Red400,
-	Color.Orange400,
-	Color.Amber400,
-	Color.Yellow300,
-	Color.Lime400,
-	Color.Green400,
-	Color.Emerald400,
-	Color.Teal400,
-	Color.Cyan400,
-	Color.Sky400,
-	Color.Blue400,
-	Color.Indigo400,
-	Color.Violet400,
-	Color.Purple400,
-	Color.Fuchsia400,
-	Color.Pink400,
-	Color.Rose400,
-];
-let currentColorIndex = 0;
-export function getNextColor() {
-	const color = colorCycle[currentColorIndex % colorCycle.length];
-	currentColorIndex++;
-	return color;
-}
+import vertexShader from "@/shaders/basic.vert?raw";
+import fragmentShader from "@/shaders/feedbackBlur.frag?raw";
 
 interface TouchState {
 	sphereNow: THREE.Mesh;
@@ -38,12 +16,20 @@ interface TouchState {
 }
 
 export class PaintScene extends BaseScene {
+	// Drawing
 	private touchStates: Map<number, TouchState>;
 	private touchSphereGeo: THREE.SphereGeometry;
 	private touchSphereMat: THREE.MeshBasicMaterial;
 	private lineGeo: THREE.CylinderGeometry;
 	private lineMeshes: THREE.Mesh[] = [];
 	private touchColors: { [touchId: number]: number } = {};
+
+	// Shader
+	private feedbackA: THREE.WebGLRenderTarget;
+	private feedbackB: THREE.WebGLRenderTarget;
+	private feedbackMaterial: THREE.ShaderMaterial;
+	private feedbackQuad: THREE.Mesh;
+	private useA = true;
 
 	constructor() {
 		super();
@@ -60,7 +46,7 @@ export class PaintScene extends BaseScene {
 		// ].forEach((position) =>
 		// 	this.addText({
 		// 		text: "Touch to draw!",
-		// 		color: 0x444444,
+		// 		color: getNextColor(),
 		// 		size: 0.2,
 		// 		position: new THREE.Vector3(...position),
 		// 	})
@@ -80,7 +66,7 @@ export class PaintScene extends BaseScene {
 		// renderer.clearColor();
 		renderer.outputColorSpace = THREE.SRGBColorSpace;
 		renderer.toneMapping = THREE.NoToneMapping;
-		renderer.autoClear = false;
+		renderer.autoClear = true;
 	}
 
 	init() {
@@ -94,6 +80,37 @@ export class PaintScene extends BaseScene {
 		this.lineGeo = new THREE.CylinderGeometry(PEN_SIZE, PEN_SIZE, 1, 8, 1);
 		this.lineGeo.rotateX(Math.PI / 2); // Make cylinder align with Z axis
 		const lineMeshes: THREE.Mesh[] = [];
+
+		/* Rendering */
+
+		const res = 1024;
+
+		this.feedbackA = new THREE.WebGLRenderTarget(res, res, {
+			format: THREE.RGBAFormat,
+			type: THREE.UnsignedByteType,
+		});
+		this.feedbackB = new THREE.WebGLRenderTarget(res, res, {
+			format: THREE.RGBAFormat,
+			type: THREE.UnsignedByteType,
+		});
+
+		this.feedbackMaterial = new THREE.ShaderMaterial({
+			uniforms: {
+				textureNew: { value: null },
+				textureOld: { value: this.feedbackA.texture },
+				blur: { value: 0.0015 },
+			},
+			vertexShader: vertexShader,
+			fragmentShader: fragmentShader,
+			depthTest: false,
+			depthWrite: false,
+			transparent: true,
+		});
+
+		this.feedbackQuad = new THREE.Mesh(
+			new THREE.PlaneGeometry(2, 2),
+			this.feedbackMaterial
+		);
 	}
 
 	updateTouchSphere(id: number, vector: THREE.Vector3) {
@@ -129,7 +146,6 @@ export class PaintScene extends BaseScene {
 
 			const line = this.createLine(state.lastPosition, newPosition);
 			this.add(line);
-			console.log("Add", line.position);
 			this.lineMeshes.push(line);
 		}
 
@@ -167,7 +183,53 @@ export class PaintScene extends BaseScene {
 		return line;
 	}
 
+	/* Rendering */
+
+	override onEnter(renderer: Renderer) {
+		console.log("PaintScene loaded");
+	}
+
+	override onExit(renderer: Renderer) {
+		console.log("PaintScene cleaned up");
+
+		// Remove feedback textures, listeners, etc.
+		this.clearLines();
+		// this.touchHandler.removeAllListeners?.();
+	}
+
 	postRender() {
 		this.clearLines();
+	}
+
+	override renderScene(renderer: Renderer) {
+		const projectionScene = renderer.projectionScene;
+
+		// 1️⃣ Capture cube map
+		projectionScene.cubeCamera.position.copy(renderer.centerCamera.position);
+		projectionScene.cubeCamera.quaternion.copy(
+			renderer.centerCamera.quaternion
+		);
+		projectionScene.cubeCamera.update(renderer, this);
+
+		// 2️⃣ Render AEP into target
+		renderer.setRenderTarget(projectionScene.aepTarget);
+		renderer.render(projectionScene, projectionScene.screenCamera);
+
+		// 3️⃣ Feedback blur pass
+		const readBuffer = this.useA ? this.feedbackA : this.feedbackB;
+		const writeBuffer = this.useA ? this.feedbackB : this.feedbackA;
+		this.feedbackMaterial.uniforms.textureNew.value =
+			projectionScene.aepTarget.texture;
+		this.feedbackMaterial.uniforms.textureOld.value = readBuffer.texture;
+
+		renderer.setRenderTarget(writeBuffer);
+		renderer.render(this.feedbackQuad, projectionScene.screenCamera);
+
+		// 4️⃣ Display final
+		renderer.setRenderTarget(null);
+		renderer.render(this.feedbackQuad, projectionScene.screenCamera);
+
+		// 5️⃣ Swap buffers
+		this.useA = !this.useA;
 	}
 }

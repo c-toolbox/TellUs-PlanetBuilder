@@ -7,7 +7,7 @@ import { ORIGIN, TOUCH_DISTANCE, TOUCH_SIZE } from "@/constants";
 
 import circleAsset from "@/assets/circle.png";
 
-export class GlobeTouchHandler extends EventEmitter {
+export class TouchHandler extends EventEmitter {
 	public touchGroup: THREE.Group;
 	private touchPoints: Map<TouchId, TouchPoint>;
 	private touchMaterial: THREE.MeshBasicMaterial;
@@ -28,19 +28,19 @@ export class GlobeTouchHandler extends EventEmitter {
 			// premultipliedAlpha: true,
 			side: THREE.DoubleSide,
 			depthWrite: true,
-			visible: false,
+			// visible: false,
 		});
+	}
 
-		/* TuIO */
-
-		const tuioSocket = new TuioSocket();
-		tuioSocket.on("touchAdd", (id: TouchId) => {
+	connect() {
+		const socket = new TuioSocket();
+		socket.on("touchAdd", (id: TouchId) => {
 			this.addTouch(id);
 		});
-		tuioSocket.on("touchRemove", (id: TouchId) => {
+		socket.on("touchRemove", (id: TouchId) => {
 			this.removeTouch(id);
 		});
-		tuioSocket.on("touchUpdate", (id: TouchId, pitch: number, yaw: number) => {
+		socket.on("touchUpdate", (id: TouchId, pitch: number, yaw: number) => {
 			this.updateTouch(id, pitch, yaw);
 		});
 	}
@@ -61,7 +61,11 @@ export class GlobeTouchHandler extends EventEmitter {
 		let object = this.touchPoints.get(touchId);
 		if (!object) return console.warn("Unknown touch id:", touchId);
 
-		const direction = new THREE.Vector3().setFromSphericalCoords(1, pitch, -yaw-Math.PI/2);
+		const direction = new THREE.Vector3().setFromSphericalCoords(
+			1,
+			pitch,
+			-yaw - Math.PI / 2
+		);
 		object.position.copy(direction).multiplyScalar(TOUCH_DISTANCE); // 200
 		object.lookAt(ORIGIN);
 

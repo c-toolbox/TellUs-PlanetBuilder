@@ -38,6 +38,7 @@ import backgroundAsset from "@/assets/backgrounds/globe/black_and_white.jpeg";
 // import model from "@/geometry/models/goldberg162.json"
 // import model from "@/geometry/models/goldberg212.json"
 import model from "@/geometry/models/goldberg252.json";
+import { Renderer } from "./Renderer";
 // import model from "@/geometry/models/goldberg272.json"
 // import model from "@/geometry/models/goldberg282.json"
 // import model from "@/geometry/models/goldberg363.json"
@@ -58,6 +59,9 @@ import model from "@/geometry/models/goldberg252.json";
 export class WorldScene extends BaseScene {
 	constructor() {
 		super();
+
+		this.onTouch = this.onTouch.bind(this);
+		this.onClick = this.onClick.bind(this);
 
 		this.addBackground(backgroundAsset);
 		// this.addText({
@@ -84,15 +88,34 @@ export class WorldScene extends BaseScene {
 		if (SHOW_FACES) this.add(globe.faceGroup);
 
 		this.makeClickable(globe.faceGroup);
+	}
 
-		/* Touch input */
+	override onEnter(renderer: Renderer) {
+		console.log("WorldScene active");
 
-		this.touchHandler.on("touch", (touchId: TouchId, vector: THREE.Vector3) => {
-			this.handleRaycast(touchId, vector, "touch");
-		});
-		this.touchHandler.on("click", (touchId: TouchId, vector: THREE.Vector3) => {
-			this.handleRaycast(touchId, vector, "click");
-		});
+		// Subscribe to touch events
+		this.touchHandler.on("touch", this.onTouch);
+		this.touchHandler.on("click", this.onClick);
+
+		// Example: listen for OmniSocket events
+		// this.omniSocket.on("playerJoined", this.handlePlayerJoin);
+	}
+
+	override onExit(renderer: Renderer) {
+		console.log("WorldScene exiting");
+
+		// Clean up event bindings
+		this.touchHandler.off("touch", this.onTouch);
+		this.touchHandler.off("click", this.onClick);
+		// this.omniSocket.off("playerJoined", this.handlePlayerJoin);
+	}
+
+	private onTouch(touchId: TouchId, vector: THREE.Vector3) {
+		this.handleRaycast(touchId, vector, "touch");
+	}
+
+	private onClick(touchId: TouchId, vector: THREE.Vector3) {
+		this.handleRaycast(touchId, vector, "click");
 	}
 
 	handleRaycast(

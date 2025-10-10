@@ -91,43 +91,27 @@ export class Renderer extends THREE.WebGLRenderer {
 
 	setScene(scene: BaseScene) {
 		this.currentScene = scene;
-		this.currentScene.setRendererSettings(this);
+		// this.currentScene.setRendererSettings(this);
 	}
 
 	redraw(delta: number) {
 		if (!this.currentScene) return;
 
 		this.currentScene.update(delta);
-
-		// Update TrackballControls (smooth camera movement)
 		this.controls.update();
-
-		// Sync centerCamera’s orientation to debugCamera’s orientation
 		this.centerCamera.quaternion.copy(this.debugCamera.quaternion);
 
 		if (this.debugMode) {
-			this.renderDebug();
+			this.render(this.currentScene, this.debugCamera);
 		} else {
-			this.renderGlobe();
+			this.currentScene.renderScene(this);
 		}
 
 		this.currentScene.postRender();
 	}
 
-	renderGlobe() {
-		// Update projection scene with the center camera's view direction
-		this.projectionScene.cubeCamera.quaternion.copy(
-			this.centerCamera.quaternion
-		);
-
-		this.currentScene.render(this);
-		this.projectionScene.cubeCamera.update(this, this.currentScene);
-
-		this.render(this.projectionScene, this.projectionScene.screenCamera);
-	}
-
+	// Render directly from the debug camera
 	renderDebug() {
-		// Render directly from the debug camera
 		this.render(this.currentScene, this.debugCamera);
 	}
 
@@ -148,9 +132,5 @@ export class Renderer extends THREE.WebGLRenderer {
 		this.debugCamera.updateProjectionMatrix();
 
 		this.controls.handleResize();
-
-		if (this.currentScene) {
-			this.currentScene.setSize(size);
-		}
 	}
 }

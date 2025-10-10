@@ -73,5 +73,5 @@ if (isNeutralino) {
 		});
 	}
 } else {
-	console.error("Not running inside Neutralino; cannot start python proxy");
+	console.warn("Not running inside Neutralino; cannot start python proxy");
 }

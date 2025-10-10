@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { Color } from "./colors";
 
 /**
  * Converts an HSL color value to RGB. Conversion formula
@@ -53,5 +54,31 @@ export function getCenterOfMesh(mesh: THREE.Mesh) {
 // Returns the pitch of a vector
 export function getPitchFromVector(vector: THREE.Vector3): number {
 	const { x, y, z } = vector.clone().normalize();
-	return (2 * Math.atan2(y, Math.sqrt(x * x + z * z)));
+	return 2 * Math.atan2(y, Math.sqrt(x * x + z * z));
+}
+
+const colorCycle = [
+	Color.Red400,
+	Color.Orange400,
+	Color.Amber400,
+	Color.Yellow300,
+	Color.Lime400,
+	Color.Green400,
+	Color.Emerald400,
+	Color.Teal400,
+	Color.Cyan400,
+	Color.Sky400,
+	Color.Blue400,
+	Color.Indigo400,
+	Color.Violet400,
+	Color.Purple400,
+	Color.Fuchsia400,
+	Color.Pink400,
+	Color.Rose400,
+];
+let currentColorIndex = 0;
+export function getNextColor() {
+	const color = colorCycle[currentColorIndex % colorCycle.length];
+	currentColorIndex++;
+	return color;
 }

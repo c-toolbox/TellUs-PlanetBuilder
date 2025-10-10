@@ -1,44 +1,33 @@
 import * as THREE from "three";
 import { FontLoader } from "three/examples/jsm/loaders/FontLoader.js";
 
-import { GlobeTouchHandler } from "@/network/GlobeTouchHandler";
 import { TouchId } from "@/network/tuioProtocol";
-import {
-	Movement,
-	OmniAuthorized,
-	OmniConnect,
-	OmniDisconnect,
-	OmniError,
-	OmniJoin,
-	OmniLeave,
-	OmniSocket,
-} from "@/network/OmniSocket";
 import Player from "@/network/Player";
 import { BACKGROUND_DISTANCE, ORIGIN } from "@/constants";
 import { Renderer } from "./Renderer";
 
+import { globalServices } from "@/network/GlobalServices";
+
 export default class BaseScene extends THREE.Scene {
-	protected touchHandler: GlobeTouchHandler;
+	protected omniSocket = globalServices.omniSocket;
+	protected touchHandler = globalServices.touchHandler;
+
 	protected raycaster: THREE.Raycaster;
 	protected clickable: THREE.Object3D[];
 
-	private omni: OmniSocket;
 	private playerGroup: THREE.Group;
 	protected players: Map<string, Player>;
 
 	constructor() {
 		super();
 
-		// Touch input
-		this.initTouchHandler();
-
-		// Online input
-		this.initOmni();
-
 		// Players
 		this.playerGroup = new THREE.Group();
 		this.add(this.playerGroup);
 		this.players = new Map<string, Player>();
+
+		this.raycaster = new THREE.Raycaster();
+		this.clickable = [];
 	}
 
 	public setRendererSettings(renderer: Renderer) {}
@@ -46,11 +35,8 @@ export default class BaseScene extends THREE.Scene {
 	/* Touch input */
 
 	private initTouchHandler() {
-		this.touchHandler = new GlobeTouchHandler();
-		this.add(this.touchHandler.touchGroup);
-
-		this.raycaster = new THREE.Raycaster();
-		this.clickable = [];
+		// this.touchHandler = new TouchHandler();
+		// this.add(this.touchHandler.touchGroup);
 	}
 
 	public makeClickable(group: THREE.Group) {
@@ -63,43 +49,38 @@ export default class BaseScene extends THREE.Scene {
 		type: "touch" | "click"
 	) {}
 
-	/* Online input */
+	/* Scene management */
 
-	private initOmni() {
-		/* Omni server */
+	onEnter(renderer: Renderer) {}
 
-		this.omni = new OmniSocket();
-		(window as any).omni = this.omni;
+	onExit(renderer: Renderer) {}
 
-		this.omni.on("server_connect", (data: OmniConnect) => {});
-		this.omni.on("server_disconnect", (data: OmniDisconnect) => {});
-		this.omni.on("server_authorized", (data: OmniAuthorized) => {});
-		this.omni.on("server_join", (data: OmniJoin) => {
-			if (data.role == "guest") {
-				const player = new Player(data.user);
-				this.playerGroup.add(player);
-				this.players.set(data.user, player);
+	/* Rendering */
 
-				this.omni.sendSetInput("joystick");
-			}
-		});
-		this.omni.on("server_leave", (data: OmniLeave) => {
-			const player = this.players.get(data.user);
-			if (player) {
-				this.players.delete(data.user);
-				this.playerGroup.remove(player);
-			}
-		});
-		this.omni.on("server_error", (data: OmniError) => {});
-		this.omni.on("movement", (data: Movement) => {
-			let player = this.players.get(data.user);
-			if (player) {
-				player.move(data.x, data.y);
-			}
-		});
+	renderScene(renderer: Renderer) {
+		const projectionScene = renderer.projectionScene;
 
-		this.omni.connect();
+		// Update cube camera orientation
+		projectionScene.cubeCamera.position.copy(renderer.centerCamera.position);
+		projectionScene.cubeCamera.quaternion.copy(
+			renderer.centerCamera.quaternion
+		);
+		projectionScene.cubeCamera.update(renderer, this);
+
+		// Render Azimuthal Equidistant Projection (fisheye)
+		renderer.setRenderTarget(null);
+		renderer.render(projectionScene, projectionScene.screenCamera);
 	}
+
+	update(delta: number) {}
+
+	updateFixed(delta: number) {}
+
+	render(renderer: Renderer) {}
+
+	postRender() {}
+
+	setSize(size: number) {}
 
 	/* 3D helpers */
 
@@ -149,14 +130,4 @@ export default class BaseScene extends THREE.Scene {
 			this.add(mesh);
 		});
 	}
-
-	update(delta: number) {}
-
-	updateFixed(delta: number) {}
-
-	render(renderer: Renderer) {}
-
-	postRender() {}
-
-	setSize(size: number) {}
 }
