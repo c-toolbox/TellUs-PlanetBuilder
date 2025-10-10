@@ -154,5 +154,9 @@ export default class BaseScene extends THREE.Scene {
 
 	updateFixed(delta: number) {}
 
+	render(renderer: Renderer) {}
+
 	postRender() {}
+
+	setSize(size: number) {}
 }

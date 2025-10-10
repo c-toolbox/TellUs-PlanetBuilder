@@ -38,7 +38,7 @@ export class Element extends CSS3DObject {
 		/* Test */
 
 		const geometry = new THREE.PlaneGeometry(480, 360);
-		const material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+		const material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, opacity: 0.1, transparent: true });
 		const mesh = new THREE.Mesh(geometry, material);
 		this.add(mesh);
 	}
