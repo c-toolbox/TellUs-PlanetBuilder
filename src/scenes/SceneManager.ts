@@ -2,6 +2,8 @@ import { Renderer } from "./Renderer";
 import BaseScene from "./BaseScene";
 import WorldScene from "./WorldScene";
 import PaintScene from "./PaintScene";
+import DistortionScene from "./DistortionScene";
+import ReactionDiffusionScene from "./ReactionDiffusionScene";
 import DomScene from "./DomScene";
 
 /* Scenes */
@@ -9,6 +11,8 @@ import DomScene from "./DomScene";
 export const scenes = {
 	World: new WorldScene(),
 	Paint: new PaintScene(),
+	Distortion: new DistortionScene(),
+	ReactionDiffusion: new ReactionDiffusionScene(),
 	Dom: new DomScene(),
 } satisfies Record<string, BaseScene>;
 

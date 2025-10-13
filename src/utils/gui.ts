@@ -1,7 +1,7 @@
 import GUI from "lil-gui";
 import { scenes, SceneKey, sceneManager } from "@/scenes/SceneManager";
 
-const gui = new GUI();
+export const gui = new GUI();
 
 export const globalSettings: { activeScene: SceneKey } = {
 	activeScene: "World",
@@ -24,13 +24,14 @@ export function initializeGui() {
 		.name("Active Scene")
 		.onChange((key: keyof typeof scenes) => {
 			openSceneFolder();
-			folders[key].show();
 			sceneManager.setScene(scenes[key]);
 		});
 
 	folders = {
 		World: gui.addFolder("World"),
 		Paint: gui.addFolder("Paint"),
+		Distortion: gui.addFolder("Distortion"),
+		ReactionDiffusion: gui.addFolder("ReactionDiffusion"),
 		Dom: gui.addFolder("Dom"),
 	};
 
@@ -56,7 +57,6 @@ export function initializeGui() {
 function openSceneFolder() {
 	Object.values(folders).forEach((folder) => {
 		folder.hide();
-		// folder.close();
 	});
 	folders[globalSettings.activeScene].show();
 }
