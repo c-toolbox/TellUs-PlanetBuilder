@@ -47,3 +47,28 @@ src/neutralino.js
 src/version.json
 neutralino.config.json
 __neutralino_globals.js
+
+icon.ico
+
+# Python
+# Virtual envs
+.venv/
+venv/
+env/
+proxy/.venv/
+**/.venv/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# pytest
+.pytest_cache/
+
+# mypy
+.mypy_cache/
+
+# pipenv / packaging
+pip-wheel-metadata/
+*.egg-info/
