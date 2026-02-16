@@ -12,7 +12,7 @@ export const worldSettings = {
 };
 
 export const paintSettings = {
-	penWidth: 0.1,
+	penWidth: 1.0,
 };
 
 let folders: { [key in SceneKey]: GUI };
@@ -33,6 +33,7 @@ export function initializeGui() {
 		Distortion: gui.addFolder("Distortion"),
 		ReactionDiffusion: gui.addFolder("ReactionDiffusion"),
 		Dom: gui.addFolder("Dom"),
+		DragDrop: gui.addFolder("DragDrop"),
 	};
 
 	const models = [

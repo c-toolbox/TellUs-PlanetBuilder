@@ -54,21 +54,21 @@ export default class PaintScene extends BaseScene {
 
 		this.init();
 
-		[
-			[1, 0, 0],
-			[-1, 0, 0],
-			[0, 1, 0],
-			[0, -1, 0],
-			[0, 0, 1],
-			[0, 0, -1],
-		].forEach((position) =>
-			this.addText({
-				text: "Touch to draw!",
-				color: getNextColor(),
-				size: 0.2,
-				position: new THREE.Vector3(...position),
-			})
-		);
+		// [
+		// 	[1, 0, 0],
+		// 	[-1, 0, 0],
+		// 	[0, 1, 0],
+		// 	[0, -1, 0],
+		// 	[0, 0, 1],
+		// 	[0, 0, -1],
+		// ].forEach((position) =>
+		// 	this.addText({
+		// 		text: "Touch to draw!",
+		// 		color: getNextColor(),
+		// 		size: 0.2,
+		// 		position: new THREE.Vector3(...position),
+		// 	})
+		// );
 
 		this.touchHandler.on("touch", (touchId: TouchId, vector: THREE.Vector3) => {
 			this.updateTouchSphere(touchId, vector);

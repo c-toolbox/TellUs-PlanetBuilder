@@ -5,6 +5,7 @@ import PaintScene from "./PaintScene";
 import DistortionScene from "./DistortionScene";
 import ReactionDiffusionScene from "./ReactionDiffusionScene";
 import DomScene from "./DomScene";
+import DragDropScene from "./DragDropScene";
 
 /* Scenes */
 
@@ -14,6 +15,7 @@ export const scenes = {
 	Distortion: new DistortionScene(),
 	ReactionDiffusion: new ReactionDiffusionScene(),
 	Dom: new DomScene(),
+	DragDrop: new DragDropScene(),
 } satisfies Record<string, BaseScene>;
 
 export type SceneKey = keyof typeof scenes;

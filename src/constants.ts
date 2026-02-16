@@ -27,7 +27,7 @@ export const SHOW_EDGES = true;
 export const SHOW_FACES = true;
 export const SHOW_PLAYERS = true;
 
-export const USE_AI_TEXTURES = false;
+export const USE_AI_TEXTURES = true;
 export const TEXTURE_SCALE = USE_AI_TEXTURES ? 1.0 : 0.6;
 
 export const DOUBLE_SIDE = false;

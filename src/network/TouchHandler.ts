@@ -25,7 +25,7 @@ export class TouchHandler extends EventEmitter {
 		this.touchMaterial = new THREE.MeshBasicMaterial({
 			map: textureLoader.load(circleAsset),
 			transparent: true,
-			// premultipliedAlpha: true,
+			premultipliedAlpha: true,
 			side: THREE.DoubleSide,
 			depthWrite: true,
 			// visible: false,

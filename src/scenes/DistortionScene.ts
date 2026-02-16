@@ -2,382 +2,366 @@ import * as THREE from "three";
 import BaseScene from "./BaseScene";
 import { TouchId } from "@/network/tuioProtocol";
 import { Renderer } from "./Renderer";
-import { getNextColor } from "@/utils/functions";
+import { paintSettings } from "@/utils/gui";
 
-import vertexShader from "@/shaders/basic.vert?raw";
-import { gui, paintSettings } from "@/utils/gui";
+// ------------------------------
+// Simple fluid simulation shaders
+// ------------------------------
 
-const fragmentShader = `
-precision highp float;
-
-uniform sampler2D textureNew; // current drawing / input
-uniform sampler2D textureOld; // previous RD state (A in R, B in G)
-uniform float blur;           // kept for compatibility (not used directly)
-uniform vec2 texelSize;       // 1.0 / resolution (e.g. vec2(1.0/res,1.0/res))
-
-// Reaction-diffusion parameters (tweak from JS)
-uniform float Da;    // diffusion rate for A
-uniform float Db;    // diffusion rate for B
-uniform float feed;  // feed rate (f)
-uniform float kill;  // kill rate (k)
-uniform float dt;    // timestep
-uniform float inject;   // strength to inject textureNew into B
-uniform float sharpen;  // unsharp mask amount
-uniform float blurRadius; // blur kernel radius (in texels)
-
+const passVertex = `
 varying vec2 vUv;
-
-// simple 3x3 Laplacian weights
-vec2 laplacian(vec2 uv) {
-    // sample center + 8 neighbors
-	vec4 c = texture2D(textureOld, uv);
-	float centerA = c.r;
-	float centerB = c.g;
-
-    // neighbors
-	float nA = texture2D(textureOld, uv + vec2(0.0, texelSize.y)).r;
-	float sA = texture2D(textureOld, uv - vec2(0.0, texelSize.y)).r;
-	float eA = texture2D(textureOld, uv + vec2(texelSize.x, 0.0)).r;
-	float wA = texture2D(textureOld, uv - vec2(texelSize.x, 0.0)).r;
-
-	float neA = texture2D(textureOld, uv + vec2(texelSize.x, texelSize.y)).r;
-	float nwA = texture2D(textureOld, uv + vec2(-texelSize.x, texelSize.y)).r;
-	float seA = texture2D(textureOld, uv + vec2(texelSize.x, -texelSize.y)).r;
-	float swA = texture2D(textureOld, uv + vec2(-texelSize.x, -texelSize.y)).r;
-
-	float nB = texture2D(textureOld, uv + vec2(0.0, texelSize.y)).g;
-	float sB = texture2D(textureOld, uv - vec2(0.0, texelSize.y)).g;
-	float eB = texture2D(textureOld, uv + vec2(texelSize.x, 0.0)).g;
-	float wB = texture2D(textureOld, uv - vec2(texelSize.x, 0.0)).g;
-
-	float neB = texture2D(textureOld, uv + vec2(texelSize.x, texelSize.y)).g;
-	float nwB = texture2D(textureOld, uv + vec2(-texelSize.x, texelSize.y)).g;
-	float seB = texture2D(textureOld, uv + vec2(texelSize.x, -texelSize.y)).g;
-	float swB = texture2D(textureOld, uv + vec2(-texelSize.x, -texelSize.y)).g;
-
-    // weights matching common Gray-Scott examples
-	float lapA = -1.0 * centerA + 0.2 * (nA + sA + eA + wA) + 0.05 * (neA + nwA + seA + swA);
-
-	float lapB = -1.0 * texture2D(textureOld, uv).g + 0.2 * (nB + sB + eB + wB) + 0.05 * (neB + nwB + seB + swB);
-
-	return vec2(lapA, lapB);
-}
-
-// small box blur for unsharp mask (averages center + 4 neighbors at radius)
-vec3 smallBlur(vec2 uv, float radius) {
-	vec2 r = texelSize * radius;
-	vec3 c = texture2D(textureOld, uv).rgb;
-	vec3 n = texture2D(textureOld, uv + vec2(0.0, r.y)).rgb;
-	vec3 s = texture2D(textureOld, uv - vec2(0.0, r.y)).rgb;
-	vec3 e = texture2D(textureOld, uv + vec2(r.x, 0.0)).rgb;
-	vec3 w = texture2D(textureOld, uv - vec2(r.x, 0.0)).rgb;
-	return (c + n + s + e + w) * 0.2;
-}
-
 void main() {
-    // read previous A and B
-	vec4 state = texture2D(textureOld, vUv);
-	float A = state.r;
-	float B = state.g;
-
-    // compute laplacian
-	vec2 lap = laplacian(vUv);
-
-    // Gray-Scott update
-	float reaction = A * B * B;
-	float dA = Da * lap.x - reaction + feed * (1.0 - A);
-	float dB = Db * lap.y + reaction - (kill + feed) * B;
-
-	float A_new = clamp(A + dA * dt, 0.0, 1.0);
-	float B_new = clamp(B + dB * dt, 0.0, 1.0);
-
-    // inject drawing input into B channel (draw adds B)
-	vec4 inputCol = texture2D(textureNew, vUv);
-    // use luminance of drawing and optionally alpha for injection
-	float drawLuma = dot(inputCol.rgb, vec3(0.299, 0.587, 0.114));
-	B_new = clamp(B_new + drawLuma * inject, 0.0, 1.0);
-
-    // Build a visually pleasing color from A/B for display (but keep A/B in R/G)
-    // Example mapping: more B -> brighter / colorful
-	float displayHue = B_new - A_new * 0.5;
-	vec3 displayColor = vec3(clamp(B_new * 1.2, 0.0, 1.0), clamp(A_new * 0.6 + B_new * 0.3, 0.0, 1.0), clamp(1.0 - A_new * 0.8, 0.0, 1.0));
-
-    // Unsharp masking: blur the old display (approx), then sharpen displayColor
-	vec3 oldRGB = texture2D(textureOld, vUv).rgb;
-	vec3 blurRGB = smallBlur(vUv, max(1.0, blurRadius));
-	vec3 sharpened = displayColor + sharpen * (displayColor - blurRGB);
-
-    // Compose final visual that will be visible on screen:
-	vec3 finalVis = clamp(sharpened, 0.0, 1.0);
-
-    // IMPORTANT: store A_new in R, B_new in G so the feedback loop keeps the RD state.
-    // Put a visually related value into B channel (we put finalVis.b into B for slight visual continuity in 3rd channel).
-	gl_FragColor = vec4(A_new, B_new, finalVis.b, 1.0);
+	vUv = uv;
+	gl_Position = vec4(position.xy, 0.0, 1.0);
 }
 `;
+
+// advect pass
+const advectFragment = `
+precision highp float;
+uniform sampler2D field;
+uniform sampler2D velocity;
+uniform float dt;
+uniform float dissipation;
+varying vec2 vUv;
+
+void main() {
+	vec2 texSize = vec2(textureSize(field, 0));
+	vec2 vel = texture2D(velocity, vUv).xy;
+	vec2 coord = vUv - dt * vel / texSize;
+	coord = mod(coord, 1.0);
+	vec4 result = texture2D(field, coord) * dissipation;
+	gl_FragColor = result;
+}
+`;
+
+// splat pass
+const splatFragment = `
+precision highp float;
+uniform sampler2D target;
+uniform vec2 point;
+uniform vec4 value;
+uniform float radius;
+varying vec2 vUv;
+
+void main() {
+	vec4 base = texture2D(target, vUv);
+    float d = distance(vUv, point);
+    float influence = exp(-d * d / (radius * radius));  // square radius falloff
+    vec4 added = value * influence;
+    gl_FragColor = base + added;
+}
+`;
+
+// buoyancy pass
+const buoyancyFragment = `
+precision highp float;
+uniform sampler2D velocity;
+uniform sampler2D density;
+uniform float alpha;
+uniform float dt;
+varying vec2 vUv;
+
+void main() {
+	vec2 vel = texture2D(velocity, vUv).xy;
+	float dens = texture2D(density, vUv).r;
+	vel.y += alpha * dens * dt;
+	gl_FragColor = vec4(vel, 0.0, 1.0);
+}
+`;
+
+// display smoke
+const displayFragment = `
+precision highp float;
+uniform sampler2D density;
+varying vec2 vUv;
+
+void main() {
+	float d = texture2D(density, vUv).r;
+	vec3 col = vec3(d * 0.9, d * 0.95, d);
+	gl_FragColor = vec4(col, 1.0);
+}
+`;
+
+// ------------------------------
+// Types and class
+// ------------------------------
 
 interface TouchState {
 	sphereNow: THREE.Mesh;
 	spherePrev: THREE.Mesh;
 	lastPosition: THREE.Vector3 | null;
+	position: THREE.Vector3;
+	velocity: THREE.Vector3;
+	uv: THREE.Vector2;
 }
 
 export default class DistortionScene extends BaseScene {
-	// Drawing
 	private touchStates: Map<number, TouchState>;
 	private touchSphereGeo: THREE.SphereGeometry;
 	private touchSphereMat: THREE.MeshBasicMaterial;
 	private lineGeo: THREE.CylinderGeometry;
 	private lineMeshes: THREE.Mesh[] = [];
-	private touchColors: { [touchId: number]: number } = {};
 
-	// Shader
-	private feedbackA: THREE.WebGLRenderTarget;
-	private feedbackB: THREE.WebGLRenderTarget;
-	private feedbackMaterial: THREE.ShaderMaterial;
-	private feedbackQuad: THREE.Mesh;
-	private useA = true;
+	// fluid sim
+	private velocityA: THREE.WebGLRenderTarget;
+	private velocityB: THREE.WebGLRenderTarget;
+	private densityA: THREE.WebGLRenderTarget;
+	private densityB: THREE.WebGLRenderTarget;
+	private advectMat: THREE.ShaderMaterial;
+	private splatMat: THREE.ShaderMaterial;
+	private buoyancyMat: THREE.ShaderMaterial;
+	private displayMat: THREE.ShaderMaterial;
+	private quad: THREE.Mesh;
+	private simRes = 512;
+	private dt = 0.016;
+	private splatRadius = 0.02;
+	private dissipation = 0.995;
+	private velocityDissipation = 0.99;
+	private buoyancyAlpha = 0.6;
 
 	constructor() {
 		super();
-
 		this.init();
-
-		[
-			[1, 0, 0],
-			[-1, 0, 0],
-			[0, 1, 0],
-			[0, -1, 0],
-			[0, 0, 1],
-			[0, 0, -1],
-		].forEach((position) =>
-			this.addText({
-				text: "·",
-				color: getNextColor(),
-				size: 1.0,
-				position: new THREE.Vector3(...position),
-			})
-		);
 
 		this.touchHandler.on("touch", (touchId: TouchId, vector: THREE.Vector3) => {
 			this.updateTouchSphere(touchId, vector);
 		});
 		this.touchHandler.on("remove", (touchId: TouchId) => {
 			this.removeTouchSphere(touchId);
-			// this.clearLines();
 		});
 	}
 
 	public setRendererSettings(renderer: Renderer): void {
-		// renderer.setClearColor(new THREE.Color(255, 0, 0));
-		// renderer.clearColor();
 		renderer.outputColorSpace = THREE.SRGBColorSpace;
 		renderer.toneMapping = THREE.NoToneMapping;
 		renderer.autoClear = true;
 	}
 
-	init() {
-		const penWidth = paintSettings.penWidth;
-
-		this.touchStates = new Map<number, TouchState>();
+	private init() {
+		this.touchStates = new Map();
+		const penWidth = paintSettings.penWidth / 100;
 		this.touchSphereGeo = new THREE.SphereGeometry(penWidth, 12, 10);
 		this.touchSphereMat = new THREE.MeshBasicMaterial({
-			color: 0xffffff,
 			depthTest: false,
 			depthWrite: false,
 		});
 		this.lineGeo = new THREE.CylinderGeometry(penWidth, penWidth, 1, 8, 1);
-		this.lineGeo.rotateX(Math.PI / 2); // Make cylinder align with Z axis
-		const lineMeshes: THREE.Mesh[] = [];
+		this.lineGeo.rotateX(Math.PI / 2);
 
-		/* Rendering */
-
-		const res = 1024;
-
-		this.feedbackA = new THREE.WebGLRenderTarget(res, res, {
+		// Fluid render targets
+		const opts: THREE.RenderTargetOptions = {
 			format: THREE.RGBAFormat,
-			type: THREE.UnsignedByteType,
-		});
-		this.feedbackB = new THREE.WebGLRenderTarget(res, res, {
-			format: THREE.RGBAFormat,
-			type: THREE.UnsignedByteType,
-		});
+			type: THREE.FloatType,
+			minFilter: THREE.LinearFilter,
+			magFilter: THREE.LinearFilter,
+			depthBuffer: false,
+			stencilBuffer: false,
+		};
+		this.velocityA = new THREE.WebGLRenderTarget(
+			this.simRes,
+			this.simRes,
+			opts
+		);
+		this.velocityB = new THREE.WebGLRenderTarget(
+			this.simRes,
+			this.simRes,
+			opts
+		);
+		this.densityA = new THREE.WebGLRenderTarget(this.simRes, this.simRes, opts);
+		this.densityB = new THREE.WebGLRenderTarget(this.simRes, this.simRes, opts);
 
-		this.feedbackMaterial = new THREE.ShaderMaterial({
+		this.advectMat = new THREE.ShaderMaterial({
 			uniforms: {
-				textureNew: { value: null },
-				textureOld: { value: this.feedbackA.texture },
-				blur: { value: 0.0015 }, // kept for compatibility
-				texelSize: { value: new THREE.Vector2(1 / res, 1 / res) },
-
-				// RD params (tweak)
-				Da: { value: 0.2 }, // diffusion A
-				Db: { value: 0.1 }, // diffusion B
-				feed: { value: 0.05 }, // f (try 0.02..0.06)
-				kill: { value: 0.062 }, // k (try 0.045..0.07)
-				dt: { value: 1.0 },
-
-				// injection & visual params
-				inject: { value: 0.6 },
-				sharpen: { value: 0.8 },
-				blurRadius: { value: 1.0 },
+				field: { value: null },
+				velocity: { value: null },
+				dt: { value: this.dt },
+				dissipation: { value: this.dissipation },
 			},
-			vertexShader,
-			fragmentShader,
-			depthTest: false,
-			depthWrite: false,
+			vertexShader: passVertex,
+			fragmentShader: advectFragment,
+		});
+
+		this.splatMat = new THREE.ShaderMaterial({
+			uniforms: {
+				target: { value: null },
+				point: { value: new THREE.Vector2(0.5, 0.5) },
+				value: { value: new THREE.Vector4(1, 1, 1, 1) },
+				radius: { value: this.splatRadius },
+			},
+			vertexShader: passVertex,
+			fragmentShader: splatFragment,
 			transparent: true,
 		});
 
-		const feedbackUniforms = this.feedbackMaterial.uniforms;
+		this.buoyancyMat = new THREE.ShaderMaterial({
+			uniforms: {
+				velocity: { value: null },
+				density: { value: null },
+				alpha: { value: this.buoyancyAlpha },
+				dt: { value: this.dt },
+			},
+			vertexShader: passVertex,
+			fragmentShader: buoyancyFragment,
+		});
 
-		// const rdFolder = gui.addFolder("Reaction Diffusion");
-		// rdFolder.add(feedbackUniforms.Da, "value", 0.1, 5.0, 0.01).name("Da");
-		// rdFolder.add(feedbackUniforms.Db, "value", 0.1, 5.0, 0.01).name("Db");
-		// rdFolder
-		// 	.add(feedbackUniforms.feed, "value", 0.01, 1.0, 0.001)
-		// 	.name("Feed");
-		// rdFolder
-		// 	.add(feedbackUniforms.kill, "value", 0.03, 1.0, 0.001)
-		// 	.name("Kill");
-		// rdFolder.add(feedbackUniforms.dt, "value", 0.1, 2.0, 0.1).name("Δt");
-		// rdFolder
-		// 	.add(feedbackUniforms.inject, "value", 0.0, 2.0, 0.01)
-		// 	.name("Inject Strength");
-		// rdFolder.open();
+		this.displayMat = new THREE.ShaderMaterial({
+			uniforms: { density: { value: this.densityA.texture } },
+			vertexShader: passVertex,
+			fragmentShader: displayFragment,
+		});
 
-		// const visFolder = gui.addFolder("Visual");
-		// visFolder
-		// 	.add(feedbackUniforms.sharpen, "value", 0.0, 2.0, 0.01)
-		// 	.name("Sharpen");
-		// visFolder
-		// 	.add(feedbackUniforms.blurRadius, "value", 0.0, 10.0, 0.1)
-		// 	.name("Blur Radius");
-		// visFolder.open();
-
-		this.feedbackQuad = new THREE.Mesh(
-			new THREE.PlaneGeometry(2, 2),
-			this.feedbackMaterial
-		);
+		this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.advectMat);
 	}
 
-	updateTouchSphere(id: number, vector: THREE.Vector3) {
-		if (!(id in this.touchColors)) {
-			this.touchColors[id] = getNextColor();
-		}
-		this.touchSphereMat.color.setHex(this.touchColors[id]);
+	private posToUV(pos: THREE.Vector3): THREE.Vector2 {
+		const u = 0.5 + Math.atan2(pos.z, pos.x) / (2 * Math.PI);
+		const v = 0.5 - Math.asin(pos.y) / Math.PI;
+		return new THREE.Vector2(u, v);
+	}
 
+	private updateTouchSphere(id: number, vec: THREE.Vector3) {
+		const pos = vec.clone().normalize();
+		const color = new THREE.Color(
+			pos.x * 0.5 + 0.5,
+			pos.y * 0.5 + 0.5,
+			pos.z * 0.5 + 0.5
+		);
 		let state = this.touchStates.get(id);
-		if (!state) {
-			const sphereNow = new THREE.Mesh(
-				this.touchSphereGeo,
-				this.touchSphereMat.clone()
-			);
-			this.add(sphereNow);
-			const spherePrev = new THREE.Mesh(
-				this.touchSphereGeo,
-				this.touchSphereMat.clone()
-			);
-			this.add(spherePrev);
 
-			state = { sphereNow, spherePrev, lastPosition: null };
+		if (!state) {
+			const now = new THREE.Mesh(
+				this.touchSphereGeo,
+				this.touchSphereMat.clone()
+			);
+			const prev = new THREE.Mesh(
+				this.touchSphereGeo,
+				this.touchSphereMat.clone()
+			);
+			this.add(now);
+			this.add(prev);
+			state = {
+				sphereNow: now,
+				spherePrev: prev,
+				lastPosition: null,
+				position: pos.clone(),
+				velocity: new THREE.Vector3(),
+				uv: this.posToUV(pos),
+			};
 			this.touchStates.set(id, state);
 		}
+		(state.sphereNow.material as THREE.MeshBasicMaterial).color.copy(color);
+		(state.spherePrev.material as THREE.MeshBasicMaterial).color.copy(color);
 
-		// Convert pitch/yaw to direction and get new position
-		const newPosition = vector.multiplyScalar(5);
-		state.sphereNow.position.copy(newPosition);
-
-		// If we have a previous position, create a line between them
+		const newPos = vec.clone().multiplyScalar(5);
 		if (state.lastPosition) {
-			state.spherePrev.position.copy(state.lastPosition);
-
-			const line = this.createLine(state.lastPosition, newPosition);
+			state.velocity.copy(newPos.clone().sub(state.lastPosition));
+			const line = this.createLine(state.lastPosition, newPos);
 			this.add(line);
 			this.lineMeshes.push(line);
+			state.spherePrev.position.copy(state.lastPosition);
 		}
-
-		// Update last position
-		state.lastPosition = newPosition.clone();
+		state.sphereNow.position.copy(newPos);
+		state.lastPosition = newPos.clone();
+		state.position.copy(pos);
+		state.uv.copy(this.posToUV(pos));
 	}
 
-	removeTouchSphere(id: number) {
-		const state = this.touchStates.get(id);
-		if (state) {
-			this.remove(state.sphereNow);
-			this.remove(state.spherePrev);
+	private removeTouchSphere(id: number) {
+		const s = this.touchStates.get(id);
+		if (s) {
+			this.remove(s.sphereNow);
+			this.remove(s.spherePrev);
 			this.touchStates.delete(id);
 		}
 	}
 
-	clearLines() {
-		// Clear all lines
-		this.lineMeshes.forEach((line) => this.remove(line));
+	private clearLines() {
+		this.lineMeshes.forEach((l) => this.remove(l));
 		this.lineMeshes.length = 0;
 	}
 
-	createLine(start: THREE.Vector3, end: THREE.Vector3): THREE.Mesh {
+	private createLine(a: THREE.Vector3, b: THREE.Vector3) {
 		const line = new THREE.Mesh(this.lineGeo, this.touchSphereMat.clone());
-		const direction = end.clone().sub(start);
-		const length = direction.length();
-
-		// Position at midpoint
-		line.position.copy(start).add(end).multiplyScalar(0.5);
-
-		// Orient to point from start to end
-		line.lookAt(end);
-		line.scale.set(1, 1, length);
-
+		const dir = b.clone().sub(a);
+		const len = dir.length();
+		line.position.copy(a).add(b).multiplyScalar(0.5);
+		line.lookAt(b);
+		line.scale.set(1, 1, len);
 		return line;
 	}
 
-	/* Rendering */
-
-	override onEnter(renderer: Renderer) {
-		console.log("PaintScene loaded");
+	private runPass(
+		renderer: Renderer,
+		mat: THREE.ShaderMaterial,
+		out: THREE.WebGLRenderTarget
+	) {
+		this.quad.material = mat;
+		renderer.setRenderTarget(out);
+		renderer.render(this.quad, renderer.projectionScene.screenCamera);
 	}
 
-	override onExit(renderer: Renderer) {
-		console.log("PaintScene cleaned up");
+	private splatTouches(renderer: Renderer) {
+		this.touchStates.forEach((state) => {
+			this.splatMat.uniforms.target.value = this.velocityA.texture;
+			this.splatMat.uniforms.point.value = state.uv;
+			this.splatMat.uniforms.value.value = new THREE.Vector4(
+				state.velocity.x,
+				state.velocity.y,
+				0,
+				1
+			);
+			this.runPass(renderer, this.splatMat, this.velocityB);
+			[this.velocityA, this.velocityB] = [this.velocityB, this.velocityA];
 
-		// Remove feedback textures, listeners, etc.
-		this.clearLines();
-		// this.touchHandler.removeAllListeners?.();
+			this.splatMat.uniforms.target.value = this.densityA.texture;
+			this.splatMat.uniforms.value.value = new THREE.Vector4(1, 1, 1, 1);
+			this.runPass(renderer, this.splatMat, this.densityB);
+			[this.densityA, this.densityB] = [this.densityB, this.densityA];
+		});
+	}
+
+	private advect(renderer: Renderer) {
+		this.advectMat.uniforms.field.value = this.velocityA.texture;
+		this.advectMat.uniforms.velocity.value = this.velocityA.texture;
+		this.advectMat.uniforms.dissipation.value = this.velocityDissipation;
+		this.runPass(renderer, this.advectMat, this.velocityB);
+		[this.velocityA, this.velocityB] = [this.velocityB, this.velocityA];
+
+		this.advectMat.uniforms.field.value = this.densityA.texture;
+		this.advectMat.uniforms.velocity.value = this.velocityA.texture;
+		this.advectMat.uniforms.dissipation.value = this.dissipation;
+		this.runPass(renderer, this.advectMat, this.densityB);
+		[this.densityA, this.densityB] = [this.densityB, this.densityA];
+	}
+
+	private buoyancy(renderer: Renderer) {
+		this.buoyancyMat.uniforms.velocity.value = this.velocityA.texture;
+		this.buoyancyMat.uniforms.density.value = this.densityA.texture;
+		this.runPass(renderer, this.buoyancyMat, this.velocityB);
+		[this.velocityA, this.velocityB] = [this.velocityB, this.velocityA];
+	}
+
+	override renderScene(renderer: Renderer) {
+		// Run fluid sim
+		this.splatTouches(renderer);
+		this.advect(renderer);
+		this.buoyancy(renderer);
+
+		// Display smoke
+		this.displayMat.uniforms.density.value = this.densityA.texture;
+		this.quad.material = this.displayMat;
+		renderer.setRenderTarget(null);
+		renderer.render(this.quad, renderer.projectionScene.screenCamera);
+
+		// 🧪 DEBUG: visualize velocity
+		renderer.setRenderTarget(null);
+		this.displayMat.uniforms.density.value = this.velocityA.texture;
+		renderer.render(this.quad, renderer.projectionScene.screenCamera);
+		return;
 	}
 
 	postRender() {
 		this.clearLines();
-	}
-
-	override renderScene(renderer: Renderer) {
-		const projectionScene = renderer.projectionScene;
-
-		// 1️⃣ Capture cube map
-		projectionScene.cubeCamera.position.copy(renderer.centerCamera.position);
-		projectionScene.cubeCamera.quaternion.copy(
-			renderer.centerCamera.quaternion
-		);
-		projectionScene.cubeCamera.update(renderer, this);
-
-		// 2️⃣ Render AEP into target
-		renderer.setRenderTarget(projectionScene.aepTarget);
-		renderer.render(projectionScene, projectionScene.screenCamera);
-
-		// 3️⃣ Feedback blur pass
-		const readBuffer = this.useA ? this.feedbackA : this.feedbackB;
-		const writeBuffer = this.useA ? this.feedbackB : this.feedbackA;
-		this.feedbackMaterial.uniforms.textureNew.value =
-			projectionScene.aepTarget.texture;
-		this.feedbackMaterial.uniforms.textureOld.value = readBuffer.texture;
-
-		renderer.setRenderTarget(writeBuffer);
-		renderer.render(this.feedbackQuad, projectionScene.screenCamera);
-
-		// 4️⃣ Display final
-		renderer.setRenderTarget(null);
-		renderer.render(this.feedbackQuad, projectionScene.screenCamera);
-
-		// 5️⃣ Swap buffers
-		this.useA = !this.useA;
 	}
 }

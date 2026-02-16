@@ -10,7 +10,7 @@ void main() {
 		return;
 	}
 
-	float c = r * 3.141592653589793;
+	float c = r * 3.141592653589793 * (360.0 / 360.0);
 	float theta = atan(p.y, p.x);
 	float sin_c = sin(c);
 	float cos_c = cos(c);

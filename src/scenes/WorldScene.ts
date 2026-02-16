@@ -99,6 +99,8 @@ export default class WorldScene extends BaseScene {
 
 		// Example: listen for OmniSocket events
 		// this.omniSocket.on("playerJoined", this.handlePlayerJoin);
+
+		this.add(this.touchHandler.touchGroup);
 	}
 
 	override onExit(renderer: Renderer) {
