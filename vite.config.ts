@@ -13,44 +13,44 @@ import buildCleanup from "./scripts/build-cleanup";
 import { title, team, description, title_dashed } from "./scripts/constants";
 
 export default () => {
-  process.env.VITE_GAME_TITLE = title;
-  process.env.VITE_GAME_TEAM = team;
-  process.env.VITE_GAME_DESCRIPTION = description;
+	process.env.VITE_GAME_TITLE = title;
+	process.env.VITE_GAME_TEAM = team;
+	process.env.VITE_GAME_DESCRIPTION = description;
 
-  return defineConfig({
-    base: "./",
-    root: "src",
-    plugins: [
-      tsconfigPaths(),
-      getGitVersion(),
-      checker({
-        typescript: true,
-      }),
-      preImageOptimizer(),
-      neuInject(),
-      neuBuild(),
-      bundleWinApp(),
-      zip({
-        inDir: `./dist/win`,
-        outDir: "./dist",
-        outFileName: `${title_dashed}-win.zip`,
-      }),
-      buildCleanup(),
-    ],
-    build: {
-      outDir: "../dist/web",
-      chunkSizeWarningLimit: 4096,
-      assetsInlineLimit: 0,
-      target: "ES2022",
-      minify: "terser",
-      terserOptions: {
-        format: {
-          comments: false,
-        },
-      },
-    },
-    server: {
-      host: "localhost",
-    },
-  });
+	return defineConfig({
+		base: "./",
+		root: "src",
+		plugins: [
+			tsconfigPaths(),
+			getGitVersion(),
+			checker({
+				typescript: true,
+			}),
+			preImageOptimizer(),
+			neuInject(),
+			neuBuild(),
+			bundleWinApp(),
+			zip({
+				inDir: `./dist/win`,
+				outDir: "./dist",
+				outFileName: `${title_dashed}-win.zip`,
+			}),
+			buildCleanup(),
+		],
+		build: {
+			outDir: "../dist/web",
+			chunkSizeWarningLimit: 4096,
+			assetsInlineLimit: 0,
+			target: "ES2022",
+			minify: "terser",
+			terserOptions: {
+				format: {
+					comments: false,
+				},
+			},
+		},
+		server: {
+			host: "localhost",
+		},
+	});
 };
