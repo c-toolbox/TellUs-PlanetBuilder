@@ -2,7 +2,6 @@ import * as THREE from "three";
 import BaseScene from "./BaseScene";
 import { TouchId } from "@/network/tuioProtocol";
 import { Renderer } from "./Renderer";
-import { paintSettings } from "@/utils/gui";
 
 // ------------------------------
 // Simple fluid simulation shaders
@@ -140,7 +139,7 @@ export default class DistortionScene extends BaseScene {
 
 	private init() {
 		this.touchStates = new Map();
-		const penWidth = paintSettings.penWidth / 100;
+		const penWidth = 1 / 100;
 		this.touchSphereGeo = new THREE.SphereGeometry(penWidth, 12, 10);
 		this.touchSphereMat = new THREE.MeshBasicMaterial({
 			depthTest: false,

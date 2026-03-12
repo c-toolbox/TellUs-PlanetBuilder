@@ -77,7 +77,7 @@ const colorCycle = [
 	Color.Rose400,
 ];
 let currentColorIndex = 0;
-export function getNextColor() {
+export function getRainbowColor() {
 	const color = colorCycle[currentColorIndex % colorCycle.length];
 	currentColorIndex++;
 	return color;

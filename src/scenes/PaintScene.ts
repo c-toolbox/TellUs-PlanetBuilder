@@ -2,12 +2,29 @@ import * as THREE from "three";
 import BaseScene from "./BaseScene";
 import { TouchId } from "@/network/tuioProtocol";
 import { Renderer } from "./Renderer";
-import { getNextColor } from "@/utils/functions";
+import { getRainbowColor, getRandomColor } from "@/utils/functions";
 
 import vertexShader from "@/shaders/basic.vert?raw";
-import { paintSettings } from "@/utils/gui";
+import { SceneKey, sceneManager, scenes } from "./SceneManager";
+import { UiConfigEvent } from "@/network/uiProtocol";
 
 const fragmentShader = `
+precision highp float;
+uniform sampler2D textureNew;
+uniform sampler2D textureOld;
+uniform float blur;
+varying vec2 vUv;
+
+void main() {
+	vec4 oldColor = texture2D(textureOld, vUv);
+	vec4 newColor = texture2D(textureNew, vUv);
+
+	vec4 composed = 1.0 * max(oldColor, newColor);
+	gl_FragColor = composed;
+}
+`;
+
+const blurFragmentShader = `
 precision highp float;
 uniform sampler2D textureNew;
 uniform sampler2D textureOld;
@@ -33,6 +50,17 @@ interface TouchState {
 	lastPosition: THREE.Vector3 | null;
 }
 
+/* Socket UI config */
+
+const ColorModes = ["rainbow", "random", "white"] as const;
+type ColorMode = (typeof ColorModes)[number];
+
+export interface PaintUiConfig {
+	penWidth: number;
+	blur: boolean;
+	colorMode: ColorMode;
+}
+
 export default class PaintScene extends BaseScene {
 	// Drawing
 	private touchStates: Map<number, TouchState>;
@@ -48,6 +76,13 @@ export default class PaintScene extends BaseScene {
 	private feedbackMaterial: THREE.ShaderMaterial;
 	private feedbackQuad: THREE.Mesh;
 	private useA = true;
+	private needsClear = false;
+
+	private uiConfig: PaintUiConfig = {
+		penWidth: 0.1,
+		blur: false,
+		colorMode: "rainbow",
+	};
 
 	constructor() {
 		super();
@@ -88,7 +123,7 @@ export default class PaintScene extends BaseScene {
 	}
 
 	init() {
-		const penWidth = paintSettings.penWidth;
+		const penWidth = this.uiConfig.penWidth;
 
 		this.touchStates = new Map<number, TouchState>();
 		this.touchSphereGeo = new THREE.SphereGeometry(penWidth, 12, 10);
@@ -129,13 +164,13 @@ export default class PaintScene extends BaseScene {
 
 		this.feedbackQuad = new THREE.Mesh(
 			new THREE.PlaneGeometry(2, 2),
-			this.feedbackMaterial
+			this.feedbackMaterial,
 		);
 	}
 
 	updateTouchSphere(id: number, vector: THREE.Vector3) {
 		if (!(id in this.touchColors)) {
-			this.touchColors[id] = getNextColor();
+			this.touchColors[id] = this.getColor();
 		}
 		this.touchSphereMat.color.setHex(this.touchColors[id]);
 
@@ -143,12 +178,12 @@ export default class PaintScene extends BaseScene {
 		if (!state) {
 			const sphereNow = new THREE.Mesh(
 				this.touchSphereGeo,
-				this.touchSphereMat.clone()
+				this.touchSphereMat.clone(),
 			);
 			this.add(sphereNow);
 			const spherePrev = new THREE.Mesh(
 				this.touchSphereGeo,
-				this.touchSphereMat.clone()
+				this.touchSphereMat.clone(),
 			);
 			this.add(spherePrev);
 
@@ -203,10 +238,39 @@ export default class PaintScene extends BaseScene {
 		return line;
 	}
 
+	updatePenWidth(width: number) {
+		this.uiConfig.penWidth = width;
+
+		// Dispose old geometries
+		this.touchSphereGeo.dispose();
+		this.lineGeo.dispose();
+
+		// Create new ones
+		this.touchSphereGeo = new THREE.SphereGeometry(width, 12, 10);
+
+		this.lineGeo = new THREE.CylinderGeometry(width, width, 1, 8, 1);
+		this.lineGeo.rotateX(Math.PI / 2);
+	}
+
+	getColor() {
+		switch (this.uiConfig.colorMode) {
+			case "rainbow":
+				return getRainbowColor();
+			case "random":
+				return getRandomColor();
+			case "white":
+				return 0xffffff;
+		}
+	}
+
 	/* Rendering */
 
 	override onEnter(renderer: Renderer) {
 		console.log("PaintScene loaded");
+
+		// Initialize UI
+		this.setupUi();
+		this.refreshConfig();
 	}
 
 	override onExit(renderer: Renderer) {
@@ -215,6 +279,8 @@ export default class PaintScene extends BaseScene {
 		// Remove feedback textures, listeners, etc.
 		this.clearLines();
 		// this.touchHandler.removeAllListeners?.();
+
+		this.clear();
 	}
 
 	postRender() {
@@ -227,7 +293,7 @@ export default class PaintScene extends BaseScene {
 		// 1️⃣ Capture cube map
 		projectionScene.cubeCamera.position.copy(renderer.centerCamera.position);
 		projectionScene.cubeCamera.quaternion.copy(
-			renderer.centerCamera.quaternion
+			renderer.centerCamera.quaternion,
 		);
 		projectionScene.cubeCamera.update(renderer, this);
 
@@ -251,5 +317,115 @@ export default class PaintScene extends BaseScene {
 
 		// 5️⃣ Swap buffers
 		this.useA = !this.useA;
+
+		// Clear is needed
+		if (this.needsClear) {
+			const prev = renderer.getRenderTarget();
+
+			renderer.setRenderTarget(this.feedbackA);
+			renderer.clear(true, true, true);
+
+			renderer.setRenderTarget(this.feedbackB);
+			renderer.clear(true, true, true);
+
+			renderer.setRenderTarget(prev);
+
+			this.useA = true;
+			this.needsClear = false;
+		}
+	}
+
+	/* Socket UI */
+
+	setupUi() {
+		this.uiSocket.on("request", () => this.refreshConfig());
+
+		this.uiSocket.on("scene", (value: SceneKey) => {
+			sceneManager.setScene(scenes[value]);
+		});
+
+		this.uiSocket.on("pen_width", (value: number) => {
+			this.updatePenWidth(value);
+			this.refreshConfig();
+		});
+
+		this.uiSocket.on("blur", (value: boolean) => {
+			this.uiConfig.blur = value;
+			this.feedbackMaterial.fragmentShader = value
+				? blurFragmentShader
+				: fragmentShader;
+			this.feedbackMaterial.needsUpdate = true;
+			this.refreshConfig();
+		});
+
+		this.uiSocket.on("color_mode", (value: ColorMode) => {
+			this.uiConfig.colorMode = value;
+			this.refreshConfig();
+		});
+
+		this.uiSocket.on("clear", () => {
+			this.needsClear = true;
+		});
+	}
+
+	refreshConfig() {
+		this.uiSocket.send(this.config);
+	}
+
+	get config(): UiConfigEvent {
+		return {
+			type: "config",
+			title: "Paint",
+			elements: [
+				{
+					type: "dropdown",
+					id: "scene",
+					hint_title: "Scene",
+					hint_text: "Switch to a different scene",
+					value: "Paint",
+					// options: Object.values(SceneKey),
+					options: [SceneKey.World, SceneKey.Paint],
+				},
+
+				{
+					type: "hr",
+					id: "paint_settings",
+					hint_title: "Paint settings",
+				},
+				{
+					type: "slider",
+					id: "pen_width",
+					hint_title: "Pen size",
+					hint_text: "The width of the pen while drawing",
+					value: this.uiConfig.penWidth,
+					min: 0.01,
+					max: 1.0,
+					step: 0.01,
+				},
+				{
+					type: "switch",
+					id: "blur",
+					hint_title: "Enable blur",
+					hint_text: "Make the painting fade away",
+					value: this.uiConfig.blur,
+				},
+				{
+					type: "dropdown",
+					id: "color_mode",
+					hint_title: "Color mode",
+					hint_text: "How colors are picked while drawing",
+					options: ColorModes,
+					value: this.uiConfig.colorMode,
+				},
+				{
+					type: "button",
+					id: "clear",
+					hint_title: "Clear",
+					hint_text: "Clear all drawings and start fresh",
+					text: "Clear",
+					color: "#c70036",
+				},
+			],
+		};
 	}
 }

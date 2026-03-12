@@ -2,10 +2,9 @@ import * as THREE from "three";
 import BaseScene from "./BaseScene";
 import { TouchId } from "@/network/tuioProtocol";
 import { Renderer } from "./Renderer";
-import { getNextColor } from "@/utils/functions";
+import { getRainbowColor } from "@/utils/functions";
 
 import vertexShader from "@/shaders/basic.vert?raw";
-import { gui, paintSettings } from "@/utils/gui";
 
 const fragmentShader = `
 precision highp float;
@@ -153,7 +152,7 @@ export default class ReactionDiffusionScene extends BaseScene {
 		].forEach((position) =>
 			this.addText({
 				text: "·",
-				color: getNextColor(),
+				color: getRainbowColor(),
 				size: 1.0,
 				position: new THREE.Vector3(...position),
 			})
@@ -177,7 +176,7 @@ export default class ReactionDiffusionScene extends BaseScene {
 	}
 
 	init() {
-		const penWidth = paintSettings.penWidth;
+		const penWidth = 1.0;
 
 		this.touchStates = new Map<number, TouchState>();
 		this.touchSphereGeo = new THREE.SphereGeometry(penWidth, 12, 10);
@@ -263,7 +262,7 @@ export default class ReactionDiffusionScene extends BaseScene {
 
 	updateTouchSphere(id: number, vector: THREE.Vector3) {
 		if (!(id in this.touchColors)) {
-			this.touchColors[id] = getNextColor();
+			this.touchColors[id] = getRainbowColor();
 		}
 		this.touchSphereMat.color.setHex(this.touchColors[id]);
 

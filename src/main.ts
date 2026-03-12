@@ -8,9 +8,7 @@ import "@/utils/storage";
 import "./utils/proxy";
 
 import { globalServices } from "@/network/GlobalServices";
-import { sceneManager, scenes } from "./scenes/SceneManager";
-import { globalSettings, initializeGui } from "./utils/gui";
+import { SceneKey, sceneManager, scenes } from "./scenes/SceneManager";
 
 globalServices.connectAll();
-sceneManager.setScene(scenes[globalSettings.activeScene]);
-initializeGui();
+sceneManager.setScene(scenes[SceneKey.World]);

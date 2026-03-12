@@ -81,7 +81,7 @@ export interface Movement {
 	y: number;
 }
 
-/* All requests*/
+/* All requests */
 
 export type ValidRequests = OmniToken | SetInput;
 

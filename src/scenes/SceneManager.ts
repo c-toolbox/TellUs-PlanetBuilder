@@ -9,6 +9,15 @@ import DragDropScene from "./DragDropScene";
 
 /* Scenes */
 
+export enum SceneKey {
+	World = "World",
+	Paint = "Paint",
+	Distortion = "Distortion",
+	ReactionDiffusion = "ReactionDiffusion",
+	Dom = "Dom",
+	DragDrop = "DragDrop",
+}
+
 export const scenes = {
 	World: new WorldScene(),
 	Paint: new PaintScene(),
@@ -16,9 +25,7 @@ export const scenes = {
 	ReactionDiffusion: new ReactionDiffusionScene(),
 	Dom: new DomScene(),
 	DragDrop: new DragDropScene(),
-} satisfies Record<string, BaseScene>;
-
-export type SceneKey = keyof typeof scenes;
+} satisfies Record<SceneKey, BaseScene>;
 
 /* Manager */
 

@@ -1,12 +1,7 @@
 import * as THREE from "three";
 import { createNoise3D, NoiseFunction3D } from "simplex-noise";
 import { getPitchFromVector } from "@/utils/functions";
-import {
-	DEFAULT_BIOME,
-	GENERATE_BIOMES,
-	SIMPLIFY_BIOMES,
-	USE_AI_TEXTURES,
-} from "@/constants";
+import { DEFAULT_BIOME, GENERATE_BIOMES } from "@/constants";
 
 export enum Tile {
 	None = "",
@@ -39,79 +34,103 @@ import assetAiOcean from "@/assets/ai/ocean.jpg";
 import assetAiSpruce from "@/assets/ai/spruce.jpg";
 import assetAiSea from "@/assets/ai/sea.png";
 import assetAiSnow from "@/assets/ai/snow.jpg";
+import { DistributionType } from "@/scenes/WorldSceneConfig";
 
-const tileAssets = {
-	[Tile.None]: assetSquare,
-	[Tile.Beach]: USE_AI_TEXTURES ? assetAiBeach : assetBeach,
-	[Tile.Desert]: USE_AI_TEXTURES ? assetAiDesert : assetDesert,
-	[Tile.Forest]: USE_AI_TEXTURES ? assetAiForest : assetForest,
-	[Tile.Mountain]: USE_AI_TEXTURES ? assetAiMountain : assetMountain,
-	[Tile.Ocean]: USE_AI_TEXTURES ? assetAiOcean : assetOcean,
-	[Tile.Spruce]: USE_AI_TEXTURES ? assetAiSpruce : assetSpruce,
-	[Tile.Sea]: USE_AI_TEXTURES ? assetAiSea : assetSea,
-	[Tile.Snow]: USE_AI_TEXTURES ? assetAiSnow : assetSnow,
-};
+const textureSets = {
+	simple: {
+		[Tile.None]: assetSquare,
+		[Tile.Beach]: assetBeach,
+		[Tile.Desert]: assetDesert,
+		[Tile.Forest]: assetForest,
+		[Tile.Mountain]: assetMountain,
+		[Tile.Ocean]: assetOcean,
+		[Tile.Spruce]: assetSpruce,
+		[Tile.Sea]: assetSea,
+		[Tile.Snow]: assetSnow,
+	},
+	realistic: {
+		[Tile.None]: assetSquare,
+		[Tile.Beach]: assetAiBeach,
+		[Tile.Desert]: assetAiDesert,
+		[Tile.Forest]: assetAiForest,
+		[Tile.Mountain]: assetAiMountain,
+		[Tile.Ocean]: assetAiOcean,
+		[Tile.Spruce]: assetAiSpruce,
+		[Tile.Sea]: assetAiSea,
+		[Tile.Snow]: assetAiSnow,
+	},
+} as const;
+type TextureSetKey = keyof typeof textureSets;
+type TextureSet = (typeof textureSets)[keyof typeof textureSets];
 
 class TileManager {
-	public textures: Record<Tile, THREE.Texture>;
+	public textureSets: Record<TextureSetKey, Record<Tile, THREE.Texture>>;
+	public textureSet: TextureSetKey = "simple";
+	public enabledTiles: Record<Tile, boolean>;
+	public distributionMode: DistributionType = "planet-like";
+
 	private noise1: NoiseFunction3D;
 	private noise2: NoiseFunction3D;
 	private noise3: NoiseFunction3D;
 
 	constructor() {
-		this.loadTileTextures();
+		this.textureSets = {
+			simple: this.loadTileTextures(textureSets.simple),
+			realistic: this.loadTileTextures(textureSets.realistic),
+		};
+
+		this.enabledTiles = {
+			[Tile.None]: false,
+			[Tile.Beach]: true,
+			[Tile.Desert]: true,
+			[Tile.Forest]: true,
+			[Tile.Mountain]: true,
+			[Tile.Ocean]: true,
+			[Tile.Spruce]: true,
+			[Tile.Sea]: true,
+			[Tile.Snow]: true,
+		};
+
+		this.refreshNoiseSeed();
+	}
+
+	private loadTileTextures(
+		textureSet: TextureSet,
+	): Record<Tile, THREE.Texture> {
+		const loader = new THREE.TextureLoader();
+		return Object.values(Tile).reduce(
+			(obj, tile) => {
+				const asset = textureSet[tile];
+				const texture = loader.load(asset);
+				texture.wrapS = THREE.ClampToEdgeWrapping;
+				texture.wrapT = THREE.ClampToEdgeWrapping;
+				obj[tile] = texture;
+				return obj;
+			},
+			{} as Record<Tile, THREE.Texture>,
+		);
+	}
+
+	getTexture(tile: Tile) {
+		return this.textureSets[this.textureSet][tile];
+	}
+
+	refreshNoiseSeed() {
 		this.noise1 = createNoise3D();
 		this.noise2 = createNoise3D();
 		this.noise3 = createNoise3D();
 	}
 
-	private loadTileTextures() {
-		const loader = new THREE.TextureLoader();
-		this.textures = Object.values(Tile).reduce((obj, tile) => {
-			const asset = tileAssets[tile];
-			const texture = loader.load(asset);
-			texture.wrapS = THREE.ClampToEdgeWrapping;
-			texture.wrapT = THREE.ClampToEdgeWrapping;
-			obj[tile] = texture;
-			return obj;
-		}, {} as Record<Tile, THREE.Texture>);
-	}
-
-	getTexture(tile: Tile) {
-		return this.textures[tile];
-	}
-
 	getTileAt(position: THREE.Vector3): Tile {
-		function get(temperature: number, height: number) {
-			if (GENERATE_BIOMES) {
-				if (SIMPLIFY_BIOMES) {
-					if (temperature < -0.4) return Tile.Snow;
-					if (temperature < -0.0) return Tile.Ocean;
-
-					if (height < -0.1) return Tile.Ocean;
-
-					if (height > 0.1 && temperature > 0.8) return Tile.Desert;
-
-					return Tile.Forest;
-				} else {
-					if (temperature < -0.4) return Tile.Snow;
-					if (temperature < -0.0) return Tile.Ocean;
-
-					if (height < -0.3) return Tile.Ocean;
-					if (height < -0.1) return Tile.Ocean; // Sea
-
-					if (height > 0.6) return Tile.Mountain;
-					if (height > 0.1 && height < 0.5 && temperature > 0.85)
-						return Tile.Desert;
-
-					if (temperature < 0.4) return Tile.Spruce;
-					return Tile.Forest;
-				}
-			}
-
-			return Tile[DEFAULT_BIOME];
+		switch (this.distributionMode) {
+			case "planet-like":
+				return this.getPlanetLikeTileAt(position);
+			case "random":
+				return this.getRandomTile();
 		}
+	}
 
+	private getPlanetLikeTileAt(position: THREE.Vector3): Tile {
 		const k1 = 2.0;
 		const k2 = 0.8;
 		const k3 = 2.0;
@@ -125,47 +144,91 @@ class TileManager {
 			0.8 * this.noise2(k2 * x, k2 * y, k2 * z) +
 			0.2 * this.noise3(k3 * x, k3 * y, k3 * z);
 
+		const check = (tile: Tile) => this.enabledTiles[tile];
+
+		function get(temperature: number, height: number) {
+			if (GENERATE_BIOMES) {
+				if (temperature < -0.4 && check(Tile.Snow)) return Tile.Snow;
+				if (temperature < -0.0 && check(Tile.Ocean)) return Tile.Ocean;
+
+				if (height < -0.3 && check(Tile.Ocean)) return Tile.Ocean;
+				if (height < -0.1 && check(Tile.Ocean)) return Tile.Ocean; // Sea
+
+				if (height > 0.6 && check(Tile.Mountain)) return Tile.Mountain;
+				if (
+					height > 0.1 &&
+					height < 0.5 &&
+					temperature > 0.85 &&
+					check(Tile.Desert)
+				)
+					return Tile.Desert;
+
+				if (temperature < 0.4 && check(Tile.Spruce)) return Tile.Spruce;
+
+				if (check(Tile.Forest)) return Tile.Forest;
+
+				// Mega hack
+				for (const tile of Object.values(Tile)) {
+					if (check(tile)) return tile;
+				}
+			}
+
+			return Tile[DEFAULT_BIOME];
+		}
+
 		return get(temperature, height);
 	}
 
+	private getRandomTile(): Tile {
+		const tiles = Object.values(Tile).filter((tile) => this.enabledTiles[tile]);
+		if (tiles.length > 0) {
+			return tiles[Math.floor(Math.random() * tiles.length)];
+		}
+		return Tile.Ocean;
+	}
+
+	private tileCycle = [
+		Tile.Snow,
+		Tile.Ocean,
+		Tile.Sea,
+		Tile.Spruce,
+		Tile.Forest,
+		Tile.Desert,
+		Tile.Mountain,
+	];
+
 	getNextTile(tile: Tile) {
-		if (SIMPLIFY_BIOMES) {
-			switch (tile) {
-				case Tile.None:
-				case Tile.Snow:
-					return Tile.Ocean;
-				case Tile.Ocean:
-					return Tile.Forest;
-				case Tile.Forest:
-					return Tile.Desert;
-				case Tile.Desert:
-					return Tile.Snow;
+		const startIndex = this.tileCycle.indexOf(tile);
 
-				default:
-					return tile;
-			}
-		} else {
-			switch (tile) {
-				case Tile.None:
-					return Tile.Snow;
-				case Tile.Snow:
-					return Tile.Ocean;
-				case Tile.Ocean:
-					return Tile.Sea;
-				case Tile.Sea:
-					return Tile.Spruce;
-				case Tile.Spruce:
-					return Tile.Forest;
-				case Tile.Forest:
-					return Tile.Desert;
-				case Tile.Desert:
-					return Tile.Mountain;
-				case Tile.Mountain:
-					return Tile.Snow;
+		for (let i = 1; i <= this.tileCycle.length; i++) {
+			const next = this.tileCycle[(startIndex + i) % this.tileCycle.length];
 
-				default:
-					return tile;
+			if (this.enabledTiles[next]) {
+				return next;
 			}
+		}
+
+		return tile;
+	}
+
+	tileToEmoji(tile: Tile) {
+		switch (tile) {
+			case Tile.Snow:
+				return "❄️";
+			case Tile.Ocean:
+				return "🌊";
+			case Tile.Sea:
+				return "🐟";
+			case Tile.Spruce:
+				return "🌲";
+			case Tile.Forest:
+				return "🌳";
+			case Tile.Desert:
+				return "☀️";
+			case Tile.Mountain:
+				return "⛰️";
+			default:
+				return "";
 		}
 	}
 }

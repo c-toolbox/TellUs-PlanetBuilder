@@ -11,6 +11,7 @@ import { BACKGROUND_DISTANCE, ORIGIN } from "@/constants";
 export default class BaseScene extends THREE.Scene {
 	protected omniSocket = globalServices.omniSocket;
 	protected touchHandler = globalServices.touchHandler;
+	protected uiSocket = globalServices.uiSocket;
 
 	protected raycaster: THREE.Raycaster;
 	protected clickable: THREE.Object3D[];
@@ -33,11 +34,6 @@ export default class BaseScene extends THREE.Scene {
 	public setRendererSettings(renderer: Renderer) {}
 
 	/* Touch input */
-
-	private initTouchHandler() {
-		// this.touchHandler = new TouchHandler();
-		// this.add(this.touchHandler.touchGroup);
-	}
 
 	public makeClickable(group: THREE.Group) {
 		group.children.forEach((mesh) => this.clickable.push(mesh));

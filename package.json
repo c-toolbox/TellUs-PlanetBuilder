@@ -13,7 +13,6 @@
   "dependencies": {
     "@neutralinojs/lib": "^5.6.0",
     "html2canvas": "^1.4.1",
-    "lil-gui": "^0.20.0",
     "phaser": "^3.88.2",
     "phaser3-rex-plugins": "^1.80.13",
     "three": "^0.175.0"
@@ -23,6 +22,7 @@
     "@neutralinojs/neu": "^11.3.1",
     "@types/earcut": "^3.0.0",
     "@types/events": "^3.0.3",
+    "@types/node": "^25.4.0",
     "@types/three": "^0.179.0",
     "earcut": "^3.0.2",
     "png2icons": "^2.0.1",

@@ -13,7 +13,6 @@ import {
 	EDGE_COLOR,
 	EDGE_DISTANCE,
 	FACE_DISTANCE,
-	TEXTURE_SCALE,
 	DOUBLE_SIDE,
 	FACE_OPACITY,
 } from "@/constants";
@@ -246,7 +245,7 @@ export class Polyhedra {
 		});
 		const rangeX = maxX - minX;
 		const rangeY = maxY - minY;
-		const scale = Math.max(rangeX, rangeY) * TEXTURE_SCALE;
+		const scale = Math.max(rangeX, rangeY);
 
 		// Map UVs so centroid → (0.5, 0.5)
 		const uvCoords = points2D.map((p) => {

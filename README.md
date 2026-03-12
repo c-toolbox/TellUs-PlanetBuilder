@@ -118,8 +118,6 @@ Here is how you can change the visual appearance of the planet.
 
 - Open `src/constants.ts`
 - Change constant values. Suggestions:
-	- `USE_AI_TEXTURES` — toggle between AI-generated textures and simple color-icon textures
-	- `TEXTURE_SCALE` — change the size of the color-icons
 	- `VERTEX_COLOR`, `EDGE_COLOR` — change line colors
 	- `VERTEX_SIZE`, `EDGE_SIZE` — change line width
 - Save the file
