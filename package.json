@@ -5,8 +5,7 @@
   "license": "MIT",
   "scripts": {
     "start": "vite-node scripts/dev.ts",
-    "dev": "vite-node scripts/dev.ts",
-    "dev-neu": "vite-node scripts/neu-dev.ts",
+    "dev": "vite-node scripts/neu-dev.ts",
     "build": "rimraf dist && vite build",
     "postinstall": "vite-node scripts/setup.ts"
   },

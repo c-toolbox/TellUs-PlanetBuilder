@@ -47,23 +47,10 @@ This project uses a Python proxy to listen to Tellus touch interactions over TuI
 
 - Install [Python](https://www.python.org/downloads/)
 	- Click "Add python.exe to PATH" before clicking "Install Now"
+- Install packages
+	- `python -m pip install python-osc websockets`
 
-```powershell
-# Create and activate a virtual environment
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-
-# Install packages
-python -m pip install --upgrade pip
-pip install python-osc websockets
-
-# Run the proxy and allow network access
-python .\proxy\proxy.py
-
-# Press ctrl-C to exit
-```
-
-The app attempts to start `proxy/proxy.py` automatically. If Python is not installed or not on PATH, startup will fail and you can run the proxy manually using the commands above.
+The app attempts to start `proxy.py` automatically. If Python is not installed or not on PATH, startup will fail and you can run the proxy manually using the commands above.
 
 
 ### Project modules

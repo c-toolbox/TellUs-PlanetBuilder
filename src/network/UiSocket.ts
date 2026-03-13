@@ -41,9 +41,6 @@ export class UiSocket extends EventEmitter {
 	send(data: UiEvent) {
 		if (this.isConnectedToSocket) {
 			this.socket.send(JSON.stringify(data));
-		} else {
-			console.warn("Cannot send. Socket is closed.");
-			console.log(data);
 		}
 	}
 
