@@ -3,6 +3,7 @@ import { isNeutralino } from "@/utils/neu";
 import { os, events, filesystem } from "@neutralinojs/lib";
 import {} from "@neutralinojs/lib";
 
+declare const NL_PATH: string;
 const w = window as any;
 
 // Remember across hot reloads
@@ -44,10 +45,10 @@ async function startProxy() {
 	}
 
 	const tryCommands = [
-		"py proxy.py",
-		"python proxy.py",
-		"py proxy/proxy.py",
-		"python proxy/proxy.py",
+		`py "${NL_PATH}/proxy.py"`,
+		`python "${NL_PATH}/proxy.py"`,
+		`py proxy.py`,
+		`python proxy.py`,
 		// ".\\.venv\\Scripts\\python.exe proxy/proxy.py",
 		// ".\\.venv\\bin/python proxy/proxy.py",
 		// ".\\proxy\\.venv\\Scripts\\python.exe proxy/proxy.py",
