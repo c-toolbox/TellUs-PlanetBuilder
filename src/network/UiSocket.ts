@@ -60,6 +60,7 @@ export class UiSocket extends EventEmitter {
 			// Update events
 			case "button":
 				return this.emit(event.id);
+			case "color":
 			case "dropdown":
 			case "slider":
 			case "switch":

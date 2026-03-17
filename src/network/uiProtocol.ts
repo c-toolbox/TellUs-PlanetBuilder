@@ -14,6 +14,22 @@ interface UiButtonEvent {
 	id: string;
 }
 
+/* Color */
+
+interface UiColorConfig {
+	type: "color";
+	id: string;
+	hint_title?: string;
+	hint_text?: string;
+	value: string;
+}
+
+interface UiColorEvent {
+	type: "color";
+	id: string;
+	value: string;
+}
+
 /* Dropdown */
 
 interface UiDropdownConfig {
@@ -119,6 +135,7 @@ interface UiGridConfig {
 
 export type UiElement =
 	| UiButtonConfig
+	| UiColorConfig
 	| UiDropdownConfig
 	| UiHrConfig
 	| UiRatioSliderConfig
@@ -139,6 +156,7 @@ export interface UiRequestEvent {
 
 export type UiUpdateEvent =
 	| UiButtonEvent
+	| UiColorEvent
 	| UiDropdownEvent
 	| UiRatioSliderEvent
 	| UiSliderEvent
