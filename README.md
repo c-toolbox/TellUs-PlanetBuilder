@@ -1,13 +1,6 @@
 # Tellus Demo
 
-<div style="display: flex; gap: 16px;">
-	<div>
-		<img src="./screenshots/demo_geodesic.jpg" alt="Geodesic Model" width="400">
-	</div>
-	<div>
-		<img src="./screenshots/demo_drawing.jpg" alt="Drawing Demo" width="400">
-	</div>
-</div>
+<img src="./screenshots/overview.jpg" alt="Planet builder and paint demo on TellUs">
 
 Tellus Demo is a work-in-progress web/desktop demo for the Tellus project. Many features and models are experimental.
 
