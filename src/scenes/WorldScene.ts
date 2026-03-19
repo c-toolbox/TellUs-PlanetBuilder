@@ -4,19 +4,21 @@ import BaseScene from "./BaseScene";
 import { SceneKey, sceneManager, scenes } from "./SceneManager";
 import { TileMesh } from "@/geometry/TileMesh";
 import { TouchId } from "@/network/tuioProtocol";
-import { Tile, tileManager } from "@/geometry/TileManager";
+import { Tile, tileManager, Tiles } from "@/geometry/TileManager";
 import { UiConfigEvent } from "@/network/uiProtocol";
 import { Renderer } from "./Renderer";
 import { Polyhedra } from "@/geometry/Polyhedra";
 import {
 	DistributionType,
 	DistributionTypes,
-	GraphicType,
-	GraphicTypes,
+	TileTexture,
+	TileTextures,
 	ModelName,
 	ModelNames,
 	PolyhedraModels,
 	WorldUiConfig,
+	TileEdges,
+	TileEdge,
 } from "./WorldSceneConfig";
 import { ORIGIN, SHOW_EDGES, SHOW_FACES, SHOW_VERTICES } from "@/constants";
 
@@ -25,47 +27,22 @@ import backgroundAsset from "@/assets/backgrounds/globe/truecolor.png";
 export default class WorldScene extends BaseScene {
 	private globe: Polyhedra;
 
-	private uiConfig: WorldUiConfig = {
-		model: "△ 60",
-		graphics: "realistic",
+	private worldConfig: WorldUiConfig = {
+		// model: "△ 60",
+		model: "⭔ 1002",
+		tileEdge: "show borders",
+		tileTexture: "realistic tiles",
 		distribution: "planet-like",
+		refreshSeed: true,
 		biomes: {
-			[Tile.None]: {
-				value: 0,
-				color: "#000000",
-			},
-			[Tile.Snow]: {
-				value: 5,
-				color: "#e1f2fe",
-			},
-			[Tile.Ocean]: {
-				value: 60,
-				color: "#3346e4",
-			},
-			[Tile.Sea]: {
-				value: 0,
-				color: "#497dff",
-			},
-			[Tile.Spruce]: {
-				value: 10,
-				color: "#077955",
-			},
-			[Tile.Forest]: {
-				value: 20,
-				color: "#0ca440",
-			},
-			[Tile.Beach]: {
-				value: 0,
-				color: "#f7c900",
-			},
-			[Tile.Desert]: {
-				value: 5,
-				color: "#fad33e",
-			},
-			[Tile.Mountain]: {
-				value: 0,
-				color: "#93a1b8",
-			},
+			[Tile.None]: 0,
+			[Tile.Snow]: 6,
+			[Tile.Ocean]: 70,
+			[Tile.Taiga]: 10,
+			[Tile.Forest]: 20,
+			[Tile.Savanna]: 4,
+			[Tile.Desert]: 4,
+			[Tile.Mountain]: 0,
 		},
 	};
 
@@ -86,15 +63,12 @@ export default class WorldScene extends BaseScene {
 	}
 
 	createPlanet() {
-		// Update tileManager random seed
-		tileManager.refreshNoiseSeed();
-
 		// Find model from config
-		const model = PolyhedraModels.find(
-			({ name }) => name == this.uiConfig.model,
+		const polyhedra = PolyhedraModels.find(
+			({ name }) => name == this.worldConfig.model,
 		);
-		if (!model) {
-			return console.error(`Could not find model: '${this.uiConfig.model}'`);
+		if (!polyhedra) {
+			return console.error(`Could not find model: '${this.worldConfig.model}'`);
 		}
 
 		// Remove existing globe
@@ -106,13 +80,37 @@ export default class WorldScene extends BaseScene {
 		}
 
 		// Create new globe
-		this.globe = new Polyhedra(model.model);
+		this.globe = new Polyhedra(polyhedra.model);
 
 		// Add Polyhedra groups to scene
 		if (SHOW_VERTICES) this.add(this.globe.vertexGroup);
 		if (SHOW_EDGES) this.add(this.globe.edgeGroup);
 		if (SHOW_FACES) this.add(this.globe.faceGroup);
 		this.makeClickable(this.globe.faceGroup);
+
+		this.populatePlanetTiles();
+	}
+
+	populatePlanetTiles() {
+		const tilePositions = this.globe.faceGroup.children.map(
+			(mesh) => mesh.position,
+		);
+
+		const tiles = tileManager.populateTiles(
+			tilePositions,
+			this.worldConfig.biomes,
+		);
+		this.globe.tileMeshes.forEach((tileMesh, index) => {
+			tileMesh.setTile(tiles[index]);
+		});
+
+		// Check neighbor edges
+		this.globe.tileMeshes.forEach((tileMesh) => {
+			tileMesh.neighbors.forEach(({ mesh, edgeIndex }) => {
+				const same = tileMesh.tile == mesh.tile;
+				this.globe.setEdgeVisible(edgeIndex, !same);
+			});
+		});
 	}
 
 	// On entering scene
@@ -129,6 +127,7 @@ export default class WorldScene extends BaseScene {
 		// Example: listen for OmniSocket events
 		// this.omniSocket.on("playerJoined", this.handlePlayerJoin);
 
+		this.redistributeBiomes();
 		this.createPlanet();
 
 		this.add(this.touchHandler.touchGroup);
@@ -183,6 +182,10 @@ export default class WorldScene extends BaseScene {
 				}
 
 				tileMesh.setTile(touchPoint.tile);
+				tileMesh.neighbors.forEach(({ mesh, edgeIndex }) => {
+					const same = tileMesh.tile == mesh.tile;
+					this.globe.setEdgeVisible(edgeIndex, !same);
+				});
 			}
 		}
 	}
@@ -200,31 +203,36 @@ export default class WorldScene extends BaseScene {
 			sceneManager.setScene(scenes[value]);
 		});
 
-		this.uiSocket.on("apply", () => {
-			this.applyTileManagerSettings();
-
-			// Update textures of all tiles
-			for (const mesh of this.clickable) {
-				const tileMesh = mesh as TileMesh;
-				tileMesh.setTile(tileMesh.tile);
-			}
-
-			this.refreshConfig();
+		this.uiSocket.on("seed", (value: boolean) => {
+			this.worldConfig.refreshSeed = value;
 		});
 
 		this.uiSocket.on("new_planet", () => {
 			this.applyTileManagerSettings();
+			if (this.worldConfig.refreshSeed) {
+				tileManager.refreshNoiseSeed();
+			}
 			this.createPlanet();
 			this.refreshConfig();
 		});
 
-		this.uiSocket.on("graphics", (value: GraphicType) => {
-			this.uiConfig.graphics = value;
+		this.uiSocket.on("tile_edges", (value: TileEdge) => {
+			this.worldConfig.tileEdge = value;
 			this.refreshConfig();
 		});
 
+		this.uiSocket.on("tile_texture", (value: TileTexture) => {
+			this.worldConfig.tileTexture = value;
+			this.refreshConfig();
+
+			// Update textures
+			this.globe.tileMeshes.forEach((tileMesh) =>
+				tileMesh.setTile(tileMesh.tile),
+			);
+		});
+
 		this.uiSocket.on("model", (value: ModelName) => {
-			this.uiConfig.model = value;
+			this.worldConfig.model = value;
 			this.redistributeBiomes();
 			this.refreshConfig();
 			// this.createPlanet();
@@ -236,14 +244,14 @@ export default class WorldScene extends BaseScene {
 		this.uiSocket.on(Tile.Ocean, (value: boolean) =>
 			this.toggleBiome(Tile.Ocean, value),
 		);
-		this.uiSocket.on(Tile.Sea, (value: boolean) =>
-			this.toggleBiome(Tile.Sea, value),
-		);
-		this.uiSocket.on(Tile.Spruce, (value: boolean) =>
-			this.toggleBiome(Tile.Spruce, value),
+		this.uiSocket.on(Tile.Taiga, (value: boolean) =>
+			this.toggleBiome(Tile.Taiga, value),
 		);
 		this.uiSocket.on(Tile.Forest, (value: boolean) =>
 			this.toggleBiome(Tile.Forest, value),
+		);
+		this.uiSocket.on(Tile.Savanna, (value: boolean) =>
+			this.toggleBiome(Tile.Savanna, value),
 		);
 		this.uiSocket.on(Tile.Desert, (value: boolean) =>
 			this.toggleBiome(Tile.Desert, value),
@@ -253,13 +261,13 @@ export default class WorldScene extends BaseScene {
 		);
 
 		this.uiSocket.on("distribution", (value: DistributionType) => {
-			this.uiConfig.distribution = value;
+			this.worldConfig.distribution = value;
 			this.refreshConfig();
 		});
 
 		this.uiSocket.on("biome_distribution", (values: number[]) => {
-			const activeBiomes = Object.entries(this.uiConfig.biomes).filter(
-				([_, biome]) => biome.value > 0,
+			const activeBiomes = Object.entries(this.worldConfig.biomes).filter(
+				([tile, count]) => count > 0,
 			);
 
 			console.assert(
@@ -269,38 +277,18 @@ export default class WorldScene extends BaseScene {
 			);
 
 			activeBiomes.forEach(([key], i) => {
-				this.uiConfig.biomes[key as Tile].value = values[i];
+				this.worldConfig.biomes[key as Tile] = values[i];
 			});
 			// this.redistributeBiomes();
 			// this.createPlanet();
+			this.populatePlanetTiles();
 
 			this.refreshConfig();
 		});
 	}
 
 	applyTileManagerSettings() {
-		tileManager.textureSet = this.uiConfig.graphics;
-
-		tileManager.distributionMode = this.uiConfig.distribution;
-
-		Object.entries(this.uiConfig.biomes).forEach(([tile, { value }]) => {
-			tileManager.enabledTiles[tile as Tile] = value > 0;
-		});
-	}
-
-	get hasTileManagerChanges(): boolean {
-		if (tileManager.textureSet !== this.uiConfig.graphics) {
-			return true;
-		}
-
-		for (const [tile, { value }] of Object.entries(this.uiConfig.biomes)) {
-			const isEnabled = value > 0;
-			if (tileManager.enabledTiles[tile as Tile] !== isEnabled) {
-				return true;
-			}
-		}
-
-		return false;
+		tileManager.worldConfig = this.worldConfig;
 	}
 
 	refreshConfig() {
@@ -337,16 +325,23 @@ export default class WorldScene extends BaseScene {
 				},
 				{
 					type: "dropdown",
-					id: "graphics",
-					hint_title: "Graphics",
-					hint_text: "Texture style used for the tiles",
-					value: this.uiConfig.graphics,
-					options: GraphicTypes,
+					id: "tile_edges",
+					hint_title: "Tile edges",
+					hint_text: "How edges between tiles should be displayed",
+					value: this.worldConfig.tileEdge,
+					options: TileEdges,
+				},
+				{
+					type: "dropdown",
+					id: "tile_texture",
+					hint_title: "Tile texture",
+					hint_text: "Texture used for the tiles",
+					value: this.worldConfig.tileTexture,
+					options: TileTextures,
 				},
 				{
 					type: "grid",
-					id: "biome_grid",
-					columns: 2,
+					columns: 3,
 					elements: [
 						{
 							type: "switch",
@@ -354,7 +349,7 @@ export default class WorldScene extends BaseScene {
 							hint_title: `${tileManager.tileToEmoji(Tile.Snow)} ${Tile.Snow}`,
 							// hint_title: tileManager.tileToEmoji(Tile.Snow),
 							// hint_text: Tile.Snow,
-							value: this.uiConfig.biomes[Tile.Snow].value > 0,
+							value: this.worldConfig.biomes[Tile.Snow] > 0,
 						},
 						{
 							type: "switch",
@@ -362,23 +357,15 @@ export default class WorldScene extends BaseScene {
 							hint_title: `${tileManager.tileToEmoji(Tile.Ocean)} ${Tile.Ocean}`,
 							// hint_title: tileManager.tileToEmoji(Tile.Ocean),
 							// hint_text: Tile.Ocean,
-							value: this.uiConfig.biomes[Tile.Ocean].value > 0,
+							value: this.worldConfig.biomes[Tile.Ocean] > 0,
 						},
 						{
 							type: "switch",
-							id: Tile.Sea,
-							hint_title: `${tileManager.tileToEmoji(Tile.Sea)} ${Tile.Sea}`,
-							// hint_title: tileManager.tileToEmoji(Tile.Sea),
-							// hint_text: Tile.Sea,
-							value: this.uiConfig.biomes[Tile.Sea].value > 0,
-						},
-						{
-							type: "switch",
-							id: Tile.Spruce,
-							hint_title: `${tileManager.tileToEmoji(Tile.Spruce)} ${Tile.Spruce}`,
-							// hint_title: tileManager.tileToEmoji(Tile.Spruce),
-							// hint_text: Tile.Spruce,
-							value: this.uiConfig.biomes[Tile.Spruce].value > 0,
+							id: Tile.Taiga,
+							hint_title: `${tileManager.tileToEmoji(Tile.Taiga)} ${Tile.Taiga}`,
+							// hint_title: tileManager.tileToEmoji(Tile.Taiga),
+							// hint_text: Tile.Taiga,
+							value: this.worldConfig.biomes[Tile.Taiga] > 0,
 						},
 						{
 							type: "switch",
@@ -386,7 +373,15 @@ export default class WorldScene extends BaseScene {
 							hint_title: `${tileManager.tileToEmoji(Tile.Forest)} ${Tile.Forest}`,
 							// hint_title: tileManager.tileToEmoji(Tile.Forest),
 							// hint_text: Tile.Forest,
-							value: this.uiConfig.biomes[Tile.Forest].value > 0,
+							value: this.worldConfig.biomes[Tile.Forest] > 0,
+						},
+						{
+							type: "switch",
+							id: Tile.Savanna,
+							hint_title: `${tileManager.tileToEmoji(Tile.Savanna)} ${Tile.Savanna}`,
+							// hint_title: tileManager.tileToEmoji(Tile.Savanna),
+							// hint_text: Tile.Savanna,
+							value: this.worldConfig.biomes[Tile.Savanna] > 0,
 						},
 						{
 							type: "switch",
@@ -394,7 +389,7 @@ export default class WorldScene extends BaseScene {
 							hint_title: `${tileManager.tileToEmoji(Tile.Desert)} ${Tile.Desert}`,
 							// hint_title: tileManager.tileToEmoji(Tile.Desert),
 							// hint_text: Tile.Desert,
-							value: this.uiConfig.biomes[Tile.Desert].value > 0,
+							value: this.worldConfig.biomes[Tile.Desert] > 0,
 						},
 						{
 							type: "switch",
@@ -402,17 +397,9 @@ export default class WorldScene extends BaseScene {
 							hint_title: `${tileManager.tileToEmoji(Tile.Mountain)} ${Tile.Mountain}`,
 							// hint_title: tileManager.tileToEmoji(Tile.Mountain),
 							// hint_text: Tile.Mountain,
-							value: this.uiConfig.biomes[Tile.Mountain].value > 0,
+							value: this.worldConfig.biomes[Tile.Mountain] > 0,
 						},
 					],
-				},
-				{
-					type: "button",
-					id: "apply",
-					text: "Apply",
-					hint_title: "Apply changes",
-					hint_text: "Updates the graphics and available biomes",
-					color: this.hasTileManagerChanges ? "#c70036" : "#77777777",
 				},
 
 				{
@@ -425,7 +412,7 @@ export default class WorldScene extends BaseScene {
 					id: "model",
 					hint_title: "Planet model",
 					hint_text: "The shape and number of planet tiles",
-					value: this.uiConfig.model,
+					value: this.worldConfig.model,
 					options: ModelNames,
 				},
 				{
@@ -433,12 +420,12 @@ export default class WorldScene extends BaseScene {
 					id: "biome_distribution",
 					hint_title: "Biome distribution",
 					hint_text: "Specify the amount of tiles for each biome",
-					values: Object.entries(this.uiConfig.biomes)
-						.filter(([tile, { value, color }]) => value > 0)
-						.map(([tile, { value, color }]) => ({
-							name: tileManager.tileToEmoji(tile as Tile),
-							value,
-							color,
+					values: Object.entries(this.worldConfig.biomes)
+						.filter(([tile, count]) => count > 0)
+						.map(([tile, count]) => ({
+							name: Tiles[tile as Tile].emoji,
+							value: count,
+							color: "#" + Tiles[tile as Tile].color.getHexString(),
 						})),
 				},
 				{
@@ -446,8 +433,15 @@ export default class WorldScene extends BaseScene {
 					id: "distribution",
 					hint_title: "Distribution",
 					hint_text: "How tiles should be positioned",
-					value: this.uiConfig.distribution,
+					value: this.worldConfig.distribution,
 					options: DistributionTypes,
+				},
+				{
+					type: "switch",
+					id: "seed",
+					hint_title: "Random seed",
+					hint_text: "Shuffle the random seed to create a new planet",
+					value: this.worldConfig.refreshSeed,
 				},
 				{
 					type: "button",
@@ -462,6 +456,11 @@ export default class WorldScene extends BaseScene {
 					type: "hr",
 					id: "planet_status",
 					hint_title: "Planet status",
+				},
+				{
+					type: "grid",
+					columns: 3,
+					elements: [],
 				},
 				{
 					type: "text",
@@ -489,31 +488,31 @@ export default class WorldScene extends BaseScene {
 
 	redistributeBiomes() {
 		const totalTiles = PolyhedraModels.find(
-			({ name }) => name == this.uiConfig.model,
+			({ name }) => name == this.worldConfig.model,
 		)!.count;
 
-		const biomeEntries = Object.entries(this.uiConfig.biomes);
+		const biomeEntries = Object.entries(this.worldConfig.biomes) as [
+			Tile,
+			number,
+		][];
 
-		const active = biomeEntries.filter(([, biome]) => biome.value > 0);
+		// Only consider active biomes (value > 0)
+		const active = biomeEntries.filter(([, value]) => value > 0);
 		if (active.length === 0) return;
 
 		// If there are more biomes than tiles, clamp
 		const minTiles = Math.min(active.length, totalTiles);
 		const remainingTiles = totalTiles - minTiles;
 
-		const currentTotal = active.reduce(
-			(sum, [, biome]) => sum + biome.value,
-			0,
-		);
+		const currentTotal = active.reduce((sum, [, value]) => sum + value, 0);
 
 		// Step 1: scale remaining proportionally
-		const scaled = active.map(([tile, { value, color }]) => {
+		const scaled = active.map(([tile, value]) => {
 			const weight = value / currentTotal;
 			const exact = weight * remainingTiles;
 
 			return {
 				tile,
-				color,
 				base: 1, // guaranteed minimum
 				value: Math.floor(exact),
 				remainder: exact % 1,
@@ -533,19 +532,19 @@ export default class WorldScene extends BaseScene {
 
 		// Step 4: write back
 		for (const b of scaled) {
-			this.uiConfig.biomes[b.tile as Tile].value = b.base + b.value;
+			this.worldConfig.biomes[b.tile as Tile] = b.base + b.value;
 		}
 
 		// Step 5: clear inactive ones
-		for (const [tile, biome] of biomeEntries) {
-			if (biome.value > 0 && !scaled.find((b) => b.tile === tile)) {
-				biome.value = 0;
+		for (const [tile, value] of biomeEntries) {
+			if (value > 0 && !scaled.find((b) => b.tile === tile)) {
+				this.worldConfig.biomes[tile as Tile] = 0;
 			}
 		}
 	}
 
 	toggleBiome(biome: Tile, enabled: boolean) {
-		this.uiConfig.biomes[biome].value = enabled ? 10 : 0;
+		this.worldConfig.biomes[biome] = enabled ? 10 : 0;
 		this.redistributeBiomes();
 		this.refreshConfig();
 	}

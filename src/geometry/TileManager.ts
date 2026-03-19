@@ -1,109 +1,106 @@
 import * as THREE from "three";
 import { createNoise3D, NoiseFunction3D } from "simplex-noise";
 import { getPitchFromVector } from "@/utils/functions";
-import { DEFAULT_BIOME, GENERATE_BIOMES } from "@/constants";
-
-export enum Tile {
-	None = "",
-	Beach = "Beach",
-	Desert = "Desert",
-	Forest = "Forest",
-	Mountain = "Mountain",
-	Ocean = "Ocean",
-	Spruce = "Spruce",
-	Sea = "Sea",
-	Snow = "Snow",
-}
+import {
+	BiomeCount,
+	DistributionType,
+	WorldUiConfig,
+} from "@/scenes/WorldSceneConfig";
 
 import assetSquare from "@/assets/square.png";
 
-import assetBeach from "@/assets/colors/beach.png";
+import assetSavanna from "@/assets/colors/savanna.png";
 import assetDesert from "@/assets/colors/desert.png";
 import assetForest from "@/assets/colors/forest.png";
 import assetMountain from "@/assets/colors/mountain.png";
 import assetOcean from "@/assets/colors/ocean.png";
-import assetSpruce from "@/assets/colors/spruce.png";
-import assetSea from "@/assets/colors/sea.png";
+import assetTaiga from "@/assets/colors/taiga.png";
 import assetSnow from "@/assets/colors/snow.png";
 
-import assetAiBeach from "@/assets/ai/beach.png";
+import assetAiSavanna from "@/assets/ai/savanna.jpg";
 import assetAiDesert from "@/assets/ai/desert.jpg";
 import assetAiForest from "@/assets/ai/forest.jpg";
 import assetAiMountain from "@/assets/ai/mountain.jpg";
 import assetAiOcean from "@/assets/ai/ocean.jpg";
-import assetAiSpruce from "@/assets/ai/spruce.jpg";
-import assetAiSea from "@/assets/ai/sea.png";
+import assetAiTaiga from "@/assets/ai/taiga.jpg";
 import assetAiSnow from "@/assets/ai/snow.jpg";
-import { DistributionType } from "@/scenes/WorldSceneConfig";
 
-const textureSets = {
-	simple: {
-		[Tile.None]: assetSquare,
-		[Tile.Beach]: assetBeach,
-		[Tile.Desert]: assetDesert,
-		[Tile.Forest]: assetForest,
-		[Tile.Mountain]: assetMountain,
-		[Tile.Ocean]: assetOcean,
-		[Tile.Spruce]: assetSpruce,
-		[Tile.Sea]: assetSea,
-		[Tile.Snow]: assetSnow,
+export type TextureSetKey = "icon" | "ai";
+
+export const Tiles = {
+	None: {
+		texture: { icon: assetSquare, ai: assetSquare },
+		color: new THREE.Color(0xffffff),
+		emoji: "",
 	},
-	realistic: {
-		[Tile.None]: assetSquare,
-		[Tile.Beach]: assetAiBeach,
-		[Tile.Desert]: assetAiDesert,
-		[Tile.Forest]: assetAiForest,
-		[Tile.Mountain]: assetAiMountain,
-		[Tile.Ocean]: assetAiOcean,
-		[Tile.Spruce]: assetAiSpruce,
-		[Tile.Sea]: assetAiSea,
-		[Tile.Snow]: assetAiSnow,
+	Snow: {
+		texture: { icon: assetSnow, ai: assetAiSnow },
+		color: new THREE.Color(0xe1f2fe),
+		emoji: "❄️",
+	},
+	Ocean: {
+		texture: { icon: assetOcean, ai: assetAiOcean },
+		color: new THREE.Color(0x3346e4),
+		emoji: "🌊",
+	},
+	Taiga: {
+		texture: { icon: assetTaiga, ai: assetAiTaiga },
+		color: new THREE.Color(0x077955),
+		emoji: "🌲",
+	},
+	Forest: {
+		texture: { icon: assetForest, ai: assetAiForest },
+		color: new THREE.Color(0x0ca440),
+		emoji: "🌳",
+	},
+	Savanna: {
+		texture: { icon: assetSavanna, ai: assetAiSavanna },
+		color: new THREE.Color(0xa8bf18),
+		emoji: "🌾",
+	},
+	Desert: {
+		texture: { icon: assetDesert, ai: assetAiDesert },
+		color: new THREE.Color(0xfad33e),
+		emoji: "☀️",
+	},
+	Mountain: {
+		texture: { icon: assetMountain, ai: assetAiMountain },
+		color: new THREE.Color(0x93a1b8),
+		emoji: "⛰️",
 	},
 } as const;
-type TextureSetKey = keyof typeof textureSets;
-type TextureSet = (typeof textureSets)[keyof typeof textureSets];
+
+export type Tile = keyof typeof Tiles;
+
+export const Tile = Object.fromEntries(
+	Object.keys(Tiles).map((key) => [key, key]),
+) as { [K in Tile]: K };
 
 class TileManager {
+	public worldConfig: WorldUiConfig;
 	public textureSets: Record<TextureSetKey, Record<Tile, THREE.Texture>>;
-	public textureSet: TextureSetKey = "simple";
-	public enabledTiles: Record<Tile, boolean>;
 	public distributionMode: DistributionType = "planet-like";
 
 	private noise1: NoiseFunction3D;
 	private noise2: NoiseFunction3D;
 	private noise3: NoiseFunction3D;
+	private noise4: NoiseFunction3D;
+	private noise5: NoiseFunction3D;
 
 	constructor() {
 		this.textureSets = {
-			simple: this.loadTileTextures(textureSets.simple),
-			realistic: this.loadTileTextures(textureSets.realistic),
-		};
-
-		this.enabledTiles = {
-			[Tile.None]: false,
-			[Tile.Beach]: true,
-			[Tile.Desert]: true,
-			[Tile.Forest]: true,
-			[Tile.Mountain]: true,
-			[Tile.Ocean]: true,
-			[Tile.Spruce]: true,
-			[Tile.Sea]: true,
-			[Tile.Snow]: true,
+			icon: this.loadTileTextures("icon"),
+			ai: this.loadTileTextures("ai"),
 		};
 
 		this.refreshNoiseSeed();
 	}
 
-	private loadTileTextures(
-		textureSet: TextureSet,
-	): Record<Tile, THREE.Texture> {
+	private loadTileTextures(set: TextureSetKey): Record<Tile, THREE.Texture> {
 		const loader = new THREE.TextureLoader();
 		return Object.values(Tile).reduce(
 			(obj, tile) => {
-				const asset = textureSet[tile];
-				const texture = loader.load(asset);
-				texture.wrapS = THREE.ClampToEdgeWrapping;
-				texture.wrapT = THREE.ClampToEdgeWrapping;
+				const texture = this.loadTileTexture(tile, set, loader);
 				obj[tile] = texture;
 				return obj;
 			},
@@ -111,99 +108,179 @@ class TileManager {
 		);
 	}
 
+	private loadTileTexture(
+		tile: Tile,
+		set: TextureSetKey,
+		loader: THREE.TextureLoader,
+	): THREE.Texture {
+		const asset = Tiles[tile].texture[set];
+		const texture = loader.load(asset);
+		texture.wrapS = THREE.ClampToEdgeWrapping;
+		texture.wrapT = THREE.ClampToEdgeWrapping;
+		texture.colorSpace = THREE.SRGBColorSpace;
+		return texture;
+	}
+
+	get currentTextureSetKey(): TextureSetKey {
+		switch (this.worldConfig.tileTexture) {
+			case "invisible tiles":
+			case "colored tiles":
+			case "symbol tiles":
+				return "icon";
+			case "realistic tiles":
+				return "ai";
+		}
+	}
+
 	getTexture(tile: Tile) {
-		return this.textureSets[this.textureSet][tile];
+		return this.textureSets[this.currentTextureSetKey][tile];
 	}
 
 	refreshNoiseSeed() {
 		this.noise1 = createNoise3D();
 		this.noise2 = createNoise3D();
 		this.noise3 = createNoise3D();
+		this.noise4 = createNoise3D();
+		this.noise5 = createNoise3D();
 	}
 
-	getTileAt(position: THREE.Vector3): Tile {
-		switch (this.distributionMode) {
-			case "planet-like":
-				return this.getPlanetLikeTileAt(position);
-			case "random":
-				return this.getRandomTile();
-		}
-	}
-
-	private getPlanetLikeTileAt(position: THREE.Vector3): Tile {
-		const k1 = 2.0;
-		const k2 = 0.8;
-		const k3 = 2.0;
-
+	getClimate(position: THREE.Vector3) {
 		const { x, y, z } = position;
+
 		const pitch = getPitchFromVector(position) / Math.PI;
+
 		let temperature = 1 - Math.abs(2 * pitch);
-		temperature += 0.4 * this.noise1(k1 * x, k1 * y, k1 * z);
+		temperature += 0.3 * this.noise1(2.0 * x, 2.0 * y, 2.0 * z);
 
 		let height =
-			0.8 * this.noise2(k2 * x, k2 * y, k2 * z) +
-			0.2 * this.noise3(k3 * x, k3 * y, k3 * z);
+			0.8 * this.noise2(0.6 * x, 0.6 * y, 0.6 * z) +
+			0.2 * this.noise3(2.0 * x, 2.0 * y, 2.0 * z);
 
-		const check = (tile: Tile) => this.enabledTiles[tile];
+		let tectonic =
+			1 * this.noise4(1.0 * x, 1.0 * y, 1.0 * z) +
+			0 * this.noise5(2.0 * x, 2.0 * y, 2.0 * z);
 
-		function get(temperature: number, height: number) {
-			if (GENERATE_BIOMES) {
-				if (temperature < -0.4 && check(Tile.Snow)) return Tile.Snow;
-				if (temperature < -0.0 && check(Tile.Ocean)) return Tile.Ocean;
+		return { temperature, height, tectonic };
+	}
 
-				if (height < -0.3 && check(Tile.Ocean)) return Tile.Ocean;
-				if (height < -0.1 && check(Tile.Ocean)) return Tile.Ocean; // Sea
+	gaussian(x: number, mean: number, sigma: number) {
+		const d = (x - mean) / sigma;
+		return Math.exp(-d * d);
+	}
 
-				if (height > 0.6 && check(Tile.Mountain)) return Tile.Mountain;
-				if (
-					height > 0.1 &&
-					height < 0.5 &&
-					temperature > 0.85 &&
-					check(Tile.Desert)
-				)
-					return Tile.Desert;
+	getBiomeScore(tile: Tile, temp: number, height: number, tectonic: number) {
+		switch (tile) {
+			case Tile.Snow:
+				return 1000 * this.gaussian(temp, -1, 1);
 
-				if (temperature < 0.4 && check(Tile.Spruce)) return Tile.Spruce;
+			case Tile.Ocean:
+				return (
+					50 * this.gaussian(height, -1, 1) + 5 * this.gaussian(temp, -1, 1)
+				);
 
-				if (check(Tile.Forest)) return Tile.Forest;
+			case Tile.Mountain:
+				return (
+					10 * this.gaussian(tectonic, 0, 0.3) * this.gaussian(height, 0.5, 1)
+				);
 
-				// Mega hack
+			case Tile.Desert:
+				return (
+					10 *
+					(this.gaussian(temp, 0.6, 0.6) + 2 * this.gaussian(height, 1, 0.5))
+				);
+
+			case Tile.Savanna:
+				return (
+					2 * this.gaussian(temp, 0.6, 0.6) + this.gaussian(height, 1, 0.7)
+				);
+
+			case Tile.Taiga:
+				return 5 * this.gaussian(temp, -1, 0.5) + this.gaussian(height, 0, 0.5);
+
+			case Tile.Forest:
+				return 2 * this.gaussian(temp, 1, 1) + 0 * this.gaussian(height, 0, 0.5);
+
+			default:
+				return 0.1;
+		}
+	}
+
+	populateTiles(positions: THREE.Vector3[], biomes: BiomeCount): Tile[] {
+		type Candidate = {
+			posIndex: number;
+			tile: Tile;
+			score: number;
+		};
+		const candidates: Candidate[] = [];
+
+		const remaining: Record<Tile, number> = {} as any;
+		for (const tile of Object.values(Tile)) {
+			remaining[tile] = biomes[tile];
+		}
+
+		positions.forEach((pos, i) => {
+			const { temperature, height, tectonic } = this.getClimate(pos);
+
+			for (const tile of Object.values(Tile)) {
+				if (remaining[tile] <= 0) continue;
+
+				const score = this.getBiomeScore(tile, temperature, height, tectonic);
+
+				candidates.push({
+					posIndex: i,
+					tile,
+					score,
+				});
+			}
+		});
+
+		candidates.sort((a, b) => b.score - a.score);
+
+		const result: Tile[] = new Array(positions.length);
+		const usedPositions = new Set<number>();
+
+		for (const c of candidates) {
+			if (usedPositions.has(c.posIndex)) continue;
+			if (remaining[c.tile] <= 0) continue;
+
+			result[c.posIndex] = c.tile;
+			usedPositions.add(c.posIndex);
+			remaining[c.tile]--;
+		}
+
+		for (let i = 0; i < result.length; i++) {
+			if (!result[i]) {
 				for (const tile of Object.values(Tile)) {
-					if (check(tile)) return tile;
+					if (remaining[tile] > 0) {
+						result[i] = tile;
+						remaining[tile]--;
+						break;
+					}
 				}
 			}
-
-			return Tile[DEFAULT_BIOME];
 		}
 
-		return get(temperature, height);
+		return result;
 	}
 
-	private getRandomTile(): Tile {
-		const tiles = Object.values(Tile).filter((tile) => this.enabledTiles[tile]);
-		if (tiles.length > 0) {
-			return tiles[Math.floor(Math.random() * tiles.length)];
-		}
-		return Tile.Ocean;
-	}
+	// private getRandomTile(): Tile {
+	// 	const tiles = Object.values(Tile).filter((tile) => this.enabledTiles[tile]);
+	// 	if (tiles.length > 0) {
+	// 		return tiles[Math.floor(Math.random() * tiles.length)];
+	// 	}
+	// 	return Tile.Ocean;
+	// }
 
-	private tileCycle = [
-		Tile.Snow,
-		Tile.Ocean,
-		Tile.Sea,
-		Tile.Spruce,
-		Tile.Forest,
-		Tile.Desert,
-		Tile.Mountain,
-	];
+	private tileCycle = Object.keys(Tiles) as Tile[];
 
 	getNextTile(tile: Tile) {
 		const startIndex = this.tileCycle.indexOf(tile);
 
 		for (let i = 1; i <= this.tileCycle.length; i++) {
 			const next = this.tileCycle[(startIndex + i) % this.tileCycle.length];
+			const isEnabled = this.worldConfig.biomes[next] > 0;
 
-			if (this.enabledTiles[next]) {
+			if (isEnabled) {
 				return next;
 			}
 		}
@@ -211,25 +288,12 @@ class TileManager {
 		return tile;
 	}
 
-	tileToEmoji(tile: Tile) {
-		switch (tile) {
-			case Tile.Snow:
-				return "❄️";
-			case Tile.Ocean:
-				return "🌊";
-			case Tile.Sea:
-				return "🐟";
-			case Tile.Spruce:
-				return "🌲";
-			case Tile.Forest:
-				return "🌳";
-			case Tile.Desert:
-				return "☀️";
-			case Tile.Mountain:
-				return "⛰️";
-			default:
-				return "";
-		}
+	tileToEmoji(tile: Tile): string {
+		return Tiles[tile].emoji;
+	}
+
+	tileToColor(tile: Tile): THREE.Color {
+		return Tiles[tile].color;
 	}
 }
 

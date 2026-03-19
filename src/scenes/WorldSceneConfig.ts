@@ -77,19 +77,33 @@ export const PolyhedraModels = [
 export type ModelName = (typeof PolyhedraModels)[number]["name"];
 export const ModelNames = PolyhedraModels.map(({ name }) => name);
 
-// Graphics
-export const GraphicTypes = ["simple", "realistic"] as const;
-export type GraphicType = (typeof GraphicTypes)[number];
+// Tile lines
+export const TileEdges = ["hide all", "show all", "show borders"] as const;
+export type TileEdge = (typeof TileEdges)[number];
+
+// Tile texture
+export const TileTextures = [
+	"invisible tiles",
+	"colored tiles",
+	"symbol tiles",
+	"realistic tiles",
+] as const;
+export type TileTexture = (typeof TileTextures)[number];
 
 // Distribution
 export const DistributionTypes = ["planet-like", "random"] as const;
 export type DistributionType = (typeof DistributionTypes)[number];
 
+// Biomes
+export type BiomeCount = { [key in Tile]: number };
+
 /* Socket UI config */
 
 export interface WorldUiConfig {
 	model: ModelName;
-	graphics: GraphicType;
+	tileEdge: TileEdge;
+	tileTexture: TileTexture;
 	distribution: DistributionType;
-	biomes: { [key in Tile]: { value: number; color: string } };
+	refreshSeed: boolean;
+	biomes: BiomeCount;
 }
