@@ -320,7 +320,6 @@ export default class WorldScene extends BaseScene {
 
 				{
 					type: "hr",
-					id: "planet_settings",
 					hint_title: "Planet settings",
 				},
 				{
@@ -404,7 +403,6 @@ export default class WorldScene extends BaseScene {
 
 				{
 					type: "hr",
-					id: "planet_creation",
 					hint_title: "Planet creation",
 				},
 				{
@@ -454,7 +452,6 @@ export default class WorldScene extends BaseScene {
 
 				{
 					type: "hr",
-					id: "planet_status",
 					hint_title: "Planet status",
 				},
 				{
@@ -464,7 +461,6 @@ export default class WorldScene extends BaseScene {
 				},
 				{
 					type: "text",
-					id: "tile_count",
 					hint_title: "Tile count",
 					hint_text: this.tileCount,
 				},
