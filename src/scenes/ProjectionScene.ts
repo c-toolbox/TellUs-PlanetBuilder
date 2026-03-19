@@ -15,6 +15,7 @@ export class ProjectionScene extends THREE.Scene {
 			generateMipmaps: true,
 			minFilter: THREE.LinearMipmapLinearFilter,
 		});
+		cubeRenderTarget.texture.colorSpace = THREE.SRGBColorSpace;
 		this.cubeCamera = new THREE.CubeCamera(0.01, 1000, cubeRenderTarget);
 
 		this.screenCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
@@ -23,6 +24,7 @@ export class ProjectionScene extends THREE.Scene {
 			format: THREE.RGBAFormat,
 			type: THREE.UnsignedByteType,
 		});
+		this.aepTarget.texture.colorSpace = THREE.SRGBColorSpace;
 
 		const aepMaterial = new THREE.ShaderMaterial({
 			uniforms: { envMap: { value: cubeRenderTarget.texture } },

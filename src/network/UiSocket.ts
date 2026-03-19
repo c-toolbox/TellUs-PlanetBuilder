@@ -20,13 +20,14 @@ export class UiSocket extends EventEmitter {
 	connect(): void {
 		this.socket = new WebSocket(UI_URL);
 
-		this.socket.onopen = () => {
+		this.socket.onopen = (event) => {
 			console.log("Socket UI opened");
 			this.reconnectAttempts = 0;
 			if (this.reconnectTimeout) {
 				clearTimeout(this.reconnectTimeout);
 				this.reconnectTimeout = null;
 			}
+			this.emit("request", event);
 		};
 		this.socket.onclose = () => {
 			console.log("Socket UI closed");

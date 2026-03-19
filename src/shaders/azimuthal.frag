@@ -20,5 +20,8 @@ void main() {
 		 cos_c
 	);
 
-	gl_FragColor = textureCube(envMap, dir);
+	// gl_FragColor = textureCube(envMap, dir);
+	vec4 color = textureCube(envMap, dir);
+	color.rgb = pow(color.rgb, vec3(1.0 / 1.9));
+	gl_FragColor = color;
 }

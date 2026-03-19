@@ -42,7 +42,7 @@ export default class BaseScene extends THREE.Scene {
 	protected handleRaycast(
 		touchId: TouchId,
 		vector: THREE.Vector3,
-		type: "touch" | "click"
+		type: "touch" | "click",
 	) {}
 
 	/* Scene management */
@@ -59,7 +59,7 @@ export default class BaseScene extends THREE.Scene {
 		// Update cube camera orientation
 		projectionScene.cubeCamera.position.copy(renderer.centerCamera.position);
 		projectionScene.cubeCamera.quaternion.copy(
-			renderer.centerCamera.quaternion
+			renderer.centerCamera.quaternion,
 		);
 		projectionScene.cubeCamera.update(renderer, this);
 
@@ -83,7 +83,7 @@ export default class BaseScene extends THREE.Scene {
 	protected addBackground(assetPath: string) {
 		const loader = new THREE.TextureLoader();
 		loader.load(assetPath, (texture) => {
-			// tex.colorSpace = THREE.SRGBColorSpace;
+			texture.colorSpace = THREE.SRGBColorSpace;
 
 			const geometry = new THREE.SphereGeometry(BACKGROUND_DISTANCE, 64, 64);
 			const material = new THREE.MeshBasicMaterial({

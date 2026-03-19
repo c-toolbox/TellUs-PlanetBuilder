@@ -116,7 +116,7 @@ interface UiSwitchEvent {
 
 interface UiTextConfig {
 	type: "text";
-	id: string;
+	hint_title?: string;
 	hint_text?: string;
 }
 
@@ -124,7 +124,7 @@ interface UiTextConfig {
 
 interface UiGridConfig {
 	type: "grid";
-	id: string;
+	columns: number;
 	elements: UiElement[];
 }
 

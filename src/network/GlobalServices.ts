@@ -14,7 +14,7 @@ class GlobalServices {
 	}
 
 	connectAll() {
-		this.omniSocket.connect();
+		// this.omniSocket.connect();
 		this.touchHandler.connect();
 		this.uiSocket.connect();
 	}

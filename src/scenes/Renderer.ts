@@ -91,7 +91,7 @@ export class Renderer extends THREE.WebGLRenderer {
 
 	setScene(scene: BaseScene) {
 		this.currentScene = scene;
-		// this.currentScene.setRendererSettings(this);
+		this.currentScene.setRendererSettings(this);
 	}
 
 	redraw(delta: number) {

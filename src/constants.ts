@@ -6,8 +6,8 @@ export const ORIGIN = new THREE.Vector3(0, 0, 0);
 
 export const TOUCH_SIZE = 0.1;
 export const PLAYER_SIZE = 0.2;
-export const VERTEX_SIZE = 0.015;
-export const EDGE_SIZE = 0.004;
+export const VERTEX_SIZE = 0.005;
+export const EDGE_SIZE = 0.005;
 
 export const TOUCH_DISTANCE = 0.8;
 export const PLAYER_DISTANCE = 0.9;

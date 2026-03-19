@@ -389,7 +389,6 @@ export default class PaintScene extends BaseScene {
 
 				{
 					type: "hr",
-					id: "paint_settings",
 					hint_title: "Paint settings",
 				},
 				{

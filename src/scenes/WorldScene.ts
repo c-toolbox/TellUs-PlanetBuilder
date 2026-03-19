@@ -62,6 +62,14 @@ export default class WorldScene extends BaseScene {
 		this.add(dir);
 	}
 
+	public setRendererSettings(renderer: Renderer): void {
+		// renderer.setClearColor(new THREE.Color(255, 0, 0));
+		// renderer.clearColor();
+		renderer.outputColorSpace = THREE.SRGBColorSpace;
+		renderer.toneMapping = THREE.NoToneMapping;
+		// renderer.autoClear = true;
+	}
+
 	createPlanet() {
 		// Find model from config
 		const polyhedra = PolyhedraModels.find(

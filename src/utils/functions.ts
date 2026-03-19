@@ -57,6 +57,15 @@ export function getPitchFromVector(vector: THREE.Vector3): number {
 	return 2 * Math.atan2(y, Math.sqrt(x * x + z * z));
 }
 
+// Interpolate two ThreeJS colors
+export function interpolateColor(
+	colorA: THREE.Color,
+	colorB: THREE.Color,
+	t: number,
+) {
+	return colorA.clone().lerp(colorB, t);
+}
+
 const colorCycle = [
 	Color.Red400,
 	Color.Orange400,
