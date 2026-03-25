@@ -314,8 +314,7 @@ export default class WorldScene extends BaseScene {
 					hint_title: "Scene",
 					hint_text: "Switch to a different scene",
 					value: "World",
-					options: [SceneKey.World, SceneKey.Paint],
-					// options: Object.keys(scenes),
+					options: Object.keys(scenes),
 				},
 				// {
 				// 	type: "switch",

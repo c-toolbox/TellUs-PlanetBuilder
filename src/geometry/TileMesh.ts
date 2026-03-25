@@ -30,6 +30,11 @@ export class TileMesh extends THREE.Mesh {
 		}
 	}
 
+	setColor(color: THREE.Color) {
+		this.material.map = tileManager.getTexture(Tile.None);
+		this.material.color.set(color);
+	}
+
 	recenterToGeometryCenter() {
 		this.geometry.computeBoundingBox();
 

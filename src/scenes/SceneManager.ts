@@ -7,6 +7,7 @@ import ReactionDiffusionScene from "./ReactionDiffusionScene";
 import DomScene from "./DomScene";
 import DragDropScene from "./DragDropScene";
 import BoidsScene from "./boids/BoidsScene";
+import CountryScene from "./country/CountryScene";
 
 /* Scenes */
 
@@ -18,6 +19,7 @@ export enum SceneKey {
 	Dom = "Dom",
 	DragDrop = "DragDrop",
 	Boids = "Boids",
+	Country = "Country",
 }
 
 export const scenes = {
@@ -28,6 +30,7 @@ export const scenes = {
 	Dom: new DomScene(),
 	DragDrop: new DragDropScene(),
 	Boids: new BoidsScene(),
+	Country: new CountryScene(),
 } satisfies Record<SceneKey, BaseScene>;
 
 /* Manager */
