@@ -16,7 +16,7 @@ export default class BaseScene extends THREE.Scene {
 	protected raycaster: THREE.Raycaster;
 	protected clickable: THREE.Object3D[];
 
-	private playerGroup: THREE.Group;
+	protected playerGroup: THREE.Group;
 	protected players: Map<string, Player>;
 
 	constructor() {
@@ -80,7 +80,10 @@ export default class BaseScene extends THREE.Scene {
 
 	/* 3D helpers */
 
-	protected addBackground(assetPath: string) {
+	protected addBackground(
+		assetPath: string,
+		tintColor: THREE.ColorRepresentation = 0xffffff,
+	) {
 		const loader = new THREE.TextureLoader();
 		loader.load(assetPath, (texture) => {
 			texture.colorSpace = THREE.SRGBColorSpace;
@@ -88,8 +91,10 @@ export default class BaseScene extends THREE.Scene {
 			const geometry = new THREE.SphereGeometry(BACKGROUND_DISTANCE, 64, 64);
 			const material = new THREE.MeshBasicMaterial({
 				map: texture,
-				side: THREE.DoubleSide,
+				// side: THREE.DoubleSide,
+				side: THREE.BackSide,
 			});
+			material.color.set(tintColor);
 			const sphere = new THREE.Mesh(geometry, material);
 			sphere.scale.x *= -1;
 			this.add(sphere);
