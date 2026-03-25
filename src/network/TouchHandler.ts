@@ -10,7 +10,8 @@ import circleAsset from "@/assets/circle.png";
 export class TouchHandler extends EventEmitter {
 	public touchGroup: THREE.Group;
 	private touchPoints: Map<TouchId, TouchPoint>;
-	private touchMaterial: THREE.MeshBasicMaterial;
+	private touchOuterMaterial: THREE.MeshBasicMaterial;
+	private touchInnerMaterial: THREE.MeshBasicMaterial;
 
 	constructor() {
 		super();
@@ -22,14 +23,28 @@ export class TouchHandler extends EventEmitter {
 		this.touchPoints = new Map<TouchId, TouchPoint>();
 
 		const textureLoader = new THREE.TextureLoader();
-		this.touchMaterial = new THREE.MeshBasicMaterial({
+
+		this.touchOuterMaterial = new THREE.MeshBasicMaterial({
 			map: textureLoader.load(circleAsset),
+			alphaMap: textureLoader.load(circleAsset),
 			transparent: true,
 			premultipliedAlpha: true,
 			side: THREE.DoubleSide,
 			depthWrite: true,
-			// visible: false,
+			color: 0xffffff,
+			opacity: 0.9,
 		});
+		this.touchOuterMaterial.alphaTest = 0.01;
+
+		this.touchInnerMaterial = new THREE.MeshBasicMaterial({
+			map: textureLoader.load(circleAsset),
+			alphaMap: textureLoader.load(circleAsset),
+			transparent: true,
+			premultipliedAlpha: true,
+			side: THREE.DoubleSide,
+			depthWrite: true,
+		});
+		this.touchInnerMaterial.alphaTest = 0.01;
 	}
 
 	connect() {
@@ -48,7 +63,11 @@ export class TouchHandler extends EventEmitter {
 	addTouch(touchId: TouchId) {
 		const geometry = new THREE.PlaneGeometry(1, 1);
 
-		const mesh = new TouchPoint(geometry, this.touchMaterial.clone());
+		const mesh = new TouchPoint(
+			geometry,
+			this.touchOuterMaterial,
+			this.touchInnerMaterial,
+		);
 
 		// Scale with distance so angular size is constant
 		mesh.scale.setScalar(TOUCH_SIZE * TOUCH_DISTANCE); // 400
@@ -64,7 +83,7 @@ export class TouchHandler extends EventEmitter {
 		const direction = new THREE.Vector3().setFromSphericalCoords(
 			1,
 			pitch,
-			-yaw - Math.PI / 2
+			-yaw - Math.PI / 2,
 		);
 		object.position.copy(direction).multiplyScalar(TOUCH_DISTANCE); // 200
 		object.lookAt(ORIGIN);
