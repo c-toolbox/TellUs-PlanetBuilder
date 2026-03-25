@@ -1,38 +1,51 @@
 import * as THREE from "three";
-import { ORIGIN, PLAYER_SIZE } from "@/constants";
+import { createNoise3D } from "simplex-noise";
+import { TouchPoint } from "@/network/TouchPoint";
+import { ORIGIN, FISH_SIZE } from "@/constants";
 
 import fishAsset from "@/assets/fish.png";
-// import sharkAsset from "@/assets/creature.png";
+import { BoidsUiConfig } from "./BoidsScene";
+
+const noise = createNoise3D();
 
 export class Fish extends THREE.Mesh {
 	public material: THREE.MeshBasicMaterial;
+	public color: number;
+	public friendlyColors: number[];
 
+	private boidsConfig: BoidsUiConfig;
 	private distanceFromCenter: number;
-	protected forward: THREE.Vector3;
-	protected velocity: THREE.Vector3;
-	protected speed: number;
-	protected targetSpeed: number;
+	private targetSpeed: number;
+	private speed: number;
+	private facing: THREE.Vector3;
 
-	constructor(distanceFromCenter: number, color: number) {
+	constructor(
+		boidsConfig: BoidsUiConfig,
+		distanceFromCenter: number,
+		color: number,
+		friendlyColors: number[],
+	) {
 		const textureLoader = new THREE.TextureLoader();
-		const circleTexture = textureLoader.load(fishAsset);
 		const material = new THREE.MeshBasicMaterial({
-			map: circleTexture,
+			map: textureLoader.load(fishAsset),
 			color,
 			transparent: true,
 			premultipliedAlpha: true,
 			depthWrite: false,
-			// side: THREE.FrontSide,
-			side: THREE.DoubleSide,
+			side: THREE.FrontSide,
+			// side: THREE.DoubleSide,
 		});
 
 		const geometry = new THREE.PlaneGeometry(1, 1);
 		geometry.rotateZ(Math.PI / 2);
 
 		super(geometry, material);
+		this.boidsConfig = boidsConfig;
 		this.material = material;
-		this.velocity = new THREE.Vector3();
 		this.distanceFromCenter = distanceFromCenter;
+		this.color = color;
+		this.friendlyColors = friendlyColors;
+
 		this.speed = 0.002 + Math.random() * 0.002;
 		this.targetSpeed = this.speed;
 
@@ -46,107 +59,57 @@ export class Fish extends THREE.Mesh {
 		);
 		this.position.copy(pos);
 
-		this.forward = new THREE.Vector3(
+		this.facing = new THREE.Vector3(
 			Math.random() * 2 - 1,
 			Math.random() * 2 - 1,
 			Math.random() * 2 - 1,
-		).normalize();
-		this.forward.projectOnPlane(this.position.clone().normalize()).normalize();
-		this.velocity = this.forward.clone().multiplyScalar(0.003);
+		);
+		this.facing.projectOnPlane(this.position.clone()).normalize();
 
 		// Scale with distance so angular size is constant
-		// this.scale.setScalar(PLAYER_SIZE * distanceFromCenter);
-		this.scale.setScalar(PLAYER_SIZE);
+		// this.scale.setScalar(FISH_SIZE * distanceFromCenter);
+		this.scale.setScalar(FISH_SIZE);
 	}
 
 	update() {
-		const speed = 0.005;
+		this.speed = THREE.MathUtils.lerp(
+			this.speed,
+			this.targetSpeed,
+			this.targetSpeed > this.speed ? 0.1 : 0.06,
+		);
 
-		this.position.addScaledVector(this.forward, speed);
+		this.position.add(this.facing.clone().multiplyScalar(this.speed));
 		this.position.normalize().multiplyScalar(this.distanceFromCenter);
 
 		const normal = this.position.clone().normalize();
-		this.forward.projectOnPlane(normal).normalize();
+		this.facing.projectOnPlane(normal).normalize();
 
-		this.up.copy(this.forward);
+		this.up.copy(this.facing);
 		this.lookAt(ORIGIN);
 	}
 
-	// update() {
-	// 	const speedLoss = 0.995;
-	// 	const maxSpeed = 0.01;
-	// 	const minSpeed = 0.002;
+	applyBoids(fishes: Fish[], touchPoints: TouchPoint[]) {
+		const sightRadius = this.boidsConfig.sightRadius;
+		const neighborRadius = this.boidsConfig.neighborRadius;
+		const separationRadius = this.boidsConfig.separationRadius;
+		const fearRadius = this.boidsConfig.fearRadius;
 
-	// 	// Gradually slow down
-	// 	this.speed *= speedLoss;
+		const cohesionWeight = this.boidsConfig.cohesionWeight;
+		const alignmentWeight = this.boidsConfig.alignmentWeight;
+		const separationWeight = this.boidsConfig.separationWeight;
+		const fearWeight = this.boidsConfig.fearWeight;
 
-	// 	// Clamp
-	// 	this.speed = THREE.MathUtils.clamp(this.speed, minSpeed, maxSpeed);
-
-	// 	// Move forward
-	// 	this.position.addScaledVector(this.forward, this.speed);
-
-	// 	// Stay on sphere
-	// 	this.position.normalize().multiplyScalar(this.distanceFromCenter);
-
-	// 	const normal = this.position.clone().normalize();
-	// 	this.forward.projectOnPlane(normal).normalize();
-
-	// 	this.up.copy(this.forward);
-	// 	this.lookAt(ORIGIN);
-	// }
-
-	// update() {
-	// 	const speedLoss = 0.985;
-	// 	const minSpeed = 0.002;
-	// 	const maxSpeed = 0.02;
-
-	// 	// Apply damping (like C code)
-	// 	this.velocity.multiplyScalar(speedLoss);
-
-	// 	// Clamp speed
-	// 	const speed = this.velocity.length();
-	// 	const clamped = THREE.MathUtils.clamp(speed, minSpeed, maxSpeed);
-	// 	this.velocity.setLength(clamped);
-
-	// 	// Move
-	// 	this.position.add(this.velocity);
-
-	// 	// Stick to sphere
-	// 	this.position.normalize().multiplyScalar(this.distanceFromCenter);
-
-	// 	// Project velocity onto tangent plane
-	// 	const normal = this.position.clone().normalize();
-	// 	this.velocity.projectOnPlane(normal);
-
-	// 	// Update forward from velocity
-	// 	if (this.velocity.lengthSq() > 0) {
-	// 		this.forward.copy(this.velocity).normalize();
-	// 	}
-
-	// 	this.up.copy(this.forward);
-	// 	this.lookAt(ORIGIN);
-	// }
-
-	turn(angle: number) {
-		const normal = this.position.clone().normalize();
-		const quaternion = new THREE.Quaternion().setFromAxisAngle(normal, angle);
-		this.forward.applyQuaternion(quaternion).normalize();
-	}
-
-	applyBoids(fishes: Fish[], sharks: Shark[]) {
-		const sightRadius = 0.3;
-		const neighborRadius = 0.15;
-		const separationRadius = 0.08;
-		const cohesionWeight = 0.3;
-		const alignmentWeight = 0.1;
-		const separationWeight = 0.3;
-		const maxTurn = 0.04;
-		const viewAngle = Math.PI * 0.5;
+		const sightAngle = Math.PI * 0.35;
+		const baseTurn = this.boidsConfig.baseTurn;
+		const panicTurn = this.boidsConfig.panicTurn;
+		const calmSpeed = this.boidsConfig.calmSpeed;
+		const panicSpeed = this.boidsConfig.panicSpeed;
 
 		let cohesion = new THREE.Vector3();
 		let alignment = new THREE.Vector3();
 		let separation = new THREE.Vector3();
+		let fear = new THREE.Vector3();
+		let speedOfNeighbors = 0;
 
 		let count = 0;
 
@@ -155,197 +118,122 @@ export class Fish extends THREE.Mesh {
 
 			const distance = this.position.distanceTo(other.position);
 
-			// 1. Separation is strictly distance-based (safety first!)
+			// If within separation radius
 			if (distance < separationRadius) {
 				const diff = this.position.clone().sub(other.position);
-				separation.add(diff.normalize().divideScalar(distance));
+				// separation.add(diff.normalize());
+				separation.add(
+					diff.normalize().multiplyScalar(1 - distance / separationRadius),
+				);
 			}
 
-			// 2. Check if the fish is within the neighbor radius
+			// If within sight range, check sight angle
 			if (distance < sightRadius) {
-				// Calculate vector to the other fish
 				const toOther = other.position.clone().sub(this.position).normalize();
+				const angleBetween = this.facing.angleTo(toOther);
 
-				// Calculate angle between current forward direction and other fish
-				const angleBetween = this.forward.angleTo(toOther);
+				// If within sight cone, or cohesion/alignment radius
+				if (distance < neighborRadius || angleBetween < sightAngle) {
+					// The influence the other fish has. Scared, faster fish are more influential.
+					let factor = Math.pow(other.speed, 2);
 
-				// 3. Only apply Cohesion and Alignment if within Field of View
-				if (distance < neighborRadius || angleBetween < viewAngle) {
-					cohesion.add(other.position);
-					alignment.add(other.forward);
-					count++;
+					// Check if fish should separate by color
+					if (this.boidsConfig.colorAffinity) {
+						factor *= this.friendlyColors.includes(other.color) ? 1 : -1;
+					}
+
+					// Add to neighbor sums
+					cohesion.add(other.position.clone().multiplyScalar(factor));
+					alignment.add(other.facing.clone().multiplyScalar(factor));
+					speedOfNeighbors += other.speed * factor;
+					count += factor;
 				}
 			}
 		}
 
-		// const sharkFearRadius = 0.1;
-		// const panicBoost = 0.01;
+		for (const point of touchPoints) {
+			const touchPosition = point.position
+				.clone()
+				.normalize()
+				.multiplyScalar(this.distanceFromCenter);
+			const distance = this.position.distanceTo(touchPosition);
 
-		// for (const shark of sharks) {
-		// 	const dist = this.position.distanceTo(shark.position);
+			// If within sight range, also check within sight angle
+			if (distance < sightRadius) {
+				const toOther = touchPosition.clone().sub(this.position).normalize();
+				const angleBetween = this.facing.angleTo(toOther);
 
-		// 	if (dist < sharkFearRadius) {
-		// 		const flee = this.position.clone().sub(shark.position);
-
-		// 		separation.add(
-		// 			flee
-		// 				.normalize()
-		// 				.multiplyScalar(((sharkFearRadius - dist) / sharkFearRadius) ** 2),
-		// 		);
-
-		// 		this.speed += panicBoost;
-		// 	}
-		// }
-
-		const fearRadius = 0.25;
-		const panicBoost = 0.02;
-
-		// for (const shark of sharks) {
-		// 	const distance = this.position.distanceTo(shark.position);
-
-		// 	if (distance < fearRadius) {
-		// 		const away = this.position.clone().sub(shark.position).normalize();
-
-		// 		// Turn away from shark
-		// 		this.forward.lerp(away, 0.2).normalize();
-
-		// 		// Speed boost when scared
-		// 		this.speed += panicBoost * (1 - distance / fearRadius);
-		// 	}
-		// }
-
-		for (const shark of sharks) {
-			const dist = this.position.distanceTo(shark.position);
-
-			if (dist < fearRadius) {
-				const flee = this.position.clone().sub(shark.position);
-
-				const factor = Math.pow((fearRadius - dist) / fearRadius, 2);
-
-				this.velocity.addScaledVector(
-					flee.normalize(),
-					factor * 0.05, // strong impulse
-				);
+				// If within sight cone, or general radius
+				if (distance < fearRadius || angleBetween < sightAngle) {
+					const diff = this.position.clone().sub(touchPosition);
+					fear.add(diff.normalize().multiplyScalar(1 - distance / sightRadius));
+				}
 			}
 		}
 
+		// Average
 		if (count > 0) {
-			// --- Cohesion ---
 			cohesion.divideScalar(count);
 			cohesion.sub(this.position);
 
-			// --- Alignment ---
 			alignment.divideScalar(count);
+
+			speedOfNeighbors = (speedOfNeighbors / count) * 0.75;
+		} else {
+			speedOfNeighbors = calmSpeed;
 		}
 
-		// Combine forces
+		// Combine
 		const steering = new THREE.Vector3();
-
 		steering
 			.addScaledVector(cohesion, cohesionWeight)
 			.addScaledVector(alignment, alignmentWeight)
-			.addScaledVector(separation, separationWeight);
+			.addScaledVector(separation, separationWeight)
+			.addScaledVector(fear, fearWeight);
 
 		// Project onto sphere tangent
 		const normal = this.position.clone().normalize();
 		steering.projectOnPlane(normal).normalize();
 
-		// Apply steering
-		this.forward
-			.lerp(this.forward.clone().add(steering).normalize(), maxTurn)
-			.normalize();
+		/* Target speed */
+
+		const fearStrength = fear.length();
+		const separationStrength = separation.length();
+
+		this.targetSpeed =
+			speedOfNeighbors + 0.05 * fearStrength + 0.0 * separationStrength;
+
+		// Lonely
+		// if (count == 0) this.targetSpeed += calmSpeed;
+
+		this.targetSpeed = THREE.MathUtils.clamp(
+			this.targetSpeed,
+			calmSpeed,
+			panicSpeed,
+		);
+
+		// Calculate turn speed
+		const turnFactor = THREE.MathUtils.clamp(fearStrength * 10, 0, 1);
+		const maxTurn = THREE.MathUtils.lerp(baseTurn, panicTurn, turnFactor);
 
 		// const noise = new THREE.Vector3(
 		// 	Math.random() - 0.5,
 		// 	Math.random() - 0.5,
 		// 	Math.random() - 0.5,
-		// ).multiplyScalar(0.02);
+		// ).multiplyScalar(2);
+		// steering.add(noise);
+		const value = noise(
+			4.5 * this.position.x,
+			4.5 * this.position.y,
+			4.5 * this.position.z,
+		);
+		const sideways = new THREE.Vector3()
+			.crossVectors(this.facing, normal)
+			.normalize()
+			.multiplyScalar(0.4 * value);
+		steering.add(sideways);
 
-		// this.forward.add(noise).normalize();
-		// this.forward.projectOnPlane(normal).normalize();
-
-		this.velocity.addScaledVector(cohesion, cohesionWeight * 5);
-		this.velocity.addScaledVector(alignment, alignmentWeight);
-		this.velocity.addScaledVector(separation, separationWeight * 5);
-
-		// const accel = steering.length();
-		// this.speed += accel * 0.001;
+		// Apply steering
+		this.facing.lerp(this.facing.clone().add(steering).normalize(), maxTurn);
 	}
-}
-
-export class Shark extends Fish {
-	constructor(distanceFromCenter: number, color: number) {
-		super(distanceFromCenter, color);
-
-		const textureLoader = new THREE.TextureLoader();
-		const sharkTexture = textureLoader.load(fishAsset);
-		this.material.map = sharkTexture;
-		this.scale.setScalar(3 * PLAYER_SIZE);
-	}
-
-	update() {
-		this.speed = 0.006;
-		super.update();
-	}
-
-	applyBoids(sharks: Shark[], fishes: Fish[]) {
-		const chaseWeight = 0.6;
-		const avoidWeight = 0.3;
-
-		let chase = new THREE.Vector3();
-		let avoid = new THREE.Vector3();
-
-		for (const fish of fishes) {
-			const dist = this.position.distanceTo(fish.position);
-			if (dist < 0.5) {
-				chase.add(fish.position);
-			}
-		}
-
-		for (const shark of sharks) {
-			if (shark === this) continue;
-			const dist = this.position.distanceTo(shark.position);
-			if (dist < 0.2) {
-				const diff = this.position.clone().sub(shark.position);
-				avoid.add(diff.normalize());
-			}
-		}
-
-		if (chase.lengthSq() > 0) {
-			chase.divideScalar(fishes.length);
-			chase.sub(this.position);
-		}
-
-		const steering = new THREE.Vector3()
-			.addScaledVector(chase, chaseWeight)
-			.addScaledVector(avoid, avoidWeight);
-
-		const normal = this.position.clone().normalize();
-		steering.projectOnPlane(normal).normalize();
-
-		this.forward
-			.lerp(this.forward.clone().add(steering).normalize(), 0.05)
-			.normalize();
-	}
-
-	// applyBoids(sharks: Shark[], fishes: Fish[]) {
-	// 	const chaseRadius = 0.35;
-
-	// 	let chase = new THREE.Vector3();
-
-	// 	for (const fish of fishes) {
-	// 		const dist = this.position.distanceTo(fish.position);
-
-	// 		if (dist < chaseRadius) {
-	// 			chase.add(fish.position);
-	// 		}
-	// 	}
-
-	// 	if (chase.lengthSq() > 0) {
-	// 		chase.divideScalar(fishes.length);
-	// 		chase.sub(this.position).normalize();
-
-	// 		this.forward.lerp(chase, 0.05).normalize();
-	// 	}
-	// }
 }

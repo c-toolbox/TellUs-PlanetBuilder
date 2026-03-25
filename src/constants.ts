@@ -6,6 +6,7 @@ export const ORIGIN = new THREE.Vector3(0, 0, 0);
 
 export const TOUCH_SIZE = 0.1;
 export const PLAYER_SIZE = 0.2;
+export const FISH_SIZE = 0.1;
 export const VERTEX_SIZE = 0.005;
 export const EDGE_SIZE = 0.005;
 

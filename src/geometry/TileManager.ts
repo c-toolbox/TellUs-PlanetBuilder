@@ -122,6 +122,10 @@ class TileManager {
 	}
 
 	get currentTextureSetKey(): TextureSetKey {
+		if (!this.worldConfig) {
+			return "icon";
+		}
+
 		switch (this.worldConfig.tileTexture) {
 			case "invisible tiles":
 			case "colored tiles":
@@ -198,7 +202,9 @@ class TileManager {
 				return 5 * this.gaussian(temp, -1, 0.5) + this.gaussian(height, 0, 0.5);
 
 			case Tile.Forest:
-				return 2 * this.gaussian(temp, 1, 1) + 0 * this.gaussian(height, 0, 0.5);
+				return (
+					2 * this.gaussian(temp, 1, 1) + 0 * this.gaussian(height, 0, 0.5)
+				);
 
 			default:
 				return 0.1;

@@ -39,12 +39,6 @@ export default class BaseScene extends THREE.Scene {
 		group.children.forEach((mesh) => this.clickable.push(mesh));
 	}
 
-	protected handleRaycast(
-		touchId: TouchId,
-		vector: THREE.Vector3,
-		type: "touch" | "click",
-	) {}
-
 	/* Scene management */
 
 	onEnter(renderer: Renderer) {}
@@ -75,8 +69,6 @@ export default class BaseScene extends THREE.Scene {
 	render(renderer: Renderer) {}
 
 	postRender() {}
-
-	setSize(size: number) {}
 
 	/* 3D helpers */
 
