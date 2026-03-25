@@ -78,7 +78,7 @@ export default class PaintScene extends BaseScene {
 	private useA = true;
 	private needsClear = false;
 
-	private uiConfig: PaintUiConfig = {
+	private paintConfig: PaintUiConfig = {
 		penWidth: 0.1,
 		blur: false,
 		colorMode: "rainbow",
@@ -123,7 +123,7 @@ export default class PaintScene extends BaseScene {
 	}
 
 	init() {
-		const penWidth = this.uiConfig.penWidth;
+		const penWidth = this.paintConfig.penWidth;
 
 		this.touchStates = new Map<number, TouchState>();
 		this.touchSphereGeo = new THREE.SphereGeometry(penWidth, 12, 10);
@@ -239,7 +239,7 @@ export default class PaintScene extends BaseScene {
 	}
 
 	updatePenWidth(width: number) {
-		this.uiConfig.penWidth = width;
+		this.paintConfig.penWidth = width;
 
 		// Dispose old geometries
 		this.touchSphereGeo.dispose();
@@ -253,7 +253,7 @@ export default class PaintScene extends BaseScene {
 	}
 
 	getColor() {
-		switch (this.uiConfig.colorMode) {
+		switch (this.paintConfig.colorMode) {
 			case "rainbow":
 				return getRainbowColor();
 			case "random":
@@ -350,7 +350,7 @@ export default class PaintScene extends BaseScene {
 		});
 
 		this.uiSocket.on("blur", (value: boolean) => {
-			this.uiConfig.blur = value;
+			this.paintConfig.blur = value;
 			this.feedbackMaterial.fragmentShader = value
 				? blurFragmentShader
 				: fragmentShader;
@@ -359,7 +359,7 @@ export default class PaintScene extends BaseScene {
 		});
 
 		this.uiSocket.on("color_mode", (value: ColorMode) => {
-			this.uiConfig.colorMode = value;
+			this.paintConfig.colorMode = value;
 			this.refreshConfig();
 		});
 
@@ -383,8 +383,7 @@ export default class PaintScene extends BaseScene {
 					hint_title: "Scene",
 					hint_text: "Switch to a different scene",
 					value: "Paint",
-					// options: Object.values(SceneKey),
-					options: [SceneKey.World, SceneKey.Paint],
+					options: Object.values(SceneKey),
 				},
 
 				{
@@ -396,7 +395,7 @@ export default class PaintScene extends BaseScene {
 					id: "pen_width",
 					hint_title: "Pen size",
 					hint_text: "The width of the pen while drawing",
-					value: this.uiConfig.penWidth,
+					value: this.paintConfig.penWidth,
 					min: 0.01,
 					max: 1.0,
 					step: 0.01,
@@ -406,7 +405,7 @@ export default class PaintScene extends BaseScene {
 					id: "blur",
 					hint_title: "Enable blur",
 					hint_text: "Make the painting fade away",
-					value: this.uiConfig.blur,
+					value: this.paintConfig.blur,
 				},
 				{
 					type: "dropdown",
@@ -414,7 +413,7 @@ export default class PaintScene extends BaseScene {
 					hint_title: "Color mode",
 					hint_text: "How colors are picked while drawing",
 					options: ColorModes,
-					value: this.uiConfig.colorMode,
+					value: this.paintConfig.colorMode,
 				},
 				{
 					type: "button",
