@@ -69,8 +69,11 @@ export class TouchHandler extends EventEmitter {
 			this.touchInnerMaterial,
 		);
 
+		// Temporarily move it away from origin
+		mesh.position.x = 10000;
+
 		// Scale with distance so angular size is constant
-		mesh.scale.setScalar(TOUCH_SIZE * TOUCH_DISTANCE); // 400
+		mesh.scale.setScalar(TOUCH_SIZE * TOUCH_DISTANCE);
 
 		this.touchGroup.add(mesh);
 		this.touchPoints.set(touchId, mesh);
