@@ -88,31 +88,15 @@ export default class PaintScene extends BaseScene {
 		super();
 
 		this.init();
-
-		// [
-		// 	[1, 0, 0],
-		// 	[-1, 0, 0],
-		// 	[0, 1, 0],
-		// 	[0, -1, 0],
-		// 	[0, 0, 1],
-		// 	[0, 0, -1],
-		// ].forEach((position) =>
-		// 	this.addText({
-		// 		text: "Touch to draw!",
-		// 		color: getNextColor(),
-		// 		size: 0.2,
-		// 		position: new THREE.Vector3(...position),
-		// 	})
-		// );
-
-		this.touchHandler.on("touch", (touchId: TouchId, vector: THREE.Vector3) => {
-			this.updateTouchSphere(touchId, vector);
-		});
-		this.touchHandler.on("remove", (touchId: TouchId) => {
-			this.removeTouchSphere(touchId);
-			// this.clearLines();
-		});
 	}
+
+	private onTouchHandler = (touchId: TouchId, vector: THREE.Vector3) => {
+		this.updateTouchSphere(touchId, vector);
+	};
+
+	private onRemoveHandler = (touchId: TouchId) => {
+		this.removeTouchSphere(touchId);
+	};
 
 	public setRendererSettings(renderer: Renderer): void {
 		// renderer.setClearColor(new THREE.Color(255, 0, 0));
@@ -192,7 +176,7 @@ export default class PaintScene extends BaseScene {
 		}
 
 		// Convert pitch/yaw to direction and get new position
-		const newPosition = vector.multiplyScalar(5);
+		const newPosition = vector.clone().multiplyScalar(5);
 		state.sphereNow.position.copy(newPosition);
 
 		// If we have a previous position, create a line between them
@@ -266,19 +250,29 @@ export default class PaintScene extends BaseScene {
 	/* Rendering */
 
 	override onEnter(renderer: Renderer) {
-		console.log("PaintScene loaded");
+		console.info("PaintScene.onEnter");
 
 		// Initialize UI
-		this.setupUi();
-		this.refreshConfig();
+		this.initializeUi();
+		this.sendUiConfig();
+
+		// Set up touch handlers
+		this.touchHandler.on("touch", this.onTouchHandler);
+		this.touchHandler.on("remove", this.onRemoveHandler);
 	}
 
 	override onExit(renderer: Renderer) {
-		console.log("PaintScene cleaned up");
+		console.info("PaintScene.onExit");
 
 		// Remove feedback textures, listeners, etc.
 		this.clearLines();
-		// this.touchHandler.removeAllListeners?.();
+
+		// Remove touch handlers
+		this.touchHandler.off("touch", this.onTouchHandler);
+		this.touchHandler.off("remove", this.onRemoveHandler);
+
+		// Remove UI socket listeners
+		this.uiSocket.removeAllListeners();
 
 		this.clear();
 	}
@@ -337,16 +331,12 @@ export default class PaintScene extends BaseScene {
 
 	/* Socket UI */
 
-	setupUi() {
-		this.uiSocket.on("request", () => this.refreshConfig());
-
-		this.uiSocket.on("scene", (value: SceneKey) => {
-			sceneManager.setScene(scenes[value]);
-		});
+	initializeUi() {
+		super.initializeUi();
 
 		this.uiSocket.on("pen_width", (value: number) => {
 			this.updatePenWidth(value);
-			this.refreshConfig();
+			this.sendUiConfig();
 		});
 
 		this.uiSocket.on("blur", (value: boolean) => {
@@ -355,12 +345,12 @@ export default class PaintScene extends BaseScene {
 				? blurFragmentShader
 				: fragmentShader;
 			this.feedbackMaterial.needsUpdate = true;
-			this.refreshConfig();
+			this.sendUiConfig();
 		});
 
 		this.uiSocket.on("color_mode", (value: ColorMode) => {
 			this.paintConfig.colorMode = value;
-			this.refreshConfig();
+			this.sendUiConfig();
 		});
 
 		this.uiSocket.on("clear", () => {
@@ -368,11 +358,11 @@ export default class PaintScene extends BaseScene {
 		});
 	}
 
-	refreshConfig() {
-		this.uiSocket.send(this.config);
+	sendUiConfig() {
+		this.uiSocket.send(this.uiConfig);
 	}
 
-	get config(): UiConfigEvent {
+	get uiConfig(): UiConfigEvent {
 		return {
 			type: "config",
 			title: "Paint",
@@ -382,7 +372,7 @@ export default class PaintScene extends BaseScene {
 					id: "scene",
 					hint_title: "Scene",
 					hint_text: "Switch to a different scene",
-					value: "Paint",
+					value: SceneKey.Paint,
 					options: Object.values(SceneKey),
 				},
 

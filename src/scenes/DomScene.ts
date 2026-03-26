@@ -3,8 +3,8 @@ import BaseScene from "./BaseScene";
 import { CSS3DRenderer } from "three/examples/jsm/renderers/CSS3DRenderer";
 import { TouchId } from "@/network/tuioProtocol";
 import { Element } from "@/components/Element";
-import { ORIGIN } from "@/constants";
 import { Renderer } from "./Renderer";
+import { UiConfigEvent } from "@/network/uiProtocol";
 
 export default class DomScene extends BaseScene {
 	private cssRenderer: CSS3DRenderer;
@@ -71,5 +71,13 @@ export default class DomScene extends BaseScene {
 
 	setSize(size: number): void {
 		this.cssRenderer.setSize(size, size);
+	}
+
+	get uiConfig(): UiConfigEvent {
+		return {
+			type: "config",
+			title: "Dom",
+			elements: [],
+		};
 	}
 }

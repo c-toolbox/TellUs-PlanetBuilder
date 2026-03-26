@@ -88,7 +88,7 @@ export class TouchHandler extends EventEmitter {
 			pitch,
 			-yaw - Math.PI / 2,
 		);
-		object.position.copy(direction).multiplyScalar(TOUCH_DISTANCE); // 200
+		object.position.copy(direction).multiplyScalar(TOUCH_DISTANCE);
 		object.lookAt(ORIGIN);
 
 		this.emit("touch", touchId, direction);

@@ -117,15 +117,15 @@ export class OmniSocket extends EventEmitter {
 		this.socket = new WebSocket(URL);
 
 		this.socket.onopen = () => {
-			console.log("Socket Omni opened");
+			console.debug("Socket Omni opened");
 		};
 
 		this.socket.onclose = () => {
-			console.log("Socket Omni closed");
+			console.debug("Socket Omni closed");
 		};
 
 		this.socket.onerror = (event: Event) => {
-			console.log("Socket Omni error" + event);
+			console.debug("Socket Omni error" + event);
 		};
 
 		this.socket.onmessage = (event: MessageEvent) => {
@@ -138,7 +138,7 @@ export class OmniSocket extends EventEmitter {
 			this.socket.send(JSON.stringify(data));
 		} else {
 			console.warn("Cannot send. Socket is closed.");
-			console.log(data);
+			console.debug(data);
 		}
 	}
 
@@ -158,28 +158,28 @@ export class OmniSocket extends EventEmitter {
 	/* Response handlers */
 
 	onOmniConnect(data: OmniConnect) {
-		console.log("onOmniConnect", data);
+		console.debug("onOmniConnect", data);
 		this.send({ token: HOST_TOKEN }, true);
 	}
 
 	onOmniDisconnect(data: OmniDisconnect) {
-		console.log("onOmniDisconnect", data);
+		console.debug("onOmniDisconnect", data);
 	}
 
 	onOmniAuthorized(data: OmniAuthorized) {
-		console.log("onOmniAuthorized", data);
+		console.debug("onOmniAuthorized", data);
 	}
 
 	onOmniJoin(data: OmniJoin) {
-		console.log("onOmniJoin", data);
+		console.debug("onOmniJoin", data);
 	}
 
 	onOmniLeave(data: OmniLeave) {
-		console.log("onOmniLeave", data);
+		console.debug("onOmniLeave", data);
 	}
 
 	onOmniError(data: OmniError) {
-		console.log("onOmniError", data.message);
+		console.debug("onOmniError", data.message);
 	}
 
 	onMovement(data: Movement) {}

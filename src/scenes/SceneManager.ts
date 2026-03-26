@@ -2,10 +2,10 @@ import { Renderer } from "./Renderer";
 import BaseScene from "./BaseScene";
 import WorldScene from "./WorldScene";
 import PaintScene from "./PaintScene";
-import DistortionScene from "./DistortionScene";
-import ReactionDiffusionScene from "./ReactionDiffusionScene";
-import DomScene from "./DomScene";
-import DragDropScene from "./DragDropScene";
+// import DistortionScene from "./DistortionScene";
+// import ReactionDiffusionScene from "./ReactionDiffusionScene";
+// import DomScene from "./DomScene";
+// import DragDropScene from "./DragDropScene";
 import BoidsScene from "./boids/BoidsScene";
 import CountryScene from "./country/CountryScene";
 
@@ -14,10 +14,10 @@ import CountryScene from "./country/CountryScene";
 export enum SceneKey {
 	World = "World",
 	Paint = "Paint",
-	Distortion = "Distortion",
-	ReactionDiffusion = "ReactionDiffusion",
-	Dom = "Dom",
-	DragDrop = "DragDrop",
+	// Distortion = "Distortion",
+	// ReactionDiffusion = "ReactionDiffusion",
+	// Dom = "Dom",
+	// DragDrop = "DragDrop",
 	Boids = "Boids",
 	Country = "Country",
 }
@@ -25,10 +25,10 @@ export enum SceneKey {
 export const scenes = {
 	World: new WorldScene(),
 	Paint: new PaintScene(),
-	Distortion: new DistortionScene(),
-	ReactionDiffusion: new ReactionDiffusionScene(),
-	Dom: new DomScene(),
-	DragDrop: new DragDropScene(),
+	// Distortion: new DistortionScene(),
+	// ReactionDiffusion: new ReactionDiffusionScene(),
+	// Dom: new DomScene(),
+	// DragDrop: new DragDropScene(),
 	Boids: new BoidsScene(),
 	Country: new CountryScene(),
 } satisfies Record<SceneKey, BaseScene>;

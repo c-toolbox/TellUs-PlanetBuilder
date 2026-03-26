@@ -5,9 +5,9 @@ import { Renderer } from "../Renderer";
 import { Fish } from "./Fish";
 import { Color, GoogleColor } from "@/utils/colors";
 import { TouchPoint } from "@/network/TouchPoint";
-import backgroundAsset from "@/assets/square.png";
 import { UiConfigEvent } from "@/network/uiProtocol";
-import { SceneKey, sceneManager, scenes } from "../SceneManager";
+import { SceneKey } from "../SceneManager";
+import backgroundAsset from "@/assets/square.png";
 
 const FISH_COLORS = [
 	GoogleColor["Red 600"],
@@ -69,7 +69,6 @@ export default class BoidsScene extends BaseScene {
 
 	constructor() {
 		super();
-		this.setupUi();
 
 		this.addBackground(backgroundAsset, Color.Slate900);
 
@@ -89,11 +88,16 @@ export default class BoidsScene extends BaseScene {
 	}
 
 	override onEnter(renderer: Renderer) {
-		console.log("BoidsScene active");
+		console.info("BoidsScene.onEnter");
+
+		this.initializeUi();
+		this.sendUiConfig();
 	}
 
 	override onExit(renderer: Renderer) {
-		console.log("BoidsScene exiting");
+		console.info("BoidsScene.onExit");
+
+		this.uiSocket.removeAllListeners();
 	}
 
 	update(delta: number) {
@@ -165,12 +169,8 @@ export default class BoidsScene extends BaseScene {
 
 	/* Socket UI */
 
-	setupUi() {
-		this.uiSocket.on("request", () => this.refreshConfig());
-
-		this.uiSocket.on("scene", (value: SceneKey) => {
-			sceneManager.setScene(scenes[value]);
-		});
+	initializeUi() {
+		super.initializeUi();
 
 		const configKeys: BoidsConfigKey[] = [
 			"fishCount",
@@ -189,21 +189,14 @@ export default class BoidsScene extends BaseScene {
 			"panicSpeed",
 		];
 
-		configKeys.forEach((key) => this.bindConfig(key));
+		configKeys.forEach((key) => this.bindUiConfigKey(this.boidsConfig, key));
 	}
 
-	refreshConfig() {
-		this.uiSocket.send(this.config);
+	sendUiConfig() {
+		this.uiSocket.send(this.uiConfig);
 	}
 
-	private bindConfig<T extends BoidsConfigKey>(id: T) {
-		this.uiSocket.on(id, (value: BoidsUiConfig[T]) => {
-			this.boidsConfig[id] = value;
-			this.refreshConfig();
-		});
-	}
-
-	get config(): UiConfigEvent {
+	get uiConfig(): UiConfigEvent {
 		return {
 			type: "config",
 			title: "Boids",
@@ -213,7 +206,7 @@ export default class BoidsScene extends BaseScene {
 					id: "scene",
 					hint_title: "Scene",
 					hint_text: "Switch to a different scene",
-					value: "Boids",
+					value: SceneKey.Boids,
 					options: Object.values(SceneKey),
 				},
 

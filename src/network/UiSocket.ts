@@ -21,7 +21,7 @@ export class UiSocket extends EventEmitter {
 		this.socket = new WebSocket(UI_URL);
 
 		this.socket.onopen = (event) => {
-			console.log("Socket UI opened");
+			console.debug("Socket UI opened");
 			this.reconnectAttempts = 0;
 			if (this.reconnectTimeout) {
 				clearTimeout(this.reconnectTimeout);
@@ -30,7 +30,7 @@ export class UiSocket extends EventEmitter {
 			this.emit("request", event);
 		};
 		this.socket.onclose = () => {
-			console.log("Socket UI closed");
+			console.debug("Socket UI closed");
 			this.scheduleReconnect();
 		};
 		this.socket.onerror = () => {};
@@ -47,7 +47,7 @@ export class UiSocket extends EventEmitter {
 
 	onMessage(data: string) {
 		const event: UiEvent = JSON.parse(data);
-		console.log(event);
+		console.debug(event);
 
 		switch (event.type) {
 			// Config event
@@ -74,7 +74,7 @@ export class UiSocket extends EventEmitter {
 	private scheduleReconnect(): void {
 		this.reconnectAttempts++;
 		const delayMs = this.reconnectAttempts * 5000; // 5 seconds per attempt
-		console.log(
+		console.debug(
 			`Scheduling reconnection attempt ${this.reconnectAttempts} in ${delayMs}ms`,
 		);
 
@@ -83,7 +83,7 @@ export class UiSocket extends EventEmitter {
 		}
 
 		this.reconnectTimeout = setTimeout(() => {
-			console.log(
+			console.debug(
 				`Attempting to reconnect (attempt ${this.reconnectAttempts})...`,
 			);
 			this.connect();

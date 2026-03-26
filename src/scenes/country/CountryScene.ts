@@ -8,6 +8,8 @@ import { TouchId } from "@/network/tuioProtocol";
 
 import backgroundAsset from "@/assets/backgrounds/globe/standard.jpg";
 import worldGeodata from "@/assets/world.json";
+import { SceneKey, sceneManager, scenes } from "../SceneManager";
+import { UiConfigEvent } from "@/network/uiProtocol";
 
 export default class CountryScene extends BaseScene {
 	private countryMeshes: {
@@ -18,42 +20,38 @@ export default class CountryScene extends BaseScene {
 	constructor() {
 		super();
 
-		this.addBackground(backgroundAsset, 0x444444);
+		this.addBackground(backgroundAsset, 0x888888);
 
 		this.drawCountries();
 
-		window.addEventListener("keydown", (e) => {
-			if (e.key === "Enter") {
-				this.onClick(
-					0,
-					new THREE.Vector3(
-						Math.random() * 2 - 1,
-						Math.random() * 2 - 1,
-						Math.random() * 2 - 1,
-					),
-				);
-			}
-		});
+		this.add(this.touchHandler.touchGroup);
 	}
 
-	override onEnter(renderer: Renderer) {
-		console.log("CountryScene active");
+	private onTouchHandler = (touchId: TouchId, vector: THREE.Vector3) =>
+		this.onTouch(touchId, vector);
+	private onClickHandler = (touchId: TouchId, vector: THREE.Vector3) =>
+		this.onClick(touchId, vector);
 
-		this.add(this.touchHandler.touchGroup);
+	override onEnter(renderer: Renderer) {
+		console.info("CountryScene.onEnter");
+
+		this.initializeUi();
+		this.sendUiConfig();
 
 		// Subscribe to touch events
-		this.touchHandler.on("touch", this.onTouch.bind(this));
-		this.touchHandler.on("click", this.onClick.bind(this));
+		this.touchHandler.on("touch", this.onTouchHandler);
+		this.touchHandler.on("click", this.onClickHandler);
 	}
 
 	override onExit(renderer: Renderer) {
-		console.log("CountryScene exiting");
+		console.info("CountryScene.onExit");
 
-		this.clear();
+		// this.clear();
 
 		// Clean up event bindings
-		this.touchHandler.off("touch", this.onTouch.bind(this));
-		this.touchHandler.off("click", this.onClick.bind(this));
+		this.touchHandler.off("touch", this.onTouchHandler);
+		this.touchHandler.off("click", this.onClickHandler);
+		this.uiSocket.removeAllListeners();
 	}
 
 	private onTouch(touchId: TouchId, vector: THREE.Vector3) {
@@ -62,6 +60,8 @@ export default class CountryScene extends BaseScene {
 			touchPoint.setTile(Tile.None);
 			touchPoint.setColor(0xff0000);
 		}
+
+		this.onClick(touchId, vector);
 	}
 
 	private onClick(touchId: TouchId, vector: THREE.Vector3) {
@@ -187,15 +187,15 @@ export default class CountryScene extends BaseScene {
 		const theta = (lon + 180) * (Math.PI / 180); // azimuthal
 
 		return new THREE.Vector3(
-			-1 * -radius * Math.sin(phi) * Math.cos(theta),
+			radius * Math.sin(phi) * Math.cos(theta),
 			radius * Math.cos(phi),
 			radius * Math.sin(phi) * Math.sin(theta),
 		);
 	}
 
-	vectorToLatLon(v: THREE.Vector3) {
-		const lat = 90 - (Math.acos(v.y) * 180) / Math.PI;
-		const lon = (Math.atan2(v.z, -v.x) * 180) / Math.PI; // Flip x
+	vectorToLatLon(vector: THREE.Vector3) {
+		const lat = 90 - (Math.acos(vector.y) * 180) / Math.PI;
+		const lon = (Math.atan2(vector.z, -vector.x) * 180) / Math.PI; // Flip x
 
 		return { lat, lon };
 	}
@@ -244,5 +244,32 @@ export default class CountryScene extends BaseScene {
 		}
 
 		return false;
+	}
+
+	/* Socket UI */
+
+	initializeUi() {
+		super.initializeUi();
+	}
+
+	sendUiConfig() {
+		this.uiSocket.send(this.uiConfig);
+	}
+
+	get uiConfig(): UiConfigEvent {
+		return {
+			type: "config",
+			title: "Country",
+			elements: [
+				{
+					type: "dropdown",
+					id: "scene",
+					hint_title: "Scene",
+					hint_text: "Switch to a different scene",
+					value: SceneKey.Country,
+					options: Object.values(SceneKey),
+				},
+			],
+		};
 	}
 }

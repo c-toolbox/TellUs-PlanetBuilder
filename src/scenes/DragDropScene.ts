@@ -8,6 +8,7 @@ import BaseScene from "./BaseScene";
 
 import { Renderer } from "./Renderer";
 import { Polyhedra } from "@/geometry/Polyhedra";
+import { UiConfigEvent } from "@/network/uiProtocol";
 import backgroundAsset from "@/assets/backgrounds/globe/black_and_white.jpeg";
 
 
@@ -29,7 +30,7 @@ export default class DragDropScene extends BaseScene {
 	}
 
 	override onEnter(renderer: Renderer) {
-		console.log("DragDropScene active");
+		console.info("DragDropScene.onEnter");
 
 		// Subscribe to touch events
 		this.touchHandler.on("touch", this.onTouch);
@@ -40,7 +41,7 @@ export default class DragDropScene extends BaseScene {
 	}
 
 	override onExit(renderer: Renderer) {
-		console.log("DragDropScene exiting");
+		console.info("DragDropScene.onExit");
 
 		// Clean up event bindings
 		this.touchHandler.off("touch", this.onTouch);
@@ -83,5 +84,13 @@ export default class DragDropScene extends BaseScene {
 
 	update(delta: number) {
 		this.players.forEach((player) => player.update());
+	}
+
+	get uiConfig(): UiConfigEvent {
+		return {
+			type: "config",
+			title: "Drag Drop",
+			elements: [],
+		};
 	}
 }

@@ -6,9 +6,10 @@ import { globalServices } from "@/network/GlobalServices";
 import { TouchId } from "@/network/tuioProtocol";
 import Player from "@/network/Player";
 import { BACKGROUND_DISTANCE, ORIGIN } from "@/constants";
+import { SceneKey, sceneManager, scenes } from "./SceneManager";
+import { UiConfigEvent } from "@/network/uiProtocol";
 
-
-export default class BaseScene extends THREE.Scene {
+export default abstract class BaseScene extends THREE.Scene {
 	protected omniSocket = globalServices.omniSocket;
 	protected touchHandler = globalServices.touchHandler;
 	protected uiSocket = globalServices.uiSocket;
@@ -123,4 +124,30 @@ export default class BaseScene extends THREE.Scene {
 			this.add(mesh);
 		});
 	}
+
+	/* Socket UI */
+
+	protected initializeUi() {
+		this.uiSocket.on("request", () => this.sendUiConfig());
+
+		this.uiSocket.on("scene", (value: SceneKey) => {
+			sceneManager.setScene(scenes[value]);
+		});
+	}
+
+	protected sendUiConfig() {
+		this.uiSocket.send(this.uiConfig);
+	}
+
+	protected bindUiConfigKey<T extends string>(
+		config: Record<string, any>,
+		key: T,
+	) {
+		this.uiSocket.on(key, (value: any) => {
+			config[key] = value;
+			this.sendUiConfig();
+		});
+	}
+
+	protected abstract get uiConfig(): UiConfigEvent;
 }

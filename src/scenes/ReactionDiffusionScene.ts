@@ -3,6 +3,7 @@ import BaseScene from "./BaseScene";
 import { TouchId } from "@/network/tuioProtocol";
 import { Renderer } from "./Renderer";
 import { getRainbowColor } from "@/utils/functions";
+import { UiConfigEvent } from "@/network/uiProtocol";
 
 import vertexShader from "@/shaders/basic.vert?raw";
 
@@ -333,11 +334,11 @@ export default class ReactionDiffusionScene extends BaseScene {
 	/* Rendering */
 
 	override onEnter(renderer: Renderer) {
-		console.log("PaintScene loaded");
+		console.info("ReactionDiffusionScene.onEnter");
 	}
 
 	override onExit(renderer: Renderer) {
-		console.log("PaintScene cleaned up");
+		console.info("ReactionDiffusionScene.onExit");
 
 		// Remove feedback textures, listeners, etc.
 		this.clearLines();
@@ -378,5 +379,13 @@ export default class ReactionDiffusionScene extends BaseScene {
 
 		// 5️⃣ Swap buffers
 		this.useA = !this.useA;
+	}
+
+	get uiConfig(): UiConfigEvent {
+		return {
+			type: "config",
+			title: "Reaction Diffusion",
+			elements: [],
+		};
 	}
 }

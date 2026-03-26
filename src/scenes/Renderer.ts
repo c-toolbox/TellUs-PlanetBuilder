@@ -57,7 +57,6 @@ export class Renderer extends THREE.WebGLRenderer {
 		window.addEventListener("keydown", (e) => {
 			if (e.key === " ") {
 				this.debugMode = !this.debugMode;
-				console.log("Debug mode:", this.debugMode);
 			}
 		});
 

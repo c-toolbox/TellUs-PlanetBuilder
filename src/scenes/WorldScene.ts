@@ -123,7 +123,7 @@ export default class WorldScene extends BaseScene {
 
 	// On entering scene
 	override onEnter(renderer: Renderer) {
-		console.log("WorldScene active");
+		console.info("WorldScene.onEnter");
 
 		// Set tileManager variables
 		this.applyTileManagerSettings();
@@ -141,19 +141,20 @@ export default class WorldScene extends BaseScene {
 		this.add(this.touchHandler.touchGroup);
 
 		// Initialize Socket UI
-		this.setupUi();
-		this.refreshConfig();
+		this.initializeUi();
+		this.sendUiConfig();
 	}
 
 	// On exiting scene
 	override onExit(renderer: Renderer) {
-		console.log("WorldScene exiting");
+		console.info("WorldScene.onExit");
 
 		this.clear();
 
 		// Clean up event bindings
 		this.touchHandler.off("touch", this.onTouch);
 		this.touchHandler.off("click", this.onClick);
+		this.uiSocket.removeAllListeners();
 		// this.omniSocket.off("playerJoined", this.handlePlayerJoin);
 	}
 
@@ -186,7 +187,7 @@ export default class WorldScene extends BaseScene {
 				}
 
 				if (tileMesh.tile != touchPoint.tile) {
-					this.refreshConfig();
+					this.sendUiConfig();
 				}
 
 				tileMesh.setTile(touchPoint.tile);
@@ -204,12 +205,8 @@ export default class WorldScene extends BaseScene {
 
 	/* Socket UI */
 
-	setupUi() {
-		this.uiSocket.on("request", () => this.refreshConfig());
-
-		this.uiSocket.on("scene", (value: SceneKey) => {
-			sceneManager.setScene(scenes[value]);
-		});
+	initializeUi() {
+		super.initializeUi();
 
 		this.uiSocket.on("seed", (value: boolean) => {
 			this.worldConfig.refreshSeed = value;
@@ -221,17 +218,17 @@ export default class WorldScene extends BaseScene {
 				tileManager.refreshNoiseSeed();
 			}
 			this.createPlanet();
-			this.refreshConfig();
+			this.sendUiConfig();
 		});
 
 		this.uiSocket.on("tile_edges", (value: TileEdge) => {
 			this.worldConfig.tileEdge = value;
-			this.refreshConfig();
+			this.sendUiConfig();
 		});
 
 		this.uiSocket.on("tile_texture", (value: TileTexture) => {
 			this.worldConfig.tileTexture = value;
-			this.refreshConfig();
+			this.sendUiConfig();
 
 			// Update textures
 			this.globe.tileMeshes.forEach((tileMesh) =>
@@ -242,7 +239,7 @@ export default class WorldScene extends BaseScene {
 		this.uiSocket.on("model", (value: ModelName) => {
 			this.worldConfig.model = value;
 			this.redistributeBiomes();
-			this.refreshConfig();
+			this.sendUiConfig();
 			// this.createPlanet();
 		});
 
@@ -270,7 +267,7 @@ export default class WorldScene extends BaseScene {
 
 		this.uiSocket.on("distribution", (value: DistributionType) => {
 			this.worldConfig.distribution = value;
-			this.refreshConfig();
+			this.sendUiConfig();
 		});
 
 		this.uiSocket.on("biome_distribution", (values: number[]) => {
@@ -291,7 +288,7 @@ export default class WorldScene extends BaseScene {
 			// this.createPlanet();
 			this.populatePlanetTiles();
 
-			this.refreshConfig();
+			this.sendUiConfig();
 		});
 	}
 
@@ -299,11 +296,11 @@ export default class WorldScene extends BaseScene {
 		tileManager.worldConfig = this.worldConfig;
 	}
 
-	refreshConfig() {
-		this.uiSocket.send(this.config);
+	sendUiConfig() {
+		this.uiSocket.send(this.uiConfig);
 	}
 
-	get config(): UiConfigEvent {
+	get uiConfig(): UiConfigEvent {
 		return {
 			type: "config",
 			title: "Planet builder",
@@ -313,8 +310,8 @@ export default class WorldScene extends BaseScene {
 					id: "scene",
 					hint_title: "Scene",
 					hint_text: "Switch to a different scene",
-					value: "World",
-					options: Object.keys(scenes),
+					value: SceneKey.World,
+					options: Object.values(SceneKey),
 				},
 				// {
 				// 	type: "switch",
@@ -549,7 +546,7 @@ export default class WorldScene extends BaseScene {
 	toggleBiome(biome: Tile, enabled: boolean) {
 		this.worldConfig.biomes[biome] = enabled ? 10 : 0;
 		this.redistributeBiomes();
-		this.refreshConfig();
+		this.sendUiConfig();
 	}
 
 	get tileCount(): string {

@@ -2,6 +2,7 @@ import * as THREE from "three";
 import BaseScene from "./BaseScene";
 import { TouchId } from "@/network/tuioProtocol";
 import { Renderer } from "./Renderer";
+import { UiConfigEvent } from "@/network/uiProtocol";
 
 // ------------------------------
 // Simple fluid simulation shaders
@@ -362,5 +363,13 @@ export default class DistortionScene extends BaseScene {
 
 	postRender() {
 		this.clearLines();
+	}
+
+	get uiConfig(): UiConfigEvent {
+		return {
+			type: "config",
+			title: "Distortion",
+			elements: [],
+		};
 	}
 }
