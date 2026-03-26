@@ -1,16 +1,18 @@
 // Try to start the Python TUIO proxy when running inside Neutralino
 import { isNeutralino } from "@/utils/neu";
-import { os, events, filesystem } from "@neutralinojs/lib";
-import {} from "@neutralinojs/lib";
+import { app, os, events } from "@neutralinojs/lib";
 
 declare const NL_PATH: string;
 const w = window as any;
+
+let proxyProcessId: number | null = null;
 
 async function trySpawn(command: string): Promise<any | null> {
 	const proc = await os.spawnProcess(command);
 
 	// If Neutralino returns a process object with an ID, consider it "started"
 	if (proc && proc.id !== undefined) {
+		proxyProcessId = proc.id;
 		// Setup the listener in the background for logging/cleanup,
 		// but don't 'await' it for the main flow.
 		const handler = (evt: any) => {
@@ -28,7 +30,7 @@ async function trySpawn(command: string): Promise<any | null> {
 		};
 
 		events.on("spawnedProcess", handler);
-		return proc; // Resolve immediately so startProxy() can continue
+		return proc;
 	}
 
 	return null;
@@ -62,28 +64,23 @@ async function startProxy() {
 	console.error("Could not start proxy");
 }
 
-async function isPortBusy(port: number): Promise<boolean> {
-	try {
-		// We use netstat to check if the port is in the "LISTENING" state
-		const { stdOut } = await os.execCommand(
-			`netstat -ano | findstr :${port} | findstr LISTENING`,
-		);
-		return stdOut.trim().length > 0;
-	} catch {
-		return false; // Command fails if no match is found
+events.on("windowClose", async () => {
+	console.log("App closing...");
+
+	if (proxyProcessId !== null) {
+		try {
+			await os.updateSpawnedProcess(proxyProcessId, "exit");
+			console.log("Proxy process terminated");
+		} catch (err) {
+			console.warn("Failed to terminate proxy:", err);
+		}
 	}
-}
+
+	app.exit();
+});
 
 if (isNeutralino) {
-	const busy = await isPortBusy(8765);
-
-	if (busy) {
-		console.log("Proxy already running on port 8765. Skipping spawn.");
-		w._proxyStarted = true;
-	} else {
-		console.log("Port 8765 is free. Starting proxy...");
-		startProxy();
-	}
+	startProxy();
 } else {
 	console.warn("Not running inside Neutralino; cannot start python proxy");
 }

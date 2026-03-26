@@ -10,7 +10,8 @@
 			"storage.getData",
 			"storage.setData",
 			"os.execCommand",
-			"os.spawnProcess"
+			"os.spawnProcess",
+			"os.updateSpawnedProcess"
 		],
 		"window": {}
 	}
