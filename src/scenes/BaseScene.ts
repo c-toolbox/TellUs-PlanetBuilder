@@ -20,6 +20,10 @@ export default abstract class BaseScene extends THREE.Scene {
 	protected playerGroup: THREE.Group;
 	protected players: Map<string, Player>;
 
+	private boundTouch: (touchId: TouchId, vector: THREE.Vector3) => void;
+	private boundClick: (touchId: TouchId, vector: THREE.Vector3) => void;
+	private boundRemove: (touchId: TouchId) => void;
+
 	constructor() {
 		super();
 
@@ -30,6 +34,10 @@ export default abstract class BaseScene extends THREE.Scene {
 
 		this.raycaster = new THREE.Raycaster();
 		this.clickable = [];
+
+		this.boundTouch = (touchId, vector) => this.onTouch(touchId, vector);
+		this.boundClick = (touchId, vector) => this.onClick(touchId, vector);
+		this.boundRemove = (touchId) => this.onRemove(touchId);
 	}
 
 	public setRendererSettings(renderer: Renderer) {}
@@ -42,9 +50,22 @@ export default abstract class BaseScene extends THREE.Scene {
 
 	/* Scene management */
 
-	onEnter(renderer: Renderer) {}
+	onEnter(renderer: Renderer) {
+		this.initializeUi();
+		this.sendUiConfig();
 
-	onExit(renderer: Renderer) {}
+		this.touchHandler.on("touch", this.boundTouch);
+		this.touchHandler.on("click", this.boundClick);
+		this.touchHandler.on("remove", this.boundRemove);
+	}
+
+	onExit(renderer: Renderer) {
+		this.touchHandler.off("touch", this.boundTouch);
+		this.touchHandler.off("click", this.boundClick);
+		this.touchHandler.off("remove", this.boundRemove);
+
+		this.uiSocket.removeAllListeners();
+	}
 
 	/* Rendering */
 
@@ -70,6 +91,12 @@ export default abstract class BaseScene extends THREE.Scene {
 	render(renderer: Renderer) {}
 
 	postRender() {}
+
+	protected onTouch(touchId: TouchId, vector: THREE.Vector3) {}
+
+	protected onClick(touchId: TouchId, vector: THREE.Vector3) {}
+
+	protected onRemove(touchId: TouchId) {}
 
 	/* 3D helpers */
 

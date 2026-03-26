@@ -24,7 +24,7 @@ async function trySpawn(command: string): Promise<any | null> {
 			}
 
 			if (action === "exit") {
-				console.log(`Proxy process ${proc.id} exited with code ${data}`);
+				console.debug(`Proxy process ${proc.id} exited with code ${data}`);
 				events.off("spawnedProcess", handler);
 			}
 		};
@@ -36,25 +36,41 @@ async function trySpawn(command: string): Promise<any | null> {
 	return null;
 }
 
+async function isProxyRunning(): Promise<boolean> {
+	try {
+		const ws = new WebSocket("ws://localhost:8765");
+		return await new Promise((resolve) => {
+			ws.onopen = () => {
+				ws.close();
+				resolve(true);
+			};
+			ws.onerror = () => resolve(false);
+		});
+	} catch {
+		return false;
+	}
+}
+
 async function startProxy() {
+	if (await isProxyRunning()) {
+		console.debug("Proxy already running, skipping spawn");
+		return;
+	}
+
 	const tryCommands = [
 		`py "${NL_PATH}/proxy.py"`,
 		`python "${NL_PATH}/proxy.py"`,
-		`py proxy.py`,
-		`python proxy.py`,
-		// ".\\.venv\\Scripts\\python.exe proxy/proxy.py",
-		// ".\\.venv\\bin/python proxy/proxy.py",
-		// ".\\proxy\\.venv\\Scripts\\python.exe proxy/proxy.py",
-		// ".\\proxy\\.venv\\bin/python proxy/proxy.py",
+		`py proxy.py"`,
+		`python proxy.py"`,
 	];
 
 	for (const command of tryCommands) {
-		console.log("Trying:", command);
+		console.debug("Trying:", command);
 
 		const proc = await trySpawn(command);
 
 		if (proc) {
-			console.log("Proxy started using", command);
+			console.debug("Proxy started using", command);
 			return;
 		} else {
 			console.warn("Command failed:", command);
@@ -65,12 +81,12 @@ async function startProxy() {
 }
 
 events.on("windowClose", async () => {
-	console.log("App closing...");
+	console.debug("App closing...");
 
 	if (proxyProcessId !== null) {
 		try {
 			await os.updateSpawnedProcess(proxyProcessId, "exit");
-			console.log("Proxy process terminated");
+			console.debug("Proxy process terminated");
 		} catch (err) {
 			console.warn("Failed to terminate proxy:", err);
 		}

@@ -11,13 +11,9 @@ import { Polyhedra } from "@/geometry/Polyhedra";
 import { UiConfigEvent } from "@/network/uiProtocol";
 import backgroundAsset from "@/assets/backgrounds/globe/black_and_white.jpeg";
 
-
 export default class DragDropScene extends BaseScene {
 	constructor() {
 		super();
-
-		this.onTouch = this.onTouch.bind(this);
-		this.onClick = this.onClick.bind(this);
 
 		this.addBackground(backgroundAsset);
 		this.addText({
@@ -30,37 +26,29 @@ export default class DragDropScene extends BaseScene {
 	}
 
 	override onEnter(renderer: Renderer) {
-		console.info("DragDropScene.onEnter");
-
-		// Subscribe to touch events
-		this.touchHandler.on("touch", this.onTouch);
-		this.touchHandler.on("click", this.onClick);
+		super.onEnter(renderer);
 
 		// Example: listen for OmniSocket events
 		// this.omniSocket.on("playerJoined", this.handlePlayerJoin);
 	}
 
 	override onExit(renderer: Renderer) {
-		console.info("DragDropScene.onExit");
-
-		// Clean up event bindings
-		this.touchHandler.off("touch", this.onTouch);
-		this.touchHandler.off("click", this.onClick);
+		super.onExit(renderer);
 		// this.omniSocket.off("playerJoined", this.handlePlayerJoin);
 	}
 
-	private onTouch(touchId: TouchId, vector: THREE.Vector3) {
+	protected onTouch(touchId: TouchId, vector: THREE.Vector3) {
 		this.handleRaycast(touchId, vector, "touch");
 	}
 
-	private onClick(touchId: TouchId, vector: THREE.Vector3) {
+	protected onClick(touchId: TouchId, vector: THREE.Vector3) {
 		this.handleRaycast(touchId, vector, "click");
 	}
 
 	handleRaycast(
 		touchId: TouchId,
 		vector: THREE.Vector3,
-		type: "touch" | "click"
+		type: "touch" | "click",
 	) {
 		this.raycaster.set(ORIGIN, vector);
 

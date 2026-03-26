@@ -27,34 +27,7 @@ export default class CountryScene extends BaseScene {
 		this.add(this.touchHandler.touchGroup);
 	}
 
-	private onTouchHandler = (touchId: TouchId, vector: THREE.Vector3) =>
-		this.onTouch(touchId, vector);
-	private onClickHandler = (touchId: TouchId, vector: THREE.Vector3) =>
-		this.onClick(touchId, vector);
-
-	override onEnter(renderer: Renderer) {
-		console.info("CountryScene.onEnter");
-
-		this.initializeUi();
-		this.sendUiConfig();
-
-		// Subscribe to touch events
-		this.touchHandler.on("touch", this.onTouchHandler);
-		this.touchHandler.on("click", this.onClickHandler);
-	}
-
-	override onExit(renderer: Renderer) {
-		console.info("CountryScene.onExit");
-
-		// this.clear();
-
-		// Clean up event bindings
-		this.touchHandler.off("touch", this.onTouchHandler);
-		this.touchHandler.off("click", this.onClickHandler);
-		this.uiSocket.removeAllListeners();
-	}
-
-	private onTouch(touchId: TouchId, vector: THREE.Vector3) {
+	protected onTouch(touchId: TouchId, vector: THREE.Vector3) {
 		const touchPoint = this.touchHandler.getTouchPoint(touchId);
 		if (touchPoint) {
 			touchPoint.setTile(Tile.None);
@@ -64,7 +37,7 @@ export default class CountryScene extends BaseScene {
 		this.onClick(touchId, vector);
 	}
 
-	private onClick(touchId: TouchId, vector: THREE.Vector3) {
+	protected onClick(touchId: TouchId, vector: THREE.Vector3) {
 		const { lat, lon } = this.vectorToLatLon(vector);
 
 		for (const entry of this.countryMeshes) {

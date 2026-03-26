@@ -90,13 +90,13 @@ export default class PaintScene extends BaseScene {
 		this.init();
 	}
 
-	private onTouchHandler = (touchId: TouchId, vector: THREE.Vector3) => {
+	protected onTouch(touchId: TouchId, vector: THREE.Vector3) {
 		this.updateTouchSphere(touchId, vector);
-	};
+	}
 
-	private onRemoveHandler = (touchId: TouchId) => {
+	protected onRemove(touchId: TouchId) {
 		this.removeTouchSphere(touchId);
-	};
+	}
 
 	public setRendererSettings(renderer: Renderer): void {
 		// renderer.setClearColor(new THREE.Color(255, 0, 0));
@@ -249,31 +249,11 @@ export default class PaintScene extends BaseScene {
 
 	/* Rendering */
 
-	override onEnter(renderer: Renderer) {
-		console.info("PaintScene.onEnter");
-
-		// Initialize UI
-		this.initializeUi();
-		this.sendUiConfig();
-
-		// Set up touch handlers
-		this.touchHandler.on("touch", this.onTouchHandler);
-		this.touchHandler.on("remove", this.onRemoveHandler);
-	}
-
 	override onExit(renderer: Renderer) {
-		console.info("PaintScene.onExit");
+		super.onExit(renderer);
 
 		// Remove feedback textures, listeners, etc.
 		this.clearLines();
-
-		// Remove touch handlers
-		this.touchHandler.off("touch", this.onTouchHandler);
-		this.touchHandler.off("remove", this.onRemoveHandler);
-
-		// Remove UI socket listeners
-		this.uiSocket.removeAllListeners();
-
 		this.clear();
 	}
 

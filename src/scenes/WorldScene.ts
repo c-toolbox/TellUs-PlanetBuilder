@@ -49,9 +49,6 @@ export default class WorldScene extends BaseScene {
 	constructor() {
 		super();
 
-		this.onTouch = this.onTouch.bind(this);
-		this.onClick = this.onClick.bind(this);
-
 		this.addBackground(backgroundAsset);
 
 		// Lighting
@@ -123,46 +120,29 @@ export default class WorldScene extends BaseScene {
 
 	// On entering scene
 	override onEnter(renderer: Renderer) {
-		console.info("WorldScene.onEnter");
+		super.onEnter(renderer);
 
 		// Set tileManager variables
 		this.applyTileManagerSettings();
-
-		// Subscribe to touch events
-		this.touchHandler.on("touch", this.onTouch);
-		this.touchHandler.on("click", this.onClick);
-
-		// Example: listen for OmniSocket events
-		// this.omniSocket.on("playerJoined", this.handlePlayerJoin);
 
 		this.redistributeBiomes();
 		this.createPlanet();
 
 		this.add(this.touchHandler.touchGroup);
-
-		// Initialize Socket UI
-		this.initializeUi();
-		this.sendUiConfig();
 	}
 
 	// On exiting scene
 	override onExit(renderer: Renderer) {
-		console.info("WorldScene.onExit");
+		super.onExit(renderer);
 
 		this.clear();
-
-		// Clean up event bindings
-		this.touchHandler.off("touch", this.onTouch);
-		this.touchHandler.off("click", this.onClick);
-		this.uiSocket.removeAllListeners();
-		// this.omniSocket.off("playerJoined", this.handlePlayerJoin);
 	}
 
-	private onTouch(touchId: TouchId, vector: THREE.Vector3) {
+	protected onTouch(touchId: TouchId, vector: THREE.Vector3) {
 		this.handleRaycast(touchId, vector, "touch");
 	}
 
-	private onClick(touchId: TouchId, vector: THREE.Vector3) {
+	protected onClick(touchId: TouchId, vector: THREE.Vector3) {
 		this.handleRaycast(touchId, vector, "click");
 	}
 

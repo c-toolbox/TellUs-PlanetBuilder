@@ -87,19 +87,6 @@ export default class BoidsScene extends BaseScene {
 		renderer.setClearColor(Color.Slate950);
 	}
 
-	override onEnter(renderer: Renderer) {
-		console.info("BoidsScene.onEnter");
-
-		this.initializeUi();
-		this.sendUiConfig();
-	}
-
-	override onExit(renderer: Renderer) {
-		console.info("BoidsScene.onExit");
-
-		this.uiSocket.removeAllListeners();
-	}
-
 	update(delta: number) {
 		// Check if config.fishCount has changed and add/remove fish
 		this.syncFishCount();

@@ -156,7 +156,7 @@ export default class ReactionDiffusionScene extends BaseScene {
 				color: getRainbowColor(),
 				size: 1.0,
 				position: new THREE.Vector3(...position),
-			})
+			}),
 		);
 
 		this.touchHandler.on("touch", (touchId: TouchId, vector: THREE.Vector3) => {
@@ -257,7 +257,7 @@ export default class ReactionDiffusionScene extends BaseScene {
 
 		this.feedbackQuad = new THREE.Mesh(
 			new THREE.PlaneGeometry(2, 2),
-			this.feedbackMaterial
+			this.feedbackMaterial,
 		);
 	}
 
@@ -271,12 +271,12 @@ export default class ReactionDiffusionScene extends BaseScene {
 		if (!state) {
 			const sphereNow = new THREE.Mesh(
 				this.touchSphereGeo,
-				this.touchSphereMat.clone()
+				this.touchSphereMat.clone(),
 			);
 			this.add(sphereNow);
 			const spherePrev = new THREE.Mesh(
 				this.touchSphereGeo,
-				this.touchSphereMat.clone()
+				this.touchSphereMat.clone(),
 			);
 			this.add(spherePrev);
 
@@ -333,16 +333,11 @@ export default class ReactionDiffusionScene extends BaseScene {
 
 	/* Rendering */
 
-	override onEnter(renderer: Renderer) {
-		console.info("ReactionDiffusionScene.onEnter");
-	}
-
 	override onExit(renderer: Renderer) {
-		console.info("ReactionDiffusionScene.onExit");
+		super.onExit(renderer);
 
-		// Remove feedback textures, listeners, etc.
 		this.clearLines();
-		// this.touchHandler.removeAllListeners?.();
+		this.clear();
 	}
 
 	postRender() {
@@ -355,7 +350,7 @@ export default class ReactionDiffusionScene extends BaseScene {
 		// 1️⃣ Capture cube map
 		projectionScene.cubeCamera.position.copy(renderer.centerCamera.position);
 		projectionScene.cubeCamera.quaternion.copy(
-			renderer.centerCamera.quaternion
+			renderer.centerCamera.quaternion,
 		);
 		projectionScene.cubeCamera.update(renderer, this);
 
