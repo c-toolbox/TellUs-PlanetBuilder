@@ -1,19 +1,39 @@
 import * as THREE from "three";
+import earcut from "earcut";
+
+import BaseScene from "@/scenes/BaseScene";
+import { Renderer } from "@/scenes/Renderer";
+import { Tile } from "@/geometry/TileManager";
 import { TouchId } from "@/network/tuioProtocol";
-import BaseScene from "../BaseScene";
-import { Renderer } from "../Renderer";
 
 import backgroundAsset from "@/assets/backgrounds/globe/standard.jpg";
 import worldGeodata from "@/assets/world.json";
-import { Tile } from "@/geometry/TileManager";
 
 export default class CountryScene extends BaseScene {
+	private countryMeshes: {
+		mesh: THREE.Mesh;
+		feature: any;
+	}[] = [];
+
 	constructor() {
 		super();
 
 		this.addBackground(backgroundAsset, 0x444444);
 
 		this.drawCountries();
+
+		window.addEventListener("keydown", (e) => {
+			if (e.key === "Enter") {
+				this.onClick(
+					0,
+					new THREE.Vector3(
+						Math.random() * 2 - 1,
+						Math.random() * 2 - 1,
+						Math.random() * 2 - 1,
+					),
+				);
+			}
+		});
 	}
 
 	override onEnter(renderer: Renderer) {
@@ -47,9 +67,13 @@ export default class CountryScene extends BaseScene {
 	private onClick(touchId: TouchId, vector: THREE.Vector3) {
 		const { lat, lon } = this.vectorToLatLon(vector);
 
-		for (const feature of worldGeodata.features) {
-			if (this.isInsideFeature(lon, lat, feature.geometry)) {
-				console.log("Clicked country:", feature.properties.name);
+		for (const entry of this.countryMeshes) {
+			if (this.isInsideFeature(lon, lat, entry.feature.geometry)) {
+				console.log("Clicked country:", entry.feature.properties.name);
+
+				const material = entry.mesh.material as THREE.MeshBasicMaterial;
+				material.color.set(Math.random() * 0xffffff);
+
 				return;
 			}
 		}
@@ -62,20 +86,29 @@ export default class CountryScene extends BaseScene {
 	drawCountries() {
 		worldGeodata.features.forEach((countryData) => {
 			const { type, coordinates } = countryData.geometry;
-			// const color = Math.random() * 0xffffff;
-			const color = 0xffffff;
+			const outlineColor = 0xffffff;
+			const color = Math.random() * 0xffffff;
 
 			if (type == "Polygon") {
-				this.drawCountry(coordinates as [number, number][][], color);
+				this.drawCountryOutline(
+					coordinates as [number, number][][],
+					outlineColor,
+				);
+				this.drawCountry(
+					coordinates as [number, number][][],
+					color,
+					countryData,
+				);
 			} else if (type == "MultiPolygon") {
 				coordinates.forEach((coords) => {
-					this.drawCountry(coords as [number, number][][], color);
+					this.drawCountryOutline(coords as [number, number][][], outlineColor);
+					this.drawCountry(coords as [number, number][][], color, countryData);
 				});
 			}
 		});
 	}
 
-	drawCountry(
+	drawCountryOutline(
 		coordinates: [number, number][][],
 		color: THREE.ColorRepresentation,
 	) {
@@ -86,11 +119,67 @@ export default class CountryScene extends BaseScene {
 		});
 
 		const geometry = new THREE.BufferGeometry().setFromPoints(points);
+		geometry.scale(0.5, 0.5, 0.5);
 
 		const material = new THREE.LineBasicMaterial({ color });
 
 		const line = new THREE.LineLoop(geometry, material);
 		this.add(line);
+	}
+
+	drawCountry(
+		coordinates: [number, number][][],
+		color: THREE.ColorRepresentation,
+		feature: any,
+	) {
+		const vertices: number[] = [];
+		const holes: number[] = [];
+		const positions3D: THREE.Vector3[] = [];
+
+		let holeIndex = 0;
+
+		coordinates.forEach((ring, i) => {
+			if (i > 0) {
+				holeIndex += coordinates[i - 1].length;
+				holes.push(holeIndex);
+			}
+
+			ring.forEach(([lon, lat]) => {
+				// Store 2D for triangulation
+				vertices.push(lon, lat);
+
+				// Store 3D version
+				positions3D.push(this.latLonToVector3(lat, lon, 1.001));
+			});
+		});
+
+		// Triangulate
+		const indices = earcut(vertices, holes, 2);
+
+		// Build geometry
+		const finalVertices: number[] = [];
+
+		indices.forEach((i) => {
+			const v = positions3D[i];
+			finalVertices.push(v.x, v.y, v.z);
+		});
+
+		const geometry = new THREE.BufferGeometry();
+		geometry.setAttribute(
+			"position",
+			new THREE.Float32BufferAttribute(finalVertices, 3),
+		);
+		geometry.computeVertexNormals();
+
+		const material = new THREE.MeshBasicMaterial({
+			color,
+			side: THREE.DoubleSide,
+		});
+
+		const mesh = new THREE.Mesh(geometry, material);
+
+		this.add(mesh);
+		this.countryMeshes.push({ mesh, feature });
 	}
 
 	latLonToVector3(lat: number, lon: number, radius = 1): THREE.Vector3 {
@@ -157,6 +246,3 @@ export default class CountryScene extends BaseScene {
 		return false;
 	}
 }
-
-type PolygonCoordinates = [number, number][][];
-type MultiPolygonCoordinates = [number, number][][];
