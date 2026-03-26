@@ -1,15 +1,14 @@
 import * as THREE from "three";
 import earcut from "earcut";
-
 import BaseScene from "@/scenes/BaseScene";
-import { Renderer } from "@/scenes/Renderer";
-import { Tile } from "@/geometry/TileManager";
-import { TouchId } from "@/network/tuioProtocol";
+import { SceneKey } from "@/scenes/SceneManager";
 
-import backgroundAsset from "@/assets/backgrounds/globe/standard.jpg";
-import worldGeodata from "@/assets/world.json";
-import { SceneKey, sceneManager, scenes } from "../SceneManager";
+import { TouchId } from "@/network/tuioProtocol";
 import { UiConfigEvent } from "@/network/uiProtocol";
+import { ORIGIN } from "@/constants";
+
+import worldGeodata from "@/assets/world.json";
+import backgroundAsset from "@/assets/backgrounds/globe/standard.jpg";
 
 export default class CountryScene extends BaseScene {
 	private countryMeshes: {
@@ -30,17 +29,27 @@ export default class CountryScene extends BaseScene {
 	}
 
 	protected onClick(touchId: TouchId, vector: THREE.Vector3) {
-		const { lat, lon } = this.vectorToLatLon(vector);
+		// Use raycasting to detect which country was clicked
+		this.raycaster.set(ORIGIN, vector);
 
-		for (const entry of this.countryMeshes) {
-			if (this.isInsideFeature(lon, lat, entry.feature.geometry)) {
-				console.log("Clicked country:", entry.feature.properties.name);
+		const clickableMeshes = this.countryMeshes.map((entry) => entry.mesh);
+		const intersects = this.raycaster.intersectObjects(clickableMeshes);
 
-				const material = entry.mesh.material as THREE.MeshBasicMaterial;
+		if (intersects.length > 0) {
+			const hitMesh = intersects[0].object as THREE.Mesh;
+
+			const countryEntry = this.countryMeshes.find(
+				(entry) => entry.mesh === hitMesh,
+			);
+
+			if (countryEntry) {
+				console.log("Clicked country:", countryEntry.feature.properties.name);
+
+				const material = hitMesh.material as THREE.MeshBasicMaterial;
 				material.color.set(Math.random() * 0xffffff);
-
-				return;
 			}
+
+			return;
 		}
 
 		console.log("No country hit");
@@ -156,59 +165,6 @@ export default class CountryScene extends BaseScene {
 			radius * Math.cos(phi),
 			radius * Math.sin(phi) * Math.sin(theta),
 		);
-	}
-
-	vectorToLatLon(vector: THREE.Vector3) {
-		const lat = 90 - (Math.acos(vector.y) * 180) / Math.PI;
-		const lon = (Math.atan2(vector.z, -vector.x) * 180) / Math.PI; // Flip x
-
-		return { lat, lon };
-	}
-
-	pointInPolygon(point: [number, number], vs: number[][]) {
-		const [x, y] = point;
-		let inside = false;
-
-		for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
-			const xi = vs[i][0],
-				yi = vs[i][1];
-			const xj = vs[j][0],
-				yj = vs[j][1];
-
-			const intersect =
-				yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
-
-			if (intersect) inside = !inside;
-		}
-
-		return inside;
-	}
-
-	isInsidePolygon(lon: number, lat: number, polygon: number[][][]) {
-		const [outer, ...holes] = polygon;
-
-		if (!this.pointInPolygon([lon, lat], outer)) return false;
-
-		// Exclude holes
-		for (const hole of holes) {
-			if (this.pointInPolygon([lon, lat], hole)) return false;
-		}
-
-		return true;
-	}
-
-	isInsideFeature(lon: number, lat: number, geometry: any) {
-		if (geometry.type === "Polygon") {
-			return this.isInsidePolygon(lon, lat, geometry.coordinates);
-		}
-
-		if (geometry.type === "MultiPolygon") {
-			return geometry.coordinates.some((polygon: any) =>
-				this.isInsidePolygon(lon, lat, polygon),
-			);
-		}
-
-		return false;
 	}
 
 	/* Socket UI */
