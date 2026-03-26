@@ -23,17 +23,9 @@ export default class CountryScene extends BaseScene {
 		this.addBackground(backgroundAsset, 0x888888);
 
 		this.drawCountries();
-
-		this.add(this.touchHandler.touchGroup);
 	}
 
 	protected onTouch(touchId: TouchId, vector: THREE.Vector3) {
-		const touchPoint = this.touchHandler.getTouchPoint(touchId);
-		if (touchPoint) {
-			touchPoint.setTile(Tile.None);
-			touchPoint.setColor(0xff0000);
-		}
-
 		this.onClick(touchId, vector);
 	}
 

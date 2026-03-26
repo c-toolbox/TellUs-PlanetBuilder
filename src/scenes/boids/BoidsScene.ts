@@ -79,8 +79,6 @@ export default class BoidsScene extends BaseScene {
 		for (let i = 0; i < this.boidsConfig.fishCount; i++) {
 			this.addFish();
 		}
-
-		this.add(this.touchHandler.touchGroup);
 	}
 
 	public setRendererSettings(renderer: Renderer): void {

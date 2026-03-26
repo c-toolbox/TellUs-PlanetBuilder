@@ -249,6 +249,12 @@ export default class PaintScene extends BaseScene {
 
 	/* Rendering */
 
+	override onEnter(renderer: Renderer) {
+		super.onEnter(renderer);
+
+		this.remove(this.touchHandler.touchGroup);
+	}
+
 	override onExit(renderer: Renderer) {
 		super.onExit(renderer);
 

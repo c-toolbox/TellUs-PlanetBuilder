@@ -50,6 +50,7 @@ export default abstract class BaseScene extends THREE.Scene {
 		this.initializeUi();
 		this.sendUiConfig();
 
+		this.add(this.touchHandler.touchGroup);
 		this.touchHandler.on("touch", this.onTouch);
 		this.touchHandler.on("click", this.onClick);
 		this.touchHandler.on("remove", this.onRemove);

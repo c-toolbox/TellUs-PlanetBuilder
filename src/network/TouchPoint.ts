@@ -36,10 +36,12 @@ export class TouchPoint extends THREE.Group {
 	setTile(tile: Tile) {
 		this.tile = tile;
 		this.innerMaterial.map = tileManager.getTexture(tile);
+		this.innerMaterial.color.setHex(0xffffff);
 		this.innerMaterial.needsUpdate = true;
 	}
 
 	setColor(color: number) {
+		this.innerMaterial.map = tileManager.getTexture(Tile.None);
 		this.innerMaterial.color.setHex(color);
 	}
 

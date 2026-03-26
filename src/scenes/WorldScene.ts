@@ -127,8 +127,6 @@ export default class WorldScene extends BaseScene {
 
 		this.redistributeBiomes();
 		this.createPlanet();
-
-		this.add(this.touchHandler.touchGroup);
 	}
 
 	// On exiting scene
