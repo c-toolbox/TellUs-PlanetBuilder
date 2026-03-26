@@ -5,7 +5,7 @@ import {
 	BiomeCount,
 	DistributionType,
 	WorldUiConfig,
-} from "@/scenes/WorldSceneConfig";
+} from "@/scenes/world/WorldSceneConfig";
 
 import assetSquare from "@/assets/square.png";
 

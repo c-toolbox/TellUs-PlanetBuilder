@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import BaseScene from "@/scenes/BaseScene";
-import { Renderer } from "@/scenes/Renderer";
+import { Renderer } from "@/rendering/Renderer";
 import { SceneKey } from "@/scenes/SceneManager";
 
 import { TouchPoint } from "@/network/TouchPoint";

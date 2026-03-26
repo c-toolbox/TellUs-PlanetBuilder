@@ -1,9 +1,9 @@
 import * as THREE from "three";
-import BaseScene from "./BaseScene";
+import BaseScene from "../BaseScene";
 import { CSS3DRenderer } from "three/examples/jsm/renderers/CSS3DRenderer";
 import { TouchId } from "@/network/tuioProtocol";
 import { Element } from "@/components/Element";
-import { Renderer } from "./Renderer";
+import { Renderer } from "../../rendering/Renderer";
 import { UiConfigEvent } from "@/network/uiProtocol";
 
 export default class DomScene extends BaseScene {

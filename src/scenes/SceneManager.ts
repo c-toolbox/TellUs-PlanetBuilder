@@ -1,11 +1,11 @@
-import { Renderer } from "./Renderer";
+import { Renderer } from "../rendering/Renderer";
 import BaseScene from "./BaseScene";
-import WorldScene from "./WorldScene";
-import PaintScene from "./PaintScene";
-// import DistortionScene from "./DistortionScene";
-// import ReactionDiffusionScene from "./ReactionDiffusionScene";
-// import DomScene from "./DomScene";
-// import DragDropScene from "./DragDropScene";
+import WorldScene from "./world/WorldScene";
+import PaintScene from "./paint/PaintScene";
+// import DistortionScene from "./distortion/DistortionScene";
+// import ReactionDiffusionScene from "./reactiondiffusion/ReactionDiffusionScene";
+// import DomScene from "./dom/DomScene";
+// import DragDropScene from "./dragdrop/DragDropScene";
 import BoidsScene from "./boids/BoidsScene";
 import CountryScene from "./country/CountryScene";
 

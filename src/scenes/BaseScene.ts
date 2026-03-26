@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { FontLoader } from "three/examples/jsm/loaders/FontLoader.js";
 
-import { Renderer } from "./Renderer";
+import { Renderer } from "../rendering/Renderer";
 import { globalServices } from "@/network/GlobalServices";
 import { TouchId } from "@/network/tuioProtocol";
 import Player from "@/network/Player";

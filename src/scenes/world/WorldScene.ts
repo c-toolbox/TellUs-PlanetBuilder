@@ -1,13 +1,13 @@
 import * as THREE from "three";
 import BaseScene from "@/scenes/BaseScene";
 import { SceneKey } from "@/scenes/SceneManager";
-import { Renderer } from "@/scenes/Renderer";
+import { Renderer } from "@/rendering/Renderer";
 
-import { TileMesh } from "@/geometry/TileMesh";
+import { TileMesh } from "@/scenes/world/TileMesh";
 import { TouchId } from "@/network/tuioProtocol";
-import { Tile, tileManager, Tiles } from "@/geometry/TileManager";
+import { Tile, tileManager, Tiles } from "@/scenes/world/TileManager";
 import { UiConfigEvent } from "@/network/uiProtocol";
-import { Polyhedra } from "@/geometry/Polyhedra";
+import { Polyhedra } from "@/scenes/world/Polyhedra";
 import { ORIGIN, SHOW_EDGES, SHOW_FACES, SHOW_VERTICES } from "@/constants";
 import {
 	DistributionType,
@@ -60,11 +60,8 @@ export default class WorldScene extends BaseScene {
 	}
 
 	public setRendererSettings(renderer: Renderer): void {
-		// renderer.setClearColor(new THREE.Color(255, 0, 0));
-		// renderer.clearColor();
 		renderer.outputColorSpace = THREE.SRGBColorSpace;
 		renderer.toneMapping = THREE.NoToneMapping;
-		// renderer.autoClear = true;
 	}
 
 	createPlanet() {
@@ -97,6 +94,21 @@ export default class WorldScene extends BaseScene {
 	}
 
 	populatePlanetTiles() {
+		// const blue = new THREE.Color(0x0000ff);
+		// const red = new THREE.Color(0xff0000);
+		// this.globe.faceGroup.children.forEach((mesh) => {
+		// 	const tileMesh = mesh as TileMesh;
+		// 	const { temperature, height, tectonic } = tileManager.getClimate(
+		// 		tileMesh.center,
+		// 	);
+		// 	// const t = height *0.5+0.5;
+		// 	const t = temperature *0.5+0.5;
+		// 	// const t = Math.pow(Math.abs(temperature), 0.1);
+		// 	tileMesh.setColor(interpolateColor(blue, red, t));
+		// 	// tileMesh.setColor(Math.abs(tectonic) < 0.2 ? red : blue);
+		// });
+		// return;
+
 		const tilePositions = this.globe.faceGroup.children.map(
 			(mesh) => mesh.position,
 		);
@@ -179,6 +191,16 @@ export default class WorldScene extends BaseScene {
 
 	update(delta: number) {
 		this.players.forEach((player) => player.update());
+
+		// const time = ((this as any).time ?? 0) + (delta / 1000) * 5;
+		// (this as any).time = time;
+
+		// this.clickable.slice(0,1).forEach((mesh) => {
+		// 	const tileMesh = mesh as TileMesh;
+		// 	const scale = 1 + Math.sin((this as any).time) * 0.5;
+		// 	tileMesh.position.copy(tileMesh.center.clone().multiplyScalar(scale));
+		// 	// tileMesh.scale.set(scale, scale, scale);
+		// });
 	}
 
 	/* Socket UI */

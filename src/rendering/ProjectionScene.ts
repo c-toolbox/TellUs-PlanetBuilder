@@ -1,7 +1,7 @@
 import * as THREE from "three";
 
-import vertexShader from "@/shaders/basic.vert?raw";
-import fragmentShader from "@/shaders/azimuthal.frag?raw";
+import vertexShader from "@/rendering/shaders/basic.vert?raw";
+import fragmentShader from "@/rendering/shaders/azimuthal.frag?raw";
 import { GLOBE_FOV_DEGREES } from "@/constants";
 
 export class ProjectionScene extends THREE.Scene {

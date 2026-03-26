@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { Tile, tileManager } from "@/geometry/TileManager";
+import { Tile, tileManager } from "@/scenes/world/TileManager";
 import { CLICK_DURATION } from "@/constants";
 
 export class TouchPoint extends THREE.Group {

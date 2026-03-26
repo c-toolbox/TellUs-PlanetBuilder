@@ -1,7 +1,7 @@
 import * as THREE from "three";
-import BaseScene from "./BaseScene";
+import BaseScene from "../BaseScene";
 import { TouchId } from "@/network/tuioProtocol";
-import { Renderer } from "./Renderer";
+import { Renderer } from "../../rendering/Renderer";
 import { UiConfigEvent } from "@/network/uiProtocol";
 
 // ------------------------------

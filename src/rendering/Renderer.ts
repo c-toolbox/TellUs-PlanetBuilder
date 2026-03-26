@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { TrackballControls } from "three/examples/jsm/controls/TrackballControls";
-import { ProjectionScene } from "@/scenes/ProjectionScene";
-import BaseScene from "./BaseScene";
+import { ProjectionScene } from "@/rendering/ProjectionScene";
+import BaseScene from "../scenes/BaseScene";
 
 export class Renderer extends THREE.WebGLRenderer {
 	public currentScene: BaseScene;

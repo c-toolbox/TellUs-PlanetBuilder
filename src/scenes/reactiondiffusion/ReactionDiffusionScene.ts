@@ -1,11 +1,11 @@
 import * as THREE from "three";
-import BaseScene from "./BaseScene";
+import BaseScene from "../BaseScene";
 import { TouchId } from "@/network/tuioProtocol";
-import { Renderer } from "./Renderer";
+import { Renderer } from "../../rendering/Renderer";
 import { getRainbowColor } from "@/utils/functions";
 import { UiConfigEvent } from "@/network/uiProtocol";
 
-import vertexShader from "@/shaders/basic.vert?raw";
+import vertexShader from "@/rendering/shaders/basic.vert?raw";
 
 const fragmentShader = `
 precision highp float;
