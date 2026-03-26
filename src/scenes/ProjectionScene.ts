@@ -2,6 +2,7 @@ import * as THREE from "three";
 
 import vertexShader from "@/shaders/basic.vert?raw";
 import fragmentShader from "@/shaders/azimuthal.frag?raw";
+import { GLOBE_FOV_DEGREES } from "@/constants";
 
 export class ProjectionScene extends THREE.Scene {
 	public cubeCamera: THREE.CubeCamera;
@@ -27,7 +28,10 @@ export class ProjectionScene extends THREE.Scene {
 		this.aepTarget.texture.colorSpace = THREE.SRGBColorSpace;
 
 		const aepMaterial = new THREE.ShaderMaterial({
-			uniforms: { envMap: { value: cubeRenderTarget.texture } },
+			uniforms: {
+				envMap: { value: cubeRenderTarget.texture },
+				globeFovDegrees: { value: GLOBE_FOV_DEGREES },
+			},
 			vertexShader: vertexShader,
 			fragmentShader: fragmentShader,
 			depthTest: false,

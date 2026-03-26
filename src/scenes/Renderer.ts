@@ -106,7 +106,7 @@ export class Renderer extends THREE.WebGLRenderer {
 			this.currentScene.renderScene(this);
 		}
 
-		this.currentScene.postRender();
+		this.currentScene.postRender(this);
 	}
 
 	// Render directly from the debug camera

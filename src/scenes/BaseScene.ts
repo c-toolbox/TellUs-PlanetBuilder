@@ -87,7 +87,9 @@ export default abstract class BaseScene extends THREE.Scene {
 
 	render(renderer: Renderer) {}
 
-	postRender() {}
+	postRender(renderer: Renderer) {
+		this.touchHandler.setCameraQuaternion(renderer.centerCamera.quaternion);
+	}
 
 	/* 3D helpers */
 

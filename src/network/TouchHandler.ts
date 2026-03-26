@@ -3,7 +3,12 @@ import { EventEmitter } from "events";
 import { TuioSocket } from "@/network/TuioSocket";
 import { TouchId } from "@/network/tuioProtocol";
 import { TouchPoint } from "./TouchPoint";
-import { ORIGIN, TOUCH_DISTANCE, TOUCH_SIZE } from "@/constants";
+import {
+	ORIGIN,
+	TOUCH_DISTANCE,
+	TOUCH_SIZE,
+	GLOBE_FOV_DEGREES,
+} from "@/constants";
 
 import circleAsset from "@/assets/circle.png";
 
@@ -12,11 +17,13 @@ export class TouchHandler extends EventEmitter {
 	private touchPoints: Map<TouchId, TouchPoint>;
 	private touchOuterMaterial: THREE.MeshBasicMaterial;
 	private touchInnerMaterial: THREE.MeshBasicMaterial;
+	private cameraQuaternion: THREE.Quaternion;
 
 	constructor() {
 		super();
 
 		this.touchGroup = new THREE.Group();
+		this.cameraQuaternion = new THREE.Quaternion();
 
 		/* ThreeJS */
 
@@ -83,15 +90,28 @@ export class TouchHandler extends EventEmitter {
 		let object = this.touchPoints.get(touchId);
 		if (!object) return console.warn("Unknown touch id:", touchId);
 
-		const direction = new THREE.Vector3().setFromSphericalCoords(
-			1,
-			pitch,
-			-yaw - Math.PI / 2,
+		// Scale pitch to account for the globe's FOV constraint.
+		// Only the central FOVbelt is visible (e.g. 320 of 360 degrees),
+		// so we contract input pitch to that portion of the sphere.
+		const scaledPitch = pitch * (GLOBE_FOV_DEGREES / 360);
+
+		// Convert to camera-local spherical coordinates where +Z is center (screen center),
+		// +Y is up, +X is right.
+		const direction = new THREE.Vector3(
+			Math.sin(scaledPitch) * Math.cos(yaw),
+			Math.sin(scaledPitch) * Math.sin(yaw),
+			Math.cos(scaledPitch),
 		);
-		object.position.copy(direction).multiplyScalar(TOUCH_DISTANCE);
+
+		// Apply camera quaternion to emit world-space direction
+		const worldDirection = direction
+			.clone()
+			.applyQuaternion(this.cameraQuaternion);
+
+		object.position.copy(worldDirection).multiplyScalar(TOUCH_DISTANCE);
 		object.lookAt(ORIGIN);
 
-		this.emit("touch", touchId, direction);
+		this.emit("touch", touchId, worldDirection);
 	}
 
 	removeTouch(touchId: TouchId) {
@@ -111,5 +131,9 @@ export class TouchHandler extends EventEmitter {
 
 	getTouchPoint(touchId: TouchId) {
 		return this.touchPoints.get(touchId);
+	}
+
+	setCameraQuaternion(quaternion: THREE.Quaternion) {
+		this.cameraQuaternion.copy(quaternion);
 	}
 }

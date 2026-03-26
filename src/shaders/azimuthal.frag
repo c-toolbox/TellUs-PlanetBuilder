@@ -1,5 +1,6 @@
 precision highp float;
 uniform samplerCube envMap;
+uniform float globeFovDegrees;
 varying vec2 vUv;
 
 void main() {
@@ -10,7 +11,10 @@ void main() {
 		return;
 	}
 
-	float c = r * 3.141592653589793 * (360.0 / 360.0);
+	// Scale the angle by the globe's FOV constraint
+	// If FOV is 320 degrees, max colatitude = π * (320/360)
+	float fovFactor = globeFovDegrees / 360.0;
+	float c = r * 3.141592653589793 * fovFactor;
 	float theta = atan(p.y, p.x);
 	float sin_c = sin(c);
 	float cos_c = cos(c);
