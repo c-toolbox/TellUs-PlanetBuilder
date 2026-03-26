@@ -1,12 +1,13 @@
 import * as THREE from "three";
-import BaseScene from "../BaseScene";
-import { Renderer } from "../Renderer";
+import BaseScene from "@/scenes/BaseScene";
+import { Renderer } from "@/scenes/Renderer";
+import { SceneKey } from "@/scenes/SceneManager";
 
-import { Fish } from "./Fish";
-import { Color, GoogleColor } from "@/utils/colors";
 import { TouchPoint } from "@/network/TouchPoint";
 import { UiConfigEvent } from "@/network/uiProtocol";
-import { SceneKey } from "../SceneManager";
+import { Color, GoogleColor } from "@/utils/colors";
+
+import { Fish } from "./Fish";
 import backgroundAsset from "@/assets/square.png";
 
 const FISH_COLORS = [

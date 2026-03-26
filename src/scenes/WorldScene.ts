@@ -1,13 +1,14 @@
 import * as THREE from "three";
-import BaseScene from "./BaseScene";
+import BaseScene from "@/scenes/BaseScene";
+import { SceneKey } from "@/scenes/SceneManager";
+import { Renderer } from "@/scenes/Renderer";
 
-import { SceneKey, sceneManager, scenes } from "./SceneManager";
 import { TileMesh } from "@/geometry/TileMesh";
 import { TouchId } from "@/network/tuioProtocol";
 import { Tile, tileManager, Tiles } from "@/geometry/TileManager";
 import { UiConfigEvent } from "@/network/uiProtocol";
-import { Renderer } from "./Renderer";
 import { Polyhedra } from "@/geometry/Polyhedra";
+import { ORIGIN, SHOW_EDGES, SHOW_FACES, SHOW_VERTICES } from "@/constants";
 import {
 	DistributionType,
 	DistributionTypes,
@@ -20,7 +21,6 @@ import {
 	TileEdges,
 	TileEdge,
 } from "./WorldSceneConfig";
-import { ORIGIN, SHOW_EDGES, SHOW_FACES, SHOW_VERTICES } from "@/constants";
 
 import backgroundAsset from "@/assets/backgrounds/globe/truecolor.png";
 
