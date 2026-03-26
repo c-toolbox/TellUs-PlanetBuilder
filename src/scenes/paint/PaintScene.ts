@@ -263,7 +263,8 @@ export default class PaintScene extends BaseScene {
 		this.clear();
 	}
 
-	postRender() {
+	postRender(renderer: Renderer) {
+		super.postRender(renderer);
 		this.clearLines();
 	}
 
