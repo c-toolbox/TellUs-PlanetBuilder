@@ -90,6 +90,11 @@ export default class WorldScene extends BaseScene {
 		if (SHOW_FACES) this.add(this.globe.faceGroup);
 		this.makeClickable(this.globe.faceGroup);
 
+		// Handle invisible tiles
+		if (this.worldConfig.tileTexture === "invisible tiles") {
+			this.remove(this.globe.faceGroup);
+		}
+
 		this.populatePlanetTiles();
 	}
 
@@ -121,11 +126,20 @@ export default class WorldScene extends BaseScene {
 			tileMesh.setTile(tiles[index]);
 		});
 
-		// Check neighbor edges
+		this.updateEdgeVisibility();
+	}
+
+	updateEdgeVisibility() {
 		this.globe.tileMeshes.forEach((tileMesh) => {
 			tileMesh.neighbors.forEach(({ mesh, edgeIndex }) => {
 				const same = tileMesh.tile == mesh.tile;
-				this.globe.setEdgeVisible(edgeIndex, !same);
+				let visible = false;
+				if (this.worldConfig.tileEdge === "show all") {
+					visible = true;
+				} else if (this.worldConfig.tileEdge === "show borders") {
+					visible = !same;
+				}
+				this.globe.setEdgeVisible(edgeIndex, visible);
 			});
 		});
 	}
@@ -223,6 +237,7 @@ export default class WorldScene extends BaseScene {
 
 		this.uiSocket.on("tile_edges", (value: TileEdge) => {
 			this.worldConfig.tileEdge = value;
+			this.updateEdgeVisibility();
 			this.sendUiConfig();
 		});
 
@@ -234,6 +249,15 @@ export default class WorldScene extends BaseScene {
 			this.globe.tileMeshes.forEach((tileMesh) =>
 				tileMesh.setTile(tileMesh.tile),
 			);
+
+			// Handle invisible tiles
+			if (value === "invisible tiles") {
+				this.remove(this.globe.faceGroup);
+			} else {
+				if (!this.children.includes(this.globe.faceGroup)) {
+					this.add(this.globe.faceGroup);
+				}
+			}
 		});
 
 		this.uiSocket.on("model", (value: ModelName) => {
