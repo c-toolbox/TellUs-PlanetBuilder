@@ -28,12 +28,12 @@ export default class WorldScene extends BaseScene {
 	private globe: Polyhedra;
 
 	private worldConfig: WorldUiConfig = {
-		// model: "△ 60",
-		model: "⭔ 1002",
+		model: "△ 60",
+		// model: "⭔ 1002",
 		tileEdge: "show borders",
 		tileTexture: "realistic tiles",
 		distribution: DistributionTypes[0],
-		refreshSeed: true,
+		autoGenerate: true,
 		biomes: {
 			[Tile.None]: 0,
 			[Tile.Snow]: 6,
@@ -67,6 +67,8 @@ export default class WorldScene extends BaseScene {
 	}
 
 	createPlanet() {
+		tileManager.refreshNoiseSeed();
+
 		// Find model from config
 		const polyhedra = PolyhedraModels.find(
 			({ name }) => name == this.worldConfig.model,
@@ -155,7 +157,7 @@ export default class WorldScene extends BaseScene {
 		super.onEnter(renderer);
 
 		// Set tileManager variables
-		this.applyTileManagerSettings();
+		tileManager.worldConfig = this.worldConfig;
 
 		this.redistributeBiomes();
 		this.createPlanet();
@@ -205,6 +207,13 @@ export default class WorldScene extends BaseScene {
 					const same = tileMesh.tile == mesh.tile;
 					this.globe.setEdgeVisible(edgeIndex, !same);
 				});
+
+				if (this.worldConfig.autoGenerate) {
+					const counts = this.getTileCount();
+					Object.entries(counts).forEach(([tile, count]) => {
+						this.worldConfig.biomes[tile as Tile] = count;
+					});
+				}
 			}
 		}
 	}
@@ -228,15 +237,15 @@ export default class WorldScene extends BaseScene {
 	initializeUi() {
 		super.initializeUi();
 
-		this.uiSocket.on("seed", (value: boolean) => {
-			this.worldConfig.refreshSeed = value;
+		this.uiSocket.on("auto_generate", (value: boolean) => {
+			this.worldConfig.autoGenerate = value;
+			if (value) {
+				this.createPlanet();
+			}
+			this.sendUiConfig();
 		});
 
 		this.uiSocket.on("new_planet", () => {
-			this.applyTileManagerSettings();
-			if (this.worldConfig.refreshSeed) {
-				tileManager.refreshNoiseSeed();
-			}
 			this.createPlanet();
 			this.sendUiConfig();
 		});
@@ -297,6 +306,7 @@ export default class WorldScene extends BaseScene {
 
 		this.uiSocket.on("distribution", (value: DistributionType) => {
 			this.worldConfig.distribution = value;
+			this.redistributeBiomes();
 			this.sendUiConfig();
 		});
 
@@ -314,16 +324,26 @@ export default class WorldScene extends BaseScene {
 			activeBiomes.forEach(([key], i) => {
 				this.worldConfig.biomes[key as Tile] = values[i];
 			});
-			// this.redistributeBiomes();
-			// this.createPlanet();
-			this.populatePlanetTiles();
+
+			if (this.worldConfig.autoGenerate) {
+				// this.createPlanet();
+				this.populatePlanetTiles();
+			}
 
 			this.sendUiConfig();
 		});
-	}
 
-	applyTileManagerSettings() {
-		tileManager.worldConfig = this.worldConfig;
+		this.uiSocket.on("edge_width", (value: number) => {
+			this.worldConfig.edgeWidth = value;
+			if (this.globe) this.globe.setEdgeSize(value);
+			this.sendUiConfig();
+		});
+
+		this.uiSocket.on("edge_color", (color: string) => {
+			this.worldConfig.edgeColor = color;
+			if (this.globe) this.globe.setEdgeColor(color);
+			this.sendUiConfig();
+		});
 	}
 
 	sendUiConfig() {
@@ -346,13 +366,13 @@ export default class WorldScene extends BaseScene {
 
 				{
 					type: "hr",
-					hint_title: "Planet settings",
+					hint_title: "Graphics",
 				},
 				{
 					type: "dropdown",
 					id: "tile_edges",
 					hint_title: "Tile edges",
-					hint_text: "How edges between tiles should be displayed",
+					hint_text: "How edges between tiles are displayed",
 					value: this.worldConfig.tileEdge,
 					options: TileEdges,
 				},
@@ -360,7 +380,7 @@ export default class WorldScene extends BaseScene {
 					type: "dropdown",
 					id: "tile_texture",
 					hint_title: "Tile texture",
-					hint_text: "Texture used for the tiles",
+					hint_text: "Texture used for tiles",
 					value: this.worldConfig.tileTexture,
 					options: TileTextures,
 				},
@@ -469,10 +489,11 @@ export default class WorldScene extends BaseScene {
 				},
 				{
 					type: "switch",
-					id: "seed",
-					hint_title: "Random seed",
-					hint_text: "Shuffle the random seed to create a new planet",
-					value: this.worldConfig.refreshSeed,
+					id: "auto_generate",
+					hint_title: "Auto-generate planet",
+					hint_text: "Automatically creates a new planet when settings change",
+					value: this.worldConfig.autoGenerate,
+					color: "#c70036",
 				},
 				{
 					type: "button",
@@ -489,9 +510,10 @@ export default class WorldScene extends BaseScene {
 				},
 				{
 					type: "text",
-					hint_title: "Tile count",
-					hint_text: this.tileCount,
+					hint_title: `Tiles (${this.clickable.length} total)`,
+					hint_text: this.tileCountString,
 				},
+
 				// {
 				// 	type: "button",
 				// 	id: "save",
@@ -565,15 +587,40 @@ export default class WorldScene extends BaseScene {
 				this.worldConfig.biomes[tile as Tile] = 0;
 			}
 		}
+
+		if (this.worldConfig.autoGenerate) {
+			this.createPlanet();
+		}
 	}
 
 	toggleBiome(biome: Tile, enabled: boolean) {
-		this.worldConfig.biomes[biome] = enabled ? 10 : 0;
+		const totalTiles = PolyhedraModels.find(
+			({ name }) => name == this.worldConfig.model,
+		)!.count;
+
+		const startingAmount = Math.max(1, Math.floor(0.2 * totalTiles));
+		this.worldConfig.biomes[biome] = enabled ? startingAmount : 0;
+
+		// Ensure at least one biome exists
+		const allZero = Object.values(this.worldConfig.biomes).every(
+			(value) => value === 0,
+		);
+		if (allZero) {
+			const candidates = Object.keys(this.worldConfig.biomes).filter(
+				(tile) => tile !== biome && tile !== Tile.None,
+			);
+			const fallback =
+				candidates[Math.floor(Math.random() * candidates.length)];
+			if (fallback !== undefined) {
+				this.worldConfig.biomes[fallback as Tile] = totalTiles;
+			}
+		}
+
 		this.redistributeBiomes();
 		this.sendUiConfig();
 	}
 
-	get tileCount(): string {
+	getTileCount(): Record<Tile, number> {
 		const counts = {} as Record<Tile, number>;
 		for (const tile of Object.values(Tile)) {
 			counts[tile] = 0;
@@ -583,6 +630,12 @@ export default class WorldScene extends BaseScene {
 			const tileMesh = mesh as TileMesh;
 			counts[tileMesh.tile]++;
 		}
+
+		return counts;
+	}
+
+	get tileCountString(): string {
+		const counts = this.getTileCount();
 
 		const total = this.clickable.length;
 

@@ -109,7 +109,7 @@ export interface WorldUiConfig {
 	tileEdge: TileEdge;
 	tileTexture: TileTexture;
 	distribution: DistributionType;
-	refreshSeed: boolean;
+	autoGenerate: boolean;
 	biomes: BiomeCount;
 	edgeWidth: number;
 	edgeColor: string;
