@@ -14,6 +14,19 @@ interface UiButtonEvent {
 	id: string;
 }
 
+/* Multi-button */
+
+interface UiMultiButtonConfig {
+	type: "multi_button";
+	buttons: {
+		id: string;
+		text: string;
+		color?: string;
+	}[];
+	hint_title?: string;
+	hint_text?: string;
+}
+
 /* Color */
 
 interface UiColorConfig {
@@ -132,6 +145,7 @@ interface UiGridConfig {
 
 export type UiElement =
 	| UiButtonConfig
+	| UiMultiButtonConfig
 	| UiColorConfig
 	| UiDropdownConfig
 	| UiHrConfig
