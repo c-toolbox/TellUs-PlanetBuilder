@@ -1,11 +1,7 @@
 import * as THREE from "three";
 import { createNoise3D, NoiseFunction3D } from "simplex-noise";
-import { getPitchFromVector } from "@/utils/functions";
-import {
-	BiomeCount,
-	DistributionType,
-	WorldUiConfig,
-} from "@/scenes/world/WorldSceneConfig";
+import { getPitchFromVector, shuffleArray } from "@/utils/functions";
+import { BiomeCount, WorldUiConfig } from "@/scenes/world/WorldSceneConfig";
 
 import assetSquare from "@/assets/square.png";
 
@@ -79,7 +75,6 @@ export const Tile = Object.fromEntries(
 class TileManager {
 	public worldConfig: WorldUiConfig;
 	public textureSets: Record<TextureSetKey, Record<Tile, THREE.Texture>>;
-	public distributionMode: DistributionType = "planet-like";
 
 	private noise1: NoiseFunction3D;
 	private noise2: NoiseFunction3D;
@@ -164,6 +159,9 @@ class TileManager {
 			1 * this.noise4(1.0 * x, 1.0 * y, 1.0 * z) +
 			0 * this.noise5(2.0 * x, 2.0 * y, 2.0 * z);
 
+		if (this.worldConfig.distribution == "height only") temperature = height;
+		if (this.worldConfig.distribution == "temp. only") height = temperature;
+
 		return { temperature, height, tectonic };
 	}
 
@@ -175,7 +173,7 @@ class TileManager {
 	getBiomeScore(tile: Tile, temp: number, height: number, tectonic: number) {
 		switch (tile) {
 			case Tile.Snow:
-				return 1000 * this.gaussian(temp, -1, 1);
+				return 1000 * this.gaussian(temp, -1, 1) + this.gaussian(height, -1, 1);
 
 			case Tile.Ocean:
 				return (
@@ -190,20 +188,20 @@ class TileManager {
 			case Tile.Desert:
 				return (
 					10 *
-					(this.gaussian(temp, 0.6, 0.6) + 2 * this.gaussian(height, 1, 0.5))
+					(this.gaussian(temp, 1.0, 0.6) + this.gaussian(height, 1, 0.5))
 				);
 
 			case Tile.Savanna:
 				return (
-					2 * this.gaussian(temp, 0.6, 0.6) + this.gaussian(height, 1, 0.7)
+					2 * this.gaussian(temp, 0.8, 0.6) + this.gaussian(height, 1, 0.7)
 				);
 
 			case Tile.Taiga:
-				return 5 * this.gaussian(temp, -1, 0.5) + this.gaussian(height, 0, 0.5);
+				return 4 * this.gaussian(temp, -1, 0.4) + 0.5 * this.gaussian(height, 0, 0.5);
 
 			case Tile.Forest:
 				return (
-					2 * this.gaussian(temp, 1, 1) + 0 * this.gaussian(height, 0, 0.5)
+					2 * this.gaussian(temp, 1, 0.5) + 0.5 * this.gaussian(height, 0, 0.5)
 				);
 
 			default:
@@ -241,6 +239,10 @@ class TileManager {
 		});
 
 		candidates.sort((a, b) => b.score - a.score);
+
+		if (this.worldConfig.distribution == "random") {
+			shuffleArray(candidates);
+		}
 
 		const result: Tile[] = new Array(positions.length);
 		const usedPositions = new Set<number>();

@@ -91,7 +91,12 @@ export const TileTextures = [
 export type TileTexture = (typeof TileTextures)[number];
 
 // Distribution
-export const DistributionTypes = ["planet-like", "random"] as const;
+export const DistributionTypes = [
+	"height & temp.",
+	"height only",
+	"temp. only",
+	"random",
+] as const;
 export type DistributionType = (typeof DistributionTypes)[number];
 
 // Biomes

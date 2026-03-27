@@ -32,7 +32,7 @@ export default class WorldScene extends BaseScene {
 		model: "⭔ 1002",
 		tileEdge: "show borders",
 		tileTexture: "realistic tiles",
-		distribution: "planet-like",
+		distribution: DistributionTypes[0],
 		refreshSeed: true,
 		biomes: {
 			[Tile.None]: 0,
@@ -40,7 +40,7 @@ export default class WorldScene extends BaseScene {
 			[Tile.Ocean]: 70,
 			[Tile.Taiga]: 10,
 			[Tile.Forest]: 20,
-			[Tile.Savanna]: 4,
+			[Tile.Savanna]: 0,
 			[Tile.Desert]: 4,
 			[Tile.Mountain]: 0,
 		},
@@ -343,14 +343,6 @@ export default class WorldScene extends BaseScene {
 					value: SceneKey.World,
 					options: Object.values(SceneKey),
 				},
-				// {
-				// 	type: "switch",
-				// 	id: "live",
-				// 	hint_title: "Live update",
-				// 	hint_text:
-				// 		"Allow any change to settings to immediately update the planet",
-				// 	value: true,
-				// },
 
 				{
 					type: "hr",
@@ -393,68 +385,6 @@ export default class WorldScene extends BaseScene {
 						},
 					],
 				},
-				{
-					type: "grid",
-					columns: 3,
-					elements: [
-						{
-							type: "switch",
-							id: Tile.Snow,
-							hint_title: `${tileManager.tileToEmoji(Tile.Snow)} ${Tile.Snow}`,
-							// hint_title: tileManager.tileToEmoji(Tile.Snow),
-							// hint_text: Tile.Snow,
-							value: this.worldConfig.biomes[Tile.Snow] > 0,
-						},
-						{
-							type: "switch",
-							id: Tile.Ocean,
-							hint_title: `${tileManager.tileToEmoji(Tile.Ocean)} ${Tile.Ocean}`,
-							// hint_title: tileManager.tileToEmoji(Tile.Ocean),
-							// hint_text: Tile.Ocean,
-							value: this.worldConfig.biomes[Tile.Ocean] > 0,
-						},
-						{
-							type: "switch",
-							id: Tile.Taiga,
-							hint_title: `${tileManager.tileToEmoji(Tile.Taiga)} ${Tile.Taiga}`,
-							// hint_title: tileManager.tileToEmoji(Tile.Taiga),
-							// hint_text: Tile.Taiga,
-							value: this.worldConfig.biomes[Tile.Taiga] > 0,
-						},
-						{
-							type: "switch",
-							id: Tile.Forest,
-							hint_title: `${tileManager.tileToEmoji(Tile.Forest)} ${Tile.Forest}`,
-							// hint_title: tileManager.tileToEmoji(Tile.Forest),
-							// hint_text: Tile.Forest,
-							value: this.worldConfig.biomes[Tile.Forest] > 0,
-						},
-						{
-							type: "switch",
-							id: Tile.Savanna,
-							hint_title: `${tileManager.tileToEmoji(Tile.Savanna)} ${Tile.Savanna}`,
-							// hint_title: tileManager.tileToEmoji(Tile.Savanna),
-							// hint_text: Tile.Savanna,
-							value: this.worldConfig.biomes[Tile.Savanna] > 0,
-						},
-						{
-							type: "switch",
-							id: Tile.Desert,
-							hint_title: `${tileManager.tileToEmoji(Tile.Desert)} ${Tile.Desert}`,
-							// hint_title: tileManager.tileToEmoji(Tile.Desert),
-							// hint_text: Tile.Desert,
-							value: this.worldConfig.biomes[Tile.Desert] > 0,
-						},
-						{
-							type: "switch",
-							id: Tile.Mountain,
-							hint_title: `${tileManager.tileToEmoji(Tile.Mountain)} ${Tile.Mountain}`,
-							// hint_title: tileManager.tileToEmoji(Tile.Mountain),
-							// hint_text: Tile.Mountain,
-							value: this.worldConfig.biomes[Tile.Mountain] > 0,
-						},
-					],
-				},
 
 				{
 					type: "hr",
@@ -464,15 +394,71 @@ export default class WorldScene extends BaseScene {
 					type: "dropdown",
 					id: "model",
 					hint_title: "Planet model",
-					hint_text: "The shape and number of planet tiles",
+					hint_text: "Defines the planet's shape and number of tiles",
 					value: this.worldConfig.model,
 					options: ModelNames,
+				},
+				{
+					type: "dropdown",
+					id: "distribution",
+					hint_title: "Distribution",
+					hint_text: "How tiles are arranged across the planet",
+					value: this.worldConfig.distribution,
+					options: DistributionTypes,
+				},
+				{
+					type: "grid",
+					columns: 3,
+					elements: [
+						{
+							type: "switch",
+							id: Tile.Snow,
+							hint_title: `${tileManager.tileToEmoji(Tile.Snow)} ${Tile.Snow}`,
+							value: this.worldConfig.biomes[Tile.Snow] > 0,
+						},
+						{
+							type: "switch",
+							id: Tile.Ocean,
+							hint_title: `${tileManager.tileToEmoji(Tile.Ocean)} ${Tile.Ocean}`,
+							value: this.worldConfig.biomes[Tile.Ocean] > 0,
+						},
+						{
+							type: "switch",
+							id: Tile.Taiga,
+							hint_title: `${tileManager.tileToEmoji(Tile.Taiga)} ${Tile.Taiga}`,
+							value: this.worldConfig.biomes[Tile.Taiga] > 0,
+						},
+						{
+							type: "switch",
+							id: Tile.Forest,
+							hint_title: `${tileManager.tileToEmoji(Tile.Forest)} ${Tile.Forest}`,
+							value: this.worldConfig.biomes[Tile.Forest] > 0,
+						},
+						{
+							type: "switch",
+							id: Tile.Savanna,
+							hint_title: `${tileManager.tileToEmoji(Tile.Savanna)} ${Tile.Savanna}`,
+							value: this.worldConfig.biomes[Tile.Savanna] > 0,
+						},
+						{
+							type: "switch",
+							id: Tile.Desert,
+							hint_title: `${tileManager.tileToEmoji(Tile.Desert)} ${Tile.Desert}`,
+							value: this.worldConfig.biomes[Tile.Desert] > 0,
+						},
+						{
+							type: "switch",
+							id: Tile.Mountain,
+							hint_title: `${tileManager.tileToEmoji(Tile.Mountain)} ${Tile.Mountain}`,
+							value: this.worldConfig.biomes[Tile.Mountain] > 0,
+						},
+					],
 				},
 				{
 					type: "ratio_slider",
 					id: "biome_distribution",
 					hint_title: "Biome distribution",
-					hint_text: "Specify the amount of tiles for each biome",
+					hint_text: "Adjust how many tiles each biome occupies",
 					values: Object.entries(this.worldConfig.biomes)
 						.filter(([tile, count]) => count > 0)
 						.map(([tile, count]) => ({
@@ -480,14 +466,6 @@ export default class WorldScene extends BaseScene {
 							value: count,
 							color: "#" + Tiles[tile as Tile].color.getHexString(),
 						})),
-				},
-				{
-					type: "dropdown",
-					id: "distribution",
-					hint_title: "Distribution",
-					hint_text: "How tiles should be positioned",
-					value: this.worldConfig.distribution,
-					options: DistributionTypes,
 				},
 				{
 					type: "switch",
@@ -499,20 +477,15 @@ export default class WorldScene extends BaseScene {
 				{
 					type: "button",
 					id: "new_planet",
-					text: "Create",
-					hint_title: "Create new planet",
-					hint_text: "Generates a new planet with the above settings",
-					color: "#c70036",
+					text: "Generate",
+					hint_title: "Generate planet",
+					hint_text: "Create a new planet with the current settings",
+					color: this.worldConfig.autoGenerate ? "#999999" : "#c70036",
 				},
 
 				{
 					type: "hr",
 					hint_title: "Planet status",
-				},
-				{
-					type: "grid",
-					columns: 3,
-					elements: [],
 				},
 				{
 					type: "text",
