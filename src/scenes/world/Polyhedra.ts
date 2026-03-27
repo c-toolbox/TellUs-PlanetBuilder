@@ -2,19 +2,13 @@ import * as THREE from "three";
 import earcut from "earcut";
 
 import circle from "@/assets/circle.png";
-import { getCenterOfMesh } from "@/utils/functions";
-import { Tile, tileManager } from "./TileManager";
+import { Tile } from "./TileManager";
 
 import {
-	VERTEX_SIZE,
-	VERTEX_COLOR,
 	VERTEX_DISTANCE,
-	EDGE_SIZE,
-	EDGE_COLOR,
 	EDGE_DISTANCE,
 	FACE_DISTANCE,
 	DOUBLE_SIDE,
-	FACE_OPACITY,
 } from "@/constants";
 import { TileMesh } from "./TileMesh";
 
@@ -26,6 +20,11 @@ export class Polyhedra {
 	private vertexEdges: Map<number, number[]> = new Map();
 	private edgeMap: Map<string, number>;
 
+	private edgeSize: number;
+	private edgeColor: string;
+	private vertexSize: number;
+	private vertexColor: string;
+
 	public vertexGroup: THREE.Group;
 	public edgeGroup: THREE.Group;
 	public faceGroup: THREE.Group;
@@ -34,14 +33,23 @@ export class Polyhedra {
 		vertices,
 		edges,
 		faces,
+		edgeSize,
+		edgeColor,
 	}: {
 		vertices: number[][];
 		edges: number[][];
 		faces: number[][];
+		edgeSize: number;
+		edgeColor: string;
 	}) {
 		this.vertices = vertices.map((v) => new THREE.Vector3(v[0], v[1], v[2]));
 		this.edges = edges as [number, number][];
 		this.faces = faces;
+
+		this.edgeSize = edgeSize;
+		this.edgeColor = edgeColor;
+		this.vertexSize = edgeSize;
+		this.vertexColor = edgeColor;
 
 		this.vertexGroup = new THREE.Group();
 		this.edgeGroup = new THREE.Group();
@@ -59,7 +67,7 @@ export class Polyhedra {
 		const circleTexture = textureLoader.load(circle);
 		const material = new THREE.MeshBasicMaterial({
 			map: circleTexture,
-			color: VERTEX_COLOR,
+			color: this.vertexColor,
 			transparent: true,
 			premultipliedAlpha: true,
 			depthWrite: false, // keeps edges from z-fighting
@@ -79,7 +87,7 @@ export class Polyhedra {
 			mesh.lookAt(new THREE.Vector3(0, 0, 0));
 
 			// Scale with distance so angular size is constant
-			mesh.scale.setScalar(VERTEX_SIZE * VERTEX_DISTANCE);
+			mesh.scale.setScalar(this.vertexSize * VERTEX_DISTANCE);
 
 			this.vertexGroup.add(mesh);
 		}
@@ -105,7 +113,7 @@ export class Polyhedra {
 		/* Set up edge instanced mesh */
 
 		const material = new THREE.MeshBasicMaterial({
-			color: EDGE_COLOR,
+			color: this.edgeColor,
 			depthWrite: true,
 			side: DOUBLE_SIDE ? THREE.DoubleSide : THREE.FrontSide,
 		});
@@ -167,7 +175,7 @@ export class Polyhedra {
 			);
 
 			// Scale: width = edge length, height = angular thickness
-			const thickness = EDGE_SIZE * EDGE_DISTANCE;
+			const thickness = this.edgeSize * EDGE_DISTANCE;
 			tmp.scale.set(length, thickness, 1);
 
 			tmp.updateMatrix();
@@ -306,7 +314,6 @@ export class Polyhedra {
 		// Step 7: Create mesh
 		const material = new THREE.MeshBasicMaterial({
 			transparent: true,
-			opacity: FACE_OPACITY,
 			side: DOUBLE_SIDE ? THREE.DoubleSide : THREE.FrontSide,
 		});
 		const mesh = new TileMesh(geometry, material);
@@ -384,7 +391,7 @@ export class Polyhedra {
 
 		matrix.decompose(pos, quat, scale);
 
-		scale.y = visible ? EDGE_SIZE * EDGE_DISTANCE : 0.00001;
+		scale.y = visible ? this.edgeSize * EDGE_DISTANCE : 0.00001;
 
 		matrix.compose(pos, quat, scale);
 		this.edgeInstancedMesh.setMatrixAt(edgeIndex, matrix);
@@ -405,6 +412,95 @@ export class Polyhedra {
 			});
 			this.setVertexVisible(vIdx, anyVisible);
 		});
+	}
+
+	setEdgeSize(size: number) {
+		this.edgeSize = size;
+		this.vertexSize = size; // Share size with vertices
+		this.updateEdgeSizes();
+		this.updateVertexSizes();
+	}
+
+	setEdgeColor(color: string) {
+		this.edgeColor = color;
+		this.vertexColor = color; // Share color with vertices
+		(this.edgeInstancedMesh.material as THREE.MeshBasicMaterial).color.setStyle(
+			color,
+		);
+		this.updateVertexColors();
+	}
+
+	private updateEdgeSizes() {
+		const tmp = new THREE.Object3D();
+		for (let i = 0; i < this.edges.length; i++) {
+			const [ia, ib] = this.edges[i];
+
+			// Place endpoints on the sphere of radius EDGE_DISTANCE
+			const a = this.vertices[ia].clone().setLength(EDGE_DISTANCE);
+			const b = this.vertices[ib].clone().setLength(EDGE_DISTANCE);
+
+			// Midpoint in world space
+			const mid = a.clone().add(b).multiplyScalar(0.5);
+
+			// Vector along the edge
+			const edgeDir = b.clone().sub(a);
+			const length = edgeDir.length();
+			if (length === 0) continue;
+
+			// Radial direction (outward from origin)
+			const radial = mid.clone().normalize();
+
+			// Project edge direction into tangent plane at midpoint
+			let tangent = edgeDir.clone().projectOnPlane(radial);
+			if (tangent.lengthSq() < 1e-10) {
+				// Fallback if edge is nearly radial
+				tangent = new THREE.Vector3(1, 0, 0).projectOnPlane(radial);
+				if (tangent.lengthSq() < 1e-10) {
+					tangent = new THREE.Vector3(0, 1, 0).projectOnPlane(radial);
+				}
+			}
+			tangent.normalize();
+
+			// Construct an orthonormal basis:
+			const x = tangent;
+			const z = radial.clone().negate();
+			const y = new THREE.Vector3().crossVectors(z, x).normalize();
+
+			// Fix x = y × z to ensure orthogonality
+			x.copy(new THREE.Vector3().crossVectors(y, z).normalize());
+
+			// Get current matrix
+			const matrix = new THREE.Matrix4();
+			this.edgeInstancedMesh.getMatrixAt(i, matrix);
+			const pos = new THREE.Vector3();
+			const quat = new THREE.Quaternion();
+			const scale = new THREE.Vector3();
+			matrix.decompose(pos, quat, scale);
+
+			// Update scale
+			const thickness = this.edgeSize * EDGE_DISTANCE;
+			scale.y = scale.y > 0.0001 ? thickness : 0.00001; // preserve visibility
+
+			matrix.compose(pos, quat, scale);
+			this.edgeInstancedMesh.setMatrixAt(i, matrix);
+		}
+		this.edgeInstancedMesh.instanceMatrix.needsUpdate = true;
+	}
+
+	private updateVertexSizes() {
+		for (const mesh of this.vertexGroup.children) {
+			const vertexMesh = mesh as THREE.Mesh;
+			vertexMesh.scale.setScalar(this.vertexSize * VERTEX_DISTANCE);
+		}
+	}
+
+	private updateVertexColors() {
+		for (const mesh of this.vertexGroup.children) {
+			const vertexMesh = mesh as THREE.Mesh;
+			(vertexMesh.material as THREE.MeshBasicMaterial).color.setStyle(
+				this.vertexColor,
+			);
+		}
 	}
 
 	get edgeInstancedMesh() {

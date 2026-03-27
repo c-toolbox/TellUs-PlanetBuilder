@@ -106,4 +106,6 @@ export interface WorldUiConfig {
 	distribution: DistributionType;
 	refreshSeed: boolean;
 	biomes: BiomeCount;
+	edgeWidth: number;
+	edgeColor: string;
 }

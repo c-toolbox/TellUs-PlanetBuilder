@@ -44,6 +44,8 @@ export default class WorldScene extends BaseScene {
 			[Tile.Desert]: 4,
 			[Tile.Mountain]: 0,
 		},
+		edgeWidth: 0.005,
+		edgeColor: "#000000",
 	};
 
 	constructor() {
@@ -82,7 +84,11 @@ export default class WorldScene extends BaseScene {
 		}
 
 		// Create new globe
-		this.globe = new Polyhedra(polyhedra.model);
+		this.globe = new Polyhedra({
+			...polyhedra.model,
+			edgeSize: this.worldConfig.edgeWidth,
+			edgeColor: this.worldConfig.edgeColor,
+		});
 
 		// Add Polyhedra groups to scene
 		if (SHOW_VERTICES) this.add(this.globe.vertexGroup);
@@ -365,6 +371,27 @@ export default class WorldScene extends BaseScene {
 					hint_text: "Texture used for the tiles",
 					value: this.worldConfig.tileTexture,
 					options: TileTextures,
+				},
+				{
+					type: "grid",
+					columns: 2,
+					elements: [
+						{
+							type: "slider",
+							id: "edge_width",
+							hint_title: "Edge width",
+							value: this.worldConfig.edgeWidth,
+							min: 0.001,
+							max: 0.025,
+							step: 0.001,
+						},
+						{
+							type: "color",
+							id: "edge_color",
+							hint_title: "Edge color",
+							value: this.worldConfig.edgeColor,
+						},
+					],
 				},
 				{
 					type: "grid",
