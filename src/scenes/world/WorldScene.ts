@@ -22,10 +22,23 @@ import {
 	TileEdge,
 } from "./WorldSceneConfig";
 
+interface SaveState {
+	id: string;
+	description: string;
+	config: WorldUiConfig;
+	tiles: Tile[];
+}
+
 import backgroundAsset from "@/assets/backgrounds/globe/truecolor.png";
 
 export default class WorldScene extends BaseScene {
 	private globe: Polyhedra;
+	private activePolyhedraModel: ModelName;
+
+	private saveCount: number = 0;
+	private saveStates: SaveState[] = [];
+	private saveStateListeners = new Map<string, (...args: any[]) => void>();
+	private planetDirty: boolean = true;
 
 	private worldConfig: WorldUiConfig = {
 		model: "△ 60",
@@ -76,6 +89,8 @@ export default class WorldScene extends BaseScene {
 		if (!polyhedra) {
 			return console.error(`Could not find model: '${this.worldConfig.model}'`);
 		}
+
+		this.activePolyhedraModel = polyhedra.name;
 
 		// Remove existing globe
 		this.clickable = [];
@@ -135,6 +150,8 @@ export default class WorldScene extends BaseScene {
 		});
 
 		this.updateEdgeVisibility();
+
+		this.markDirty();
 	}
 
 	updateEdgeVisibility() {
@@ -199,6 +216,7 @@ export default class WorldScene extends BaseScene {
 				}
 
 				if (tileMesh.tile != touchPoint.tile) {
+					this.markDirty();
 					this.sendUiConfig();
 				}
 
@@ -253,11 +271,13 @@ export default class WorldScene extends BaseScene {
 		this.uiSocket.on("tile_edges", (value: TileEdge) => {
 			this.worldConfig.tileEdge = value;
 			this.updateEdgeVisibility();
+			this.markDirty();
 			this.sendUiConfig();
 		});
 
 		this.uiSocket.on("tile_texture", (value: TileTexture) => {
 			this.worldConfig.tileTexture = value;
+			this.markDirty();
 			this.sendUiConfig();
 
 			// Update textures
@@ -336,18 +356,140 @@ export default class WorldScene extends BaseScene {
 		this.uiSocket.on("edge_width", (value: number) => {
 			this.worldConfig.edgeWidth = value;
 			if (this.globe) this.globe.setEdgeSize(value);
+			this.markDirty();
 			this.sendUiConfig();
 		});
 
 		this.uiSocket.on("edge_color", (color: string) => {
 			this.worldConfig.edgeColor = color;
 			if (this.globe) this.globe.setEdgeColor(color);
+			this.markDirty();
 			this.sendUiConfig();
+		});
+
+		this.uiSocket.on("save_planet", () => {
+			if (this.planetDirty) {
+				this.savePlanet();
+				this.sendUiConfig();
+			}
 		});
 	}
 
 	sendUiConfig() {
 		this.uiSocket.send(this.uiConfig);
+	}
+
+	private clearSaveStateListeners() {
+		this.saveStateListeners.forEach((handler, id) => {
+			this.uiSocket.off(id, handler);
+		});
+		this.saveStateListeners.clear();
+	}
+
+	private markDirty() {
+		this.planetDirty = true;
+	}
+
+	private markClean() {
+		this.planetDirty = false;
+	}
+
+	private registerSaveStateListeners() {
+		this.clearSaveStateListeners();
+
+		this.saveStates.forEach((state, index) => {
+			const loadId = `load_planet_${index}`;
+			const saveId = `save_planet_${index}`;
+			const deleteId = `delete_planet_${index}`;
+
+			const loadHandler = () => {
+				this.loadPlanet(state);
+				this.sendUiConfig();
+			};
+
+			const saveHandler = () => {
+				if (this.planetDirty) {
+					this.savePlanet(index);
+					this.sendUiConfig();
+				}
+			};
+
+			const deleteHandler = () => {
+				this.deletePlanet(index);
+				this.sendUiConfig();
+			};
+
+			this.uiSocket.on(loadId, loadHandler);
+			this.uiSocket.on(saveId, saveHandler);
+			this.uiSocket.on(deleteId, deleteHandler);
+
+			this.saveStateListeners.set(loadId, loadHandler);
+			this.saveStateListeners.set(saveId, saveHandler);
+			this.saveStateListeners.set(deleteId, deleteHandler);
+		});
+	}
+
+	private savePlanet(index?: number) {
+		// Copy worldConfig
+		const config = JSON.parse(
+			JSON.stringify(this.worldConfig),
+		) as WorldUiConfig;
+
+		// Insert settings that may have been changed with autoGenerate off
+		config.model = this.activePolyhedraModel;
+		const tiles = this.globe.tileMeshes.map((tileMesh) => tileMesh.tile);
+		const counts = this.getTileCount();
+		Object.entries(counts).forEach(([tile, count]) => {
+			config.biomes[tile as Tile] = count;
+		});
+
+		// Make a description
+		const biomeCount = Object.values(counts).filter((value) => value).length;
+		const tileCount = Object.values(counts)
+			.filter((count) => count > 0)
+			.join("/");
+		const description = `${config.model}, ${biomeCount} biomes (${tileCount})`;
+
+		// Save into array
+		if (index == null) {
+			const id = `Planet ${++this.saveCount}`;
+			const state: SaveState = { id, config, tiles, description };
+			this.saveStates.push(state);
+		} else {
+			const state = this.saveStates[index];
+			if (!state) return;
+			state.config = config;
+			state.tiles = tiles;
+			state.description = description;
+		}
+
+		this.markClean();
+		this.registerSaveStateListeners();
+	}
+
+	private loadPlanet(state: SaveState) {
+		// Load config from savestate
+		this.worldConfig = JSON.parse(
+			JSON.stringify(state.config),
+		) as WorldUiConfig;
+		tileManager.worldConfig = this.worldConfig;
+
+		// Populate planet tiles
+		this.createPlanet();
+		this.globe.tileMeshes.forEach((tileMesh, index) => {
+			tileMesh.setTile(state.tiles[index]);
+		});
+
+		// Update graphics after loading tiles
+		this.updateEdgeVisibility();
+
+		this.markClean();
+	}
+
+	private deletePlanet(index: number) {
+		if (index < 0 || index >= this.saveStates.length) return;
+		this.saveStates.splice(index, 1);
+		this.registerSaveStateListeners();
 	}
 
 	get uiConfig(): UiConfigEvent {
@@ -362,6 +504,16 @@ export default class WorldScene extends BaseScene {
 					hint_text: "Switch to a different scene",
 					value: SceneKey.World,
 					options: Object.values(SceneKey),
+				},
+
+				{
+					type: "hr",
+					hint_title: "Planet status",
+				},
+				{
+					type: "text",
+					hint_title: `Tiles (${this.clickable.length} total)`,
+					hint_text: this.tileCountString,
 				},
 
 				{
@@ -501,33 +653,42 @@ export default class WorldScene extends BaseScene {
 					text: "Generate",
 					hint_title: "Generate planet",
 					hint_text: "Create a new planet with the current settings",
-					color: this.worldConfig.autoGenerate ? "#999999" : "#c70036",
+					color: "#c70036",
 				},
 
 				{
 					type: "hr",
-					hint_title: "Planet status",
+					hint_title: "Saved planets",
 				},
 				{
-					type: "text",
-					hint_title: `Tiles (${this.clickable.length} total)`,
-					hint_text: this.tileCountString,
+					type: "button",
+					id: "save_planet",
+					text: "Save",
+					hint_title: "Save planet",
+					hint_text: "Save the current planet and its layout",
+					color: this.planetDirty ? undefined : "#77777777",
 				},
-
-				// {
-				// 	type: "button",
-				// 	id: "save",
-				// 	text: "Save",
-				// 	hint_title: "Save planet",
-				// 	hint_text: "Save the current planet",
-				// },
-				// {
-				// 	type: "button",
-				// 	id: "load",
-				// 	text: "Load",
-				// 	hint_title: "Load planet",
-				// 	hint_text: "Load the planet from save",
-				// },
+				...this.saveStates.map((state, index) => ({
+					type: "multi_button" as const,
+					buttons: [
+						{
+							id: `load_planet_${index}`,
+							text: "Load",
+						},
+						{
+							id: `save_planet_${index}`,
+							text: "Save",
+							color: this.planetDirty ? undefined : "#77777777",
+						},
+						{
+							id: `delete_planet_${index}`,
+							text: "Delete",
+							color: "#c70036",
+						},
+					],
+					hint_title: state.id,
+					hint_text: state.description,
+				})),
 			],
 		};
 	}
@@ -537,13 +698,10 @@ export default class WorldScene extends BaseScene {
 			({ name }) => name == this.worldConfig.model,
 		)!.count;
 
-		const biomeEntries = Object.entries(this.worldConfig.biomes) as [
-			Tile,
-			number,
-		][];
-
 		// Only consider active biomes (value > 0)
-		const active = biomeEntries.filter(([, value]) => value > 0);
+		const active = Object.entries(this.worldConfig.biomes).filter(
+			([, value]) => value > 0,
+		);
 		if (active.length === 0) return;
 
 		// If there are more biomes than tiles, clamp
@@ -582,7 +740,7 @@ export default class WorldScene extends BaseScene {
 		}
 
 		// Step 5: clear inactive ones
-		for (const [tile, value] of biomeEntries) {
+		for (const [tile, value] of Object.entries(this.worldConfig.biomes)) {
 			if (value > 0 && !scaled.find((b) => b.tile === tile)) {
 				this.worldConfig.biomes[tile as Tile] = 0;
 			}
@@ -641,7 +799,6 @@ export default class WorldScene extends BaseScene {
 
 		return Object.entries(counts)
 			.filter(([, count]) => count > 0)
-			.sort((a, b) => b[1] - a[1])
 			.map(([tile, count]) => {
 				const pct = Math.round((count / total) * 100);
 				return `- ${tile || "None"}: ${count} (${pct}%)`;
