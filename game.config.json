@@ -1,7 +1,7 @@
 {
 	"team": "Visualiseringscenter C",
-	"title": "Tellus Demo",
-	"description": "Web based demo for Tellus project",
+	"title": "Planet Builder",
+	"description": "TellUs Planet Builder",
 	"neutralino": {
 		"allow": [
 			"app.exit",
