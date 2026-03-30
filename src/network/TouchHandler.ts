@@ -99,7 +99,7 @@ export class TouchHandler extends EventEmitter {
 		// +Y is up, +X is right.
 		const direction = new THREE.Vector3(
 			Math.sin(scaledPitch) * Math.cos(yaw),
-			Math.sin(scaledPitch) * Math.sin(yaw),
+			-Math.sin(scaledPitch) * Math.sin(yaw), // Flip
 			Math.cos(scaledPitch),
 		);
 
