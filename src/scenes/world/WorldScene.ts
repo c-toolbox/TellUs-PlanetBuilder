@@ -157,16 +157,20 @@ export default class WorldScene extends BaseScene {
 	updateEdgeVisibility() {
 		this.globe.tileMeshes.forEach((tileMesh) => {
 			tileMesh.neighbors.forEach(({ mesh, edgeIndex }) => {
-				const same = tileMesh.tile == mesh.tile;
-				let visible = false;
-				if (this.worldConfig.tileEdge === "show all") {
-					visible = true;
-				} else if (this.worldConfig.tileEdge === "show borders") {
-					visible = !same;
-				}
-				this.globe.setEdgeVisible(edgeIndex, visible);
+				this.toggleEdge(edgeIndex, tileMesh.tile == mesh.tile);
 			});
 		});
+	}
+
+	toggleEdge(edgeIndex: number, sameEdge: boolean) {
+		switch (this.worldConfig.tileEdge) {
+			case "hide all":
+				return this.globe.setEdgeVisible(edgeIndex, false);
+			case "show all":
+				return this.globe.setEdgeVisible(edgeIndex, true);
+			case "show borders":
+				return this.globe.setEdgeVisible(edgeIndex, !sameEdge);
+		}
 	}
 
 	// On entering scene
@@ -221,10 +225,11 @@ export default class WorldScene extends BaseScene {
 				}
 
 				tileMesh.setTile(touchPoint.tile);
-				tileMesh.neighbors.forEach(({ mesh, edgeIndex }) => {
-					const same = tileMesh.tile == mesh.tile;
-					this.globe.setEdgeVisible(edgeIndex, !same);
-				});
+				if (this.worldConfig.tileEdge == "show borders") {
+					tileMesh.neighbors.forEach(({ mesh, edgeIndex }) => {
+						this.toggleEdge(edgeIndex, tileMesh.tile == mesh.tile);
+					});
+				}
 
 				if (this.worldConfig.autoGenerate) {
 					const counts = this.getTileCount();
