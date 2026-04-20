@@ -5,10 +5,28 @@ import { SceneKey } from "@/scenes/SceneManager";
 
 import { TouchId } from "@/network/tuioProtocol";
 import { UiConfigEvent } from "@/network/uiProtocol";
-import { ORIGIN } from "@/constants";
+import { BACKGROUND_DISTANCE, ORIGIN } from "@/constants";
 
 import worldGeodata from "@/assets/world.json";
-import backgroundAsset from "@/assets/backgrounds/globe/standard.jpg";
+import backgroundAsset from "@/assets/square.png";
+
+import dayMapAsset from "@/assets/backgrounds/earth/8k_earth_daymap.jpg";
+import nightMapAsset from "@/assets/backgrounds/earth/8k_earth_nightmap.jpg";
+import cloudMapAsset from "@/assets/backgrounds/earth/8k_earth_clouds.png";
+import specularMapAsset from "@/assets/backgrounds/earth/8k_earth_specular_map.jpg";
+import normalMapAsset from "@/assets/backgrounds/earth/8k_earth_normal_map.jpg";
+
+import canis_aureus_118264161 from "@/assets/backgrounds/iucn/canis_aureus_118264161.png";
+import canis_latrans_3745 from "@/assets/backgrounds/iucn/canis_latrans_3745.png";
+import canis_lupaster_118264888 from "@/assets/backgrounds/iucn/canis_lupaster_118264888.png";
+import canis_lupus_3746 from "@/assets/backgrounds/iucn/canis_lupus_3746.png";
+import { Color } from "@/utils/colors";
+const species = [
+	canis_aureus_118264161,
+	canis_latrans_3745,
+	canis_lupaster_118264888,
+	canis_lupus_3746,
+];
 
 export default class CountryScene extends BaseScene {
 	private countryMeshes: {
@@ -19,10 +37,98 @@ export default class CountryScene extends BaseScene {
 	constructor() {
 		super();
 
-		this.addBackground(backgroundAsset, 0x888888);
+		// this.addBackground(backgroundAsset, 0x888888);
+		this.addBackground(backgroundAsset, 0xffffff);
+		// this.addEarthBackground();
 
 		this.drawCountries();
+
+		species.forEach((animal, index) => {
+			// const tint = Math.random() * 0xffffff;
+			const radius = 1.02 + 0.002 * index;
+			const tint = [
+				// Color.Amber500,
+				// Color.Lime500,
+				// Color.Emerald500,
+				// Color.Teal500,
+				// Color.Cyan500,
+				Color.Red500,
+				Color.Green500,
+				Color.Yellow500,
+				Color.Orange500,
+			][index % 6];
+			this.drawSpecies(animal, radius, tint);
+		});
 	}
+
+	// setRendererSettings(renderer: Renderer) {
+	// 	renderer.outputColorSpace = THREE.SRGBColorSpace;
+	// }
+
+	/* Drawing */
+
+	addEarthBackground() {
+		const loader = new THREE.TextureLoader();
+		const dayMap = loader.load(dayMapAsset);
+		const nightMap = loader.load(nightMapAsset);
+		const cloudMap = loader.load(cloudMapAsset);
+		const specularMap = loader.load(specularMapAsset);
+		const normalMap = loader.load(normalMapAsset);
+
+		const material = new THREE.MeshBasicMaterial({
+			map: dayMap,
+			side: THREE.DoubleSide,
+			color: 0x777777,
+		});
+
+		const geometry = new THREE.SphereGeometry(0.95, 64, 64);
+		const earth = new THREE.Mesh(geometry, material);
+		this.add(earth);
+
+		const cloudMaterial = new THREE.MeshBasicMaterial({
+			map: cloudMap,
+			transparent: true,
+			opacity: 0,
+			side: THREE.DoubleSide,
+		});
+
+		const clouds = new THREE.Mesh(
+			new THREE.SphereGeometry(0.95 + 0.01, 64, 64),
+			cloudMaterial,
+		);
+
+		this.add(clouds);
+
+		const light = new THREE.DirectionalLight(0xffffff, 1);
+		light.position.set(5, 3, 5);
+		this.add(light);
+
+		dayMap.colorSpace = THREE.SRGBColorSpace;
+
+		normalMap.wrapS = normalMap.wrapT = THREE.RepeatWrapping;
+	}
+
+	drawSpecies(assetPath: string, radius: number, tintColor: number) {
+		const loader = new THREE.TextureLoader();
+		loader.load(assetPath, (texture) => {
+			texture.colorSpace = THREE.SRGBColorSpace;
+
+			const geometry = new THREE.SphereGeometry(radius, 64, 64);
+			const material = new THREE.MeshBasicMaterial({
+				map: texture,
+				// side: THREE.BackSide,
+				side: THREE.DoubleSide,
+				transparent: true,
+				opacity: 0.5,
+			});
+			material.color.set(tintColor);
+			const sphere = new THREE.Mesh(geometry, material);
+			sphere.scale.x *= -1;
+			this.add(sphere);
+		});
+	}
+
+	/* Touch input */
 
 	protected onTouch(touchId: TouchId, vector: THREE.Vector3) {
 		this.onClick(touchId, vector);
@@ -60,23 +166,24 @@ export default class CountryScene extends BaseScene {
 	drawCountries() {
 		worldGeodata.features.forEach((countryData) => {
 			const { type, coordinates } = countryData.geometry;
-			const outlineColor = 0xffffff;
-			const color = Math.random() * 0xffffff;
+			const outlineColor = 0x000000;
+			// const color = Math.random() * 0xffffff;
+			const color = 0xffffff;
 
 			if (type == "Polygon") {
 				this.drawCountryOutline(
 					coordinates as [number, number][][],
 					outlineColor,
 				);
-				this.drawCountry(
-					coordinates as [number, number][][],
-					color,
-					countryData,
-				);
+				// this.drawCountry(
+				// 	coordinates as [number, number][][],
+				// 	color,
+				// 	countryData,
+				// );
 			} else if (type == "MultiPolygon") {
 				coordinates.forEach((coords) => {
 					this.drawCountryOutline(coords as [number, number][][], outlineColor);
-					this.drawCountry(coords as [number, number][][], color, countryData);
+					// this.drawCountry(coords as [number, number][][], color, countryData);
 				});
 			}
 		});
@@ -93,7 +200,7 @@ export default class CountryScene extends BaseScene {
 		});
 
 		const geometry = new THREE.BufferGeometry().setFromPoints(points);
-		geometry.scale(0.5, 0.5, 0.5);
+		// geometry.scale(0.5, 0.5, 0.5);
 
 		const material = new THREE.LineBasicMaterial({ color });
 
