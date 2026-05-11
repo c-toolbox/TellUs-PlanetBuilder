@@ -98,7 +98,7 @@ export class Renderer extends THREE.WebGLRenderer {
 
 		this.currentScene.update(delta);
 		this.controls.update();
-		this.centerCamera.quaternion.copy(this.debugCamera.quaternion);
+		// this.centerCamera.quaternion.copy(this.debugCamera.quaternion);
 
 		if (this.debugMode) {
 			this.render(this.currentScene, this.debugCamera);

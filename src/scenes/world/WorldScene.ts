@@ -39,6 +39,7 @@ export default class WorldScene extends BaseScene {
 	private saveStates: SaveState[] = [];
 	private saveStateListeners = new Map<string, (...args: any[]) => void>();
 	private planetDirty: boolean = true;
+	private renderer: Renderer | null = null;
 
 	private worldConfig: WorldUiConfig = {
 		model: "△ 60",
@@ -57,6 +58,7 @@ export default class WorldScene extends BaseScene {
 			[Tile.Desert]: 4,
 			[Tile.Mountain]: 0,
 		},
+		rotationMode: false,
 		edgeWidth: 0.005,
 		edgeColor: "#000000",
 	};
@@ -175,6 +177,7 @@ export default class WorldScene extends BaseScene {
 
 	// On entering scene
 	override onEnter(renderer: Renderer) {
+		this.renderer = renderer;
 		super.onEnter(renderer);
 
 		// Set tileManager variables
@@ -187,6 +190,7 @@ export default class WorldScene extends BaseScene {
 	// On exiting scene
 	override onExit(renderer: Renderer) {
 		super.onExit(renderer);
+		this.renderer = null;
 
 		this.clear();
 	}
@@ -208,6 +212,11 @@ export default class WorldScene extends BaseScene {
 
 		const touchPoint = this.touchHandler.getTouchPoint(touchId);
 		if (!touchPoint) return;
+
+		if (this.worldConfig.rotationMode) {
+			this.handleCameraMovement();
+			return;
+		}
 
 		const intersects = this.raycaster.intersectObjects(this.clickable, true);
 		if (intersects.length > 0) {
@@ -241,6 +250,42 @@ export default class WorldScene extends BaseScene {
 		}
 	}
 
+	private handleCameraMovement() {
+		if (!this.renderer) return;
+
+		const touches = this.touchHandler.getTouchPoints();
+		let axisSum = new THREE.Vector3();
+		let angleSum = 0;
+		let activeCount = 0;
+
+		touches.forEach((touchPoint) => {
+			if (!touchPoint.hasPreviousPosition) return;
+
+			const prev = touchPoint.previousPosition.clone().normalize();
+			const curr = touchPoint.position.clone().normalize();
+			const dot = THREE.MathUtils.clamp(prev.dot(curr), -1, 1);
+			const angle = Math.acos(dot);
+			if (angle < 1e-4) return;
+
+			const axis = prev.clone().cross(curr);
+			if (axis.lengthSq() < 1e-8) return;
+			axis.normalize().multiplyScalar(angle);
+
+			axisSum.add(axis);
+			angleSum += angle;
+			activeCount += 1;
+		});
+
+		if (activeCount === 0 || axisSum.lengthSq() < 1e-8) return;
+
+		const axis = axisSum.normalize();
+		const angle = angleSum / activeCount;
+		const rotation = new THREE.Quaternion().setFromAxisAngle(axis, angle);
+
+		// Invert rotation so sphere follows hand motion (camera rotates opposite to touch movement)
+		this.renderer.centerCamera.quaternion.premultiply(rotation.invert());
+	}
+
 	update(delta: number) {
 		this.players.forEach((player) => player.update());
 
@@ -259,6 +304,11 @@ export default class WorldScene extends BaseScene {
 
 	initializeUi() {
 		super.initializeUi();
+
+		this.uiSocket.on("rotation_mode", (value: boolean) => {
+			this.worldConfig.rotationMode = value;
+			this.sendUiConfig();
+		});
 
 		this.uiSocket.on("auto_generate", (value: boolean) => {
 			this.worldConfig.autoGenerate = value;
@@ -509,6 +559,13 @@ export default class WorldScene extends BaseScene {
 					hint_text: "Switch to a different scene",
 					value: SceneKey.World,
 					options: Object.values(SceneKey),
+				},
+				{
+					type: "switch",
+					id: "rotation_mode",
+					hint_title: "Rotation mode",
+					hint_text: "Disable building and use touch to rotate the globe",
+					value: this.worldConfig.rotationMode,
 				},
 
 				{

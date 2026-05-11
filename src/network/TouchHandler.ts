@@ -90,6 +90,13 @@ export class TouchHandler extends EventEmitter {
 		let object = this.touchPoints.get(touchId);
 		if (!object) return console.warn("Unknown touch id:", touchId);
 
+		// Maintain previous position for touch-based camera movement.
+		if (object.hasPreviousPosition) {
+			object.previousPosition.copy(object.position).normalize();
+		} else {
+			object.hasPreviousPosition = true;
+		}
+
 		// Scale pitch to account for the globe's FOV constraint.
 		// Only the central FOVbelt is visible (e.g. 320 of 360 degrees),
 		// so we contract input pitch to that portion of the sphere.
@@ -103,6 +110,9 @@ export class TouchHandler extends EventEmitter {
 			Math.cos(scaledPitch),
 		);
 
+		// Store camera-local direction for later recomputation when camera rotates
+		object.cameraLocalDirection.copy(direction);
+
 		// Apply camera quaternion to emit world-space direction
 		const worldDirection = direction
 			.clone()
@@ -112,6 +122,17 @@ export class TouchHandler extends EventEmitter {
 		object.lookAt(ORIGIN);
 
 		this.emit("touch", touchId, worldDirection);
+	}
+
+	private updateTouchPointsForCameraRotation() {
+		this.touchPoints.forEach((touchPoint) => {
+			const worldDirection = touchPoint.cameraLocalDirection
+				.clone()
+				.applyQuaternion(this.cameraQuaternion);
+
+			touchPoint.position.copy(worldDirection).multiplyScalar(TOUCH_DISTANCE);
+			touchPoint.lookAt(ORIGIN);
+		});
 	}
 
 	removeTouch(touchId: TouchId) {
@@ -133,7 +154,21 @@ export class TouchHandler extends EventEmitter {
 		return this.touchPoints.get(touchId);
 	}
 
+	getTouchPoints() {
+		return Array.from(this.touchPoints.values());
+	}
+
 	setCameraQuaternion(quaternion: THREE.Quaternion) {
+		const changed =
+			this.cameraQuaternion.x !== quaternion.x ||
+			this.cameraQuaternion.y !== quaternion.y ||
+			this.cameraQuaternion.z !== quaternion.z ||
+			this.cameraQuaternion.w !== quaternion.w;
+
 		this.cameraQuaternion.copy(quaternion);
+
+		if (changed) {
+			this.updateTouchPointsForCameraRotation();
+		}
 	}
 }

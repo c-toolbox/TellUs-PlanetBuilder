@@ -10,6 +10,9 @@ export class TouchPoint extends THREE.Group {
 
 	public tile: Tile;
 	public createdTimestamp: number;
+	public previousPosition: THREE.Vector3;
+	public hasPreviousPosition: boolean;
+	public cameraLocalDirection: THREE.Vector3;
 
 	constructor(
 		geometry: THREE.BufferGeometry,
@@ -28,6 +31,10 @@ export class TouchPoint extends THREE.Group {
 
 		this.outerMesh.position.z = -0.1;
 		this.outerMesh.scale.setScalar(1.2);
+
+		this.previousPosition = new THREE.Vector3();
+		this.hasPreviousPosition = false;
+		this.cameraLocalDirection = new THREE.Vector3(0, 0, 1);
 
 		this.add(this.innerMesh);
 		this.add(this.outerMesh);
