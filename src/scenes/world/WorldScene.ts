@@ -40,6 +40,8 @@ export default class WorldScene extends BaseScene {
 	private saveStateListeners = new Map<string, (...args: any[]) => void>();
 	private planetDirty: boolean = true;
 	private renderer: Renderer | null = null;
+	private targetCameraQuaternion: THREE.Quaternion = new THREE.Quaternion();
+	private cameraRotationSmoothing: number = 0.12;
 
 	private worldConfig: WorldUiConfig = {
 		model: "△ 60",
@@ -178,6 +180,7 @@ export default class WorldScene extends BaseScene {
 	// On entering scene
 	override onEnter(renderer: Renderer) {
 		this.renderer = renderer;
+		this.targetCameraQuaternion.copy(renderer.centerCamera.quaternion);
 		super.onEnter(renderer);
 
 		// Set tileManager variables
@@ -283,11 +286,17 @@ export default class WorldScene extends BaseScene {
 		const rotation = new THREE.Quaternion().setFromAxisAngle(axis, angle);
 
 		// Invert rotation so sphere follows hand motion (camera rotates opposite to touch movement)
-		this.renderer.centerCamera.quaternion.premultiply(rotation.invert());
+		const invRotation = rotation.clone().invert();
+		this.targetCameraQuaternion.multiplyQuaternions(invRotation, this.targetCameraQuaternion);
 	}
 
 	update(delta: number) {
 		this.players.forEach((player) => player.update());
+
+		// Smooth camera rotation towards target using quaternion slerp
+		if (this.renderer && this.worldConfig.rotationMode) {
+			this.renderer.centerCamera.quaternion.slerp(this.targetCameraQuaternion, this.cameraRotationSmoothing);
+		}
 
 		// const time = ((this as any).time ?? 0) + (delta / 1000) * 5;
 		// (this as any).time = time;

@@ -34,6 +34,7 @@ export class Renderer extends THREE.WebGLRenderer {
 		this.debugCamera.position.set(0, 2, 0);
 		this.debugCamera.up.set(0, 0, 1);
 		this.debugCamera.lookAt(0, 0, 0);
+		this.centerCamera.quaternion.copy(this.debugCamera.quaternion);
 
 		// Trackball controls for debug camera
 		this.controls = new TrackballControls(this.debugCamera, this.domElement);
