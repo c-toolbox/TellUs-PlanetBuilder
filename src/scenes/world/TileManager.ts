@@ -19,7 +19,7 @@ import assetAiForest from "@/assets/ai/forest.jpg";
 import assetAiMountain from "@/assets/ai/mountain.jpg";
 import assetAiOcean from "@/assets/ai/ocean.jpg";
 import assetAiTaiga from "@/assets/ai/taiga.jpg";
-import assetAiSnow from "@/assets/ai/snow.jpg";
+import assetAiSnow from "@/assets/ai/snow.png";
 
 export type TextureSetKey = "icon" | "ai";
 
