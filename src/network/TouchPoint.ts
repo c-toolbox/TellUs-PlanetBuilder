@@ -30,7 +30,6 @@ export class TouchPoint extends THREE.Group {
 		this.innerMesh = new THREE.Mesh(geometry, this.innerMaterial);
 
 		this.outerMesh.position.z = -0.1;
-		this.outerMesh.scale.setScalar(1.2);
 
 		this.previousPosition = new THREE.Vector3();
 		this.hasPreviousPosition = false;
@@ -38,6 +37,8 @@ export class TouchPoint extends THREE.Group {
 
 		this.add(this.innerMesh);
 		this.add(this.outerMesh);
+
+		this.setTile(Tile.None);
 	}
 
 	setTile(tile: Tile) {
@@ -45,6 +46,10 @@ export class TouchPoint extends THREE.Group {
 		this.innerMaterial.map = tileManager.getTexture(tile);
 		this.innerMaterial.color.setHex(0xffffff);
 		this.innerMaterial.needsUpdate = true;
+
+		const size = tile != Tile.None ? 0.8 : 0.4;
+		this.innerMesh.scale.setScalar(size * 1.0);
+		this.outerMesh.scale.setScalar(size * 1.2);
 	}
 
 	setColor(color: number) {
