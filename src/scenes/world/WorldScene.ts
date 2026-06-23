@@ -232,11 +232,11 @@ export default class WorldScene extends BaseScene {
 				}
 
 				if (tileMesh.tile != touchPoint.tile) {
+					tileMesh.setTile(touchPoint.tile);
 					this.markDirty();
 					this.sendUiConfig();
 				}
 
-				tileMesh.setTile(touchPoint.tile);
 				if (this.worldConfig.tileEdge == "show borders") {
 					tileMesh.neighbors.forEach(({ mesh, edgeIndex }) => {
 						this.toggleEdge(edgeIndex, tileMesh.tile == mesh.tile);
@@ -287,7 +287,10 @@ export default class WorldScene extends BaseScene {
 
 		// Invert rotation so sphere follows hand motion (camera rotates opposite to touch movement)
 		const invRotation = rotation.clone().invert();
-		this.targetCameraQuaternion.multiplyQuaternions(invRotation, this.targetCameraQuaternion);
+		this.targetCameraQuaternion.multiplyQuaternions(
+			invRotation,
+			this.targetCameraQuaternion,
+		);
 	}
 
 	update(delta: number) {
@@ -295,7 +298,10 @@ export default class WorldScene extends BaseScene {
 
 		// Smooth camera rotation towards target using quaternion slerp
 		if (this.renderer && this.worldConfig.rotationMode) {
-			this.renderer.centerCamera.quaternion.slerp(this.targetCameraQuaternion, this.cameraRotationSmoothing);
+			this.renderer.centerCamera.quaternion.slerp(
+				this.targetCameraQuaternion,
+				this.cameraRotationSmoothing,
+			);
 		}
 
 		// const time = ((this as any).time ?? 0) + (delta / 1000) * 5;
