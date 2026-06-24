@@ -100,6 +100,7 @@ export const DistributionTypes = [
 export type DistributionType = (typeof DistributionTypes)[number];
 
 // Biomes
+export type EnabledBiomes = { [key in Tile]: boolean };
 export type BiomeCount = { [key in Tile]: number };
 
 /* Socket UI config */
@@ -111,7 +112,8 @@ export interface WorldUiConfig {
 	distribution: DistributionType;
 	autoGenerate: boolean;
 	rotationMode: boolean;
-	biomes: BiomeCount;
+	enabledBiomes: EnabledBiomes;
+	biomeCount: BiomeCount;
 	edgeWidth: number;
 	edgeColor: string;
 }

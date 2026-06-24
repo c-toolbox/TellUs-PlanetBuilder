@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { TextureSetKey, Tile, tileManager, Tiles } from "./TileManager";
+import { Tile, tileManager, Tiles } from "./TileManager";
 import { FACE_DISTANCE } from "@/constants";
 
 export class TileMesh extends THREE.Mesh {
@@ -27,6 +27,8 @@ export class TileMesh extends THREE.Mesh {
 		} else {
 			this.material.map = tileManager.getTexture(tile);
 			this.material.color.set(0xffffff);
+
+			if (tile == Tile.None) this.material.color.set(Tiles[tile].color);
 		}
 	}
 

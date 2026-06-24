@@ -49,8 +49,18 @@ export default class WorldScene extends BaseScene {
 		tileEdge: "show borders",
 		tileTexture: "realistic tiles",
 		distribution: DistributionTypes[0],
-		autoGenerate: true,
-		biomes: {
+		autoGenerate: false,
+		enabledBiomes: {
+			[Tile.None]: false,
+			[Tile.Snow]: true,
+			[Tile.Ocean]: true,
+			[Tile.Taiga]: true,
+			[Tile.Forest]: true,
+			[Tile.Savanna]: false,
+			[Tile.Desert]: true,
+			[Tile.Mountain]: false,
+		},
+		biomeCount: {
 			[Tile.None]: 0,
 			[Tile.Snow]: 6,
 			[Tile.Ocean]: 70,
@@ -147,7 +157,7 @@ export default class WorldScene extends BaseScene {
 
 		const tiles = tileManager.populateTiles(
 			tilePositions,
-			this.worldConfig.biomes,
+			this.worldConfig.biomeCount,
 		);
 		this.globe.tileMeshes.forEach((tileMesh, index) => {
 			tileMesh.setTile(tiles[index]);
@@ -158,10 +168,23 @@ export default class WorldScene extends BaseScene {
 		this.markDirty();
 	}
 
+	clearPlanetTiles() {
+		this.globe.tileMeshes.forEach((tileMesh, index) => {
+			tileMesh.setTile(Tile.None);
+		});
+
+		this.updateEdgeVisibility();
+
+		this.markDirty();
+	}
+
 	updateEdgeVisibility() {
 		this.globe.tileMeshes.forEach((tileMesh) => {
 			tileMesh.neighbors.forEach(({ mesh, edgeIndex }) => {
-				this.toggleEdge(edgeIndex, tileMesh.tile == mesh.tile);
+				this.toggleEdge(
+					edgeIndex,
+					tileMesh.tile == mesh.tile && mesh.tile != Tile.None,
+				);
 			});
 		});
 	}
@@ -239,14 +262,17 @@ export default class WorldScene extends BaseScene {
 
 				if (this.worldConfig.tileEdge == "show borders") {
 					tileMesh.neighbors.forEach(({ mesh, edgeIndex }) => {
-						this.toggleEdge(edgeIndex, tileMesh.tile == mesh.tile);
+						this.toggleEdge(
+							edgeIndex,
+							tileMesh.tile == mesh.tile && mesh.tile != Tile.None,
+						);
 					});
 				}
 
 				if (this.worldConfig.autoGenerate) {
 					const counts = this.getTileCount();
 					Object.entries(counts).forEach(([tile, count]) => {
-						this.worldConfig.biomes[tile as Tile] = count;
+						this.worldConfig.biomeCount[tile as Tile] = count;
 					});
 				}
 			}
@@ -338,6 +364,12 @@ export default class WorldScene extends BaseScene {
 			this.sendUiConfig();
 		});
 
+		this.uiSocket.on("clear_planet", () => {
+			this.worldConfig.autoGenerate = false;
+			this.clearPlanetTiles();
+			this.sendUiConfig();
+		});
+
 		this.uiSocket.on("tile_edges", (value: TileEdge) => {
 			this.worldConfig.tileEdge = value;
 			this.updateEdgeVisibility();
@@ -401,9 +433,9 @@ export default class WorldScene extends BaseScene {
 		});
 
 		this.uiSocket.on("biome_distribution", (values: number[]) => {
-			const activeBiomes = Object.entries(this.worldConfig.biomes).filter(
-				([tile, count]) => count > 0,
-			);
+			const activeBiomes = Object.entries(
+				this.worldConfig.enabledBiomes,
+			).filter(([tile, enabled]) => enabled);
 
 			console.assert(
 				activeBiomes.length === values.length,
@@ -412,7 +444,7 @@ export default class WorldScene extends BaseScene {
 			);
 
 			activeBiomes.forEach(([key], i) => {
-				this.worldConfig.biomes[key as Tile] = values[i];
+				this.worldConfig.biomeCount[key as Tile] = values[i];
 			});
 
 			if (this.worldConfig.autoGenerate) {
@@ -510,7 +542,7 @@ export default class WorldScene extends BaseScene {
 		const tiles = this.globe.tileMeshes.map((tileMesh) => tileMesh.tile);
 		const counts = this.getTileCount();
 		Object.entries(counts).forEach(([tile, count]) => {
-			config.biomes[tile as Tile] = count;
+			config.biomeCount[tile as Tile] = count;
 		});
 
 		// Make a description
@@ -663,43 +695,43 @@ export default class WorldScene extends BaseScene {
 							type: "switch",
 							id: Tile.Snow,
 							hint_title: `${tileManager.tileToEmoji(Tile.Snow)} ${Tile.Snow}`,
-							value: this.worldConfig.biomes[Tile.Snow] > 0,
+							value: this.worldConfig.enabledBiomes[Tile.Snow],
 						},
 						{
 							type: "switch",
 							id: Tile.Ocean,
 							hint_title: `${tileManager.tileToEmoji(Tile.Ocean)} ${Tile.Ocean}`,
-							value: this.worldConfig.biomes[Tile.Ocean] > 0,
+							value: this.worldConfig.enabledBiomes[Tile.Ocean],
 						},
 						{
 							type: "switch",
 							id: Tile.Taiga,
 							hint_title: `${tileManager.tileToEmoji(Tile.Taiga)} ${Tile.Taiga}`,
-							value: this.worldConfig.biomes[Tile.Taiga] > 0,
+							value: this.worldConfig.enabledBiomes[Tile.Taiga],
 						},
 						{
 							type: "switch",
 							id: Tile.Forest,
 							hint_title: `${tileManager.tileToEmoji(Tile.Forest)} ${Tile.Forest}`,
-							value: this.worldConfig.biomes[Tile.Forest] > 0,
+							value: this.worldConfig.enabledBiomes[Tile.Forest],
 						},
 						{
 							type: "switch",
 							id: Tile.Savanna,
 							hint_title: `${tileManager.tileToEmoji(Tile.Savanna)} ${Tile.Savanna}`,
-							value: this.worldConfig.biomes[Tile.Savanna] > 0,
+							value: this.worldConfig.enabledBiomes[Tile.Savanna],
 						},
 						{
 							type: "switch",
 							id: Tile.Desert,
 							hint_title: `${tileManager.tileToEmoji(Tile.Desert)} ${Tile.Desert}`,
-							value: this.worldConfig.biomes[Tile.Desert] > 0,
+							value: this.worldConfig.enabledBiomes[Tile.Desert],
 						},
 						{
 							type: "switch",
 							id: Tile.Mountain,
 							hint_title: `${tileManager.tileToEmoji(Tile.Mountain)} ${Tile.Mountain}`,
-							value: this.worldConfig.biomes[Tile.Mountain] > 0,
+							value: this.worldConfig.enabledBiomes[Tile.Mountain],
 						},
 					],
 				},
@@ -708,8 +740,10 @@ export default class WorldScene extends BaseScene {
 					id: "biome_distribution",
 					hint_title: "Biome distribution",
 					hint_text: "Adjust how many tiles each biome occupies",
-					values: Object.entries(this.worldConfig.biomes)
-						.filter(([tile, count]) => count > 0)
+					values: Object.entries(this.worldConfig.biomeCount)
+						.filter(
+							([tile, count]) => this.worldConfig.enabledBiomes[tile as Tile],
+						)
 						.map(([tile, count]) => ({
 							name: Tiles[tile as Tile].emoji,
 							value: count,
@@ -730,6 +764,14 @@ export default class WorldScene extends BaseScene {
 					text: "Generate",
 					hint_title: "Generate planet",
 					hint_text: "Create a new planet with the current settings",
+					color: "#c70036",
+				},
+				{
+					type: "button",
+					id: "clear_planet",
+					text: "Clear planet",
+					hint_title: "Empty planet",
+					hint_text: "Create a blank planet with empty tiles",
 					color: "#c70036",
 				},
 
@@ -776,8 +818,8 @@ export default class WorldScene extends BaseScene {
 		)!.count;
 
 		// Only consider active biomes (value > 0)
-		const active = Object.entries(this.worldConfig.biomes).filter(
-			([, value]) => value > 0,
+		const active = Object.entries(this.worldConfig.biomeCount).filter(
+			([tile, value]) => this.worldConfig.enabledBiomes[tile as Tile],
 		);
 		if (active.length === 0) return;
 
@@ -813,13 +855,13 @@ export default class WorldScene extends BaseScene {
 
 		// Step 4: write back
 		for (const b of scaled) {
-			this.worldConfig.biomes[b.tile as Tile] = b.base + b.value;
+			this.worldConfig.biomeCount[b.tile as Tile] = b.base + b.value;
 		}
 
 		// Step 5: clear inactive ones
-		for (const [tile, value] of Object.entries(this.worldConfig.biomes)) {
+		for (const [tile, value] of Object.entries(this.worldConfig.biomeCount)) {
 			if (value > 0 && !scaled.find((b) => b.tile === tile)) {
-				this.worldConfig.biomes[tile as Tile] = 0;
+				this.worldConfig.biomeCount[tile as Tile] = 0;
 			}
 		}
 
@@ -833,21 +875,23 @@ export default class WorldScene extends BaseScene {
 			({ name }) => name == this.worldConfig.model,
 		)!.count;
 
-		const startingAmount = Math.max(1, Math.floor(0.2 * totalTiles));
-		this.worldConfig.biomes[biome] = enabled ? startingAmount : 0;
+		// const startingAmount = Math.max(1, Math.floor(0.2 * totalTiles));
+		this.worldConfig.enabledBiomes[biome] = enabled;
+		// this.worldConfig.biomeCount[biome] = enabled ? startingAmount : 0;
+		this.worldConfig.biomeCount[biome] = 0;
 
 		// Ensure at least one biome exists
-		const allZero = Object.values(this.worldConfig.biomes).every(
+		const allZero = Object.values(this.worldConfig.biomeCount).every(
 			(value) => value === 0,
 		);
 		if (allZero) {
-			const candidates = Object.keys(this.worldConfig.biomes).filter(
+			const candidates = Object.keys(this.worldConfig.biomeCount).filter(
 				(tile) => tile !== biome && tile !== Tile.None,
 			);
 			const fallback =
 				candidates[Math.floor(Math.random() * candidates.length)];
 			if (fallback !== undefined) {
-				this.worldConfig.biomes[fallback as Tile] = totalTiles;
+				this.worldConfig.biomeCount[fallback as Tile] = totalTiles;
 			}
 		}
 

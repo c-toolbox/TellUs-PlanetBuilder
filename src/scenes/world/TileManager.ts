@@ -20,14 +20,15 @@ import assetAiMountain from "@/assets/ai/mountain.jpg";
 import assetAiOcean from "@/assets/ai/ocean.jpg";
 import assetAiTaiga from "@/assets/ai/taiga.jpg";
 import assetAiSnow from "@/assets/ai/snow.png";
+import { Color } from "@/utils/colors";
 
 export type TextureSetKey = "icon" | "ai";
 
 export const Tiles = {
 	None: {
 		texture: { icon: assetSquare, ai: assetSquare },
-		color: new THREE.Color(0xffffff),
-		emoji: "",
+		color: new THREE.Color(Color.Neutral600),
+		emoji: "🚫",
 	},
 	Snow: {
 		texture: { icon: assetSnow, ai: assetAiSnow },
@@ -286,7 +287,7 @@ class TileManager {
 
 		for (let i = 1; i <= this.tileCycle.length; i++) {
 			const next = this.tileCycle[(startIndex + i) % this.tileCycle.length];
-			const isEnabled = this.worldConfig.biomes[next] > 0;
+			const isEnabled = this.worldConfig.enabledBiomes[next];
 
 			if (isEnabled) {
 				return next;
