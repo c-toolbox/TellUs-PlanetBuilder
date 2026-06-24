@@ -78,8 +78,6 @@ export default class WorldScene extends BaseScene {
 	constructor() {
 		super();
 
-		this.addBackground(backgroundAsset);
-
 		// Lighting
 		const hemi = new THREE.HemisphereLight(0xffffff, 0x000000, 0.9);
 		this.add(hemi);
@@ -205,6 +203,8 @@ export default class WorldScene extends BaseScene {
 		this.renderer = renderer;
 		this.targetCameraQuaternion.copy(renderer.centerCamera.quaternion);
 		super.onEnter(renderer);
+
+		this.addBackground(backgroundAsset);
 
 		// Set tileManager variables
 		tileManager.worldConfig = this.worldConfig;
