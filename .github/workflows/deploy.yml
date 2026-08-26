@@ -10,8 +10,8 @@ permissions:
 
 jobs:
   build:
-    name: Build & Release
-    runs-on: ubuntu-latest
+    name: Build & Release Installer
+    runs-on: windows-latest
 
     steps:
       - name: Checkout repo
@@ -28,6 +28,11 @@ jobs:
       - name: Build project
         run: npm run build
 
+      - name: Compile Inno Setup Installer
+        uses: robin24/inno-setup-action@v1
+        with:
+          filepath: installer.iss
+
       - name: Create or update rolling release
         uses: marvinpinto/action-automatic-releases@latest
         with:
@@ -36,4 +41,5 @@ jobs:
           prerelease: false
           title: "Planet Builder - Latest Build"
           files: |
+            PlanetBuilder-Installer.exe
             dist/planet-builder-win.zip
