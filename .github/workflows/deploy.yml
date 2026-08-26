@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   build:
-    name: Build & Release Installer
+    name: Build & Release
     runs-on: windows-latest
 
     steps:
@@ -33,9 +33,9 @@ jobs:
         with:
           filepath: installer.iss
 
-      - name: Zip Installer Executable
+      - name: Compress Build Folder with Installer
         run: |
-          Compress-Archive -Path "Planet Builder Installer.exe" -DestinationPath "PlanetBuilder.zip" -Force
+          Compress-Archive -Path "dist\win\planet-builder\*" -DestinationPath "PlanetBuilder.zip" -Force
 
       - name: Create or update rolling release
         uses: marvinpinto/action-automatic-releases@latest
