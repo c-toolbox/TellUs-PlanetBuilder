@@ -33,6 +33,10 @@ jobs:
         with:
           filepath: installer.iss
 
+      - name: Zip Installer Executable
+        run: |
+          Compress-Archive -Path "Planet Builder Installer.exe" -DestinationPath "PlanetBuilder.zip" -Force
+
       - name: Create or update rolling release
         uses: marvinpinto/action-automatic-releases@latest
         with:
@@ -41,5 +45,4 @@ jobs:
           prerelease: false
           title: "Planet Builder - Latest Build"
           files: |
-            PlanetBuilder-Installer.exe
-            dist/planet-builder-win.zip
+            PlanetBuilder.zip
