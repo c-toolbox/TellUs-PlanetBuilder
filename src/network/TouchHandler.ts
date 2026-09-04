@@ -118,7 +118,25 @@ export class TouchHandler extends EventEmitter {
 			.clone()
 			.applyQuaternion(this.cameraQuaternion);
 
-		object.position.copy(worldDirection).multiplyScalar(TOUCH_DISTANCE);
+		// Compute new world position and estimate velocity (units per second)
+		const newWorldPos = worldDirection.clone().multiplyScalar(TOUCH_DISTANCE);
+		const now = Date.now();
+		if (object.hasPreviousPosition) {
+			const oldPos = object.position.clone();
+			const dt = (now - object.lastUpdateTimestamp) / 1000; // seconds
+			console.log(dt);
+			if (dt > 0.01) {
+				const displacement = newWorldPos.clone().sub(oldPos);
+				object.velocity.copy(displacement.divideScalar(dt));
+			} else {
+				object.velocity.set(0, 0, 0);
+			}
+		} else {
+			object.velocity.set(0, 0, 0);
+		}
+		object.lastUpdateTimestamp = now;
+
+		object.position.copy(newWorldPos);
 		object.lookAt(ORIGIN);
 
 		this.emit("touch", touchId, worldDirection);

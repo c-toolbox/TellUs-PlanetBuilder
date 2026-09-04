@@ -8,6 +8,7 @@ import { UiConfigEvent } from "@/network/uiProtocol";
 import { Color, GoogleColor } from "@/utils/colors";
 
 import { Fish } from "./Fish";
+import { Boat } from "./Boat";
 import backgroundAsset from "@/assets/square.png";
 
 const FISH_COLORS = [
@@ -51,10 +52,13 @@ export default class BoidsScene extends BaseScene {
 	protected fishGroup: THREE.Group;
 	private fishes: Fish[];
 
+	protected boatGroup: THREE.Group;
+	private boats: Boat[];
+
 	private boidsConfig: BoidsUiConfig = {
-		fishCount: 250,
-		colorAffinity: false,
-		sightRadius: 0.35,
+		fishCount: 300,
+		colorAffinity: true,
+		sightRadius: 0.25,
 		neighborRadius: 0.16,
 		separationRadius: 0.09,
 		fearRadius: 0.3,
@@ -64,26 +68,35 @@ export default class BoidsScene extends BaseScene {
 		fearWeight: 1.5,
 		baseTurn: 0.06,
 		panicTurn: 0.15,
-		calmSpeed: 0.0025,
+		calmSpeed: 0.0015,
 		panicSpeed: 0.02,
 	};
 
 	constructor() {
 		super();
 
-		this.addBackground(backgroundAsset, Color.Slate900);
+		this.addBackground(backgroundAsset, Color.Blue900);
 
 		this.fishGroup = new THREE.Group();
 		this.add(this.fishGroup);
 		this.fishes = [];
 
+		this.boatGroup = new THREE.Group();
+		this.add(this.boatGroup);
+		this.boats = [];
+
 		for (let i = 0; i < this.boidsConfig.fishCount; i++) {
 			this.addFish();
+		}
+
+		const initialBoatCount = Math.floor(this.boidsConfig.fishCount / 5);
+		for (let i = 0; i < initialBoatCount; i++) {
+			this.addBoat();
 		}
 	}
 
 	public setRendererSettings(renderer: Renderer): void {
-		renderer.setClearColor(Color.Slate950);
+		renderer.setClearColor(Color.Blue900);
 	}
 
 	update(delta: number) {
@@ -94,6 +107,9 @@ export default class BoidsScene extends BaseScene {
 
 		this.fishes.forEach((fish) => fish.applyBoids(this.fishes, touchPoints));
 		this.fishes.forEach((fish) => fish.update());
+
+		this.boats.forEach((boat) => boat.applyBoids(this.boats, touchPoints));
+		this.boats.forEach((boat) => boat.update());
 	}
 
 	/* Fish */
@@ -123,12 +139,45 @@ export default class BoidsScene extends BaseScene {
 		this.fishGroup.add(fish);
 	}
 
+	private addBoat() {
+		const index = this.boats.length;
+
+		const friendlyColors = [
+			0xffffff,
+			0xffffff,
+			0xffffff,
+			0xffffff,
+			0xffffff,
+		];
+		const myColor = 0xffffff;
+		const distanceFromCenter = 0.6;
+
+		const boat = new Boat(
+			this.boidsConfig,
+			distanceFromCenter,
+			myColor,
+			friendlyColors,
+		);
+
+		this.boats.push(boat);
+		this.boatGroup.add(boat);
+	}
+
 	private removeFish() {
 		const fish = this.fishes.pop();
 		if (fish) {
 			this.fishGroup.remove(fish);
 			fish.geometry.dispose();
 			fish.material.dispose();
+		}
+	}
+
+	private removeBoat() {
+		const boat = this.boats.pop();
+		if (boat) {
+			this.boatGroup.remove(boat);
+			boat.geometry.dispose();
+			boat.material.dispose();
 		}
 	}
 
@@ -149,6 +198,23 @@ export default class BoidsScene extends BaseScene {
 
 			for (let i = 0; i < removeCount; i++) {
 				this.removeFish();
+			}
+		}
+
+		// Boats: 5x less than fish
+		const boatTarget = Math.floor(this.boidsConfig.fishCount / 5);
+		const boatCurrent = this.boats.length;
+
+		if (boatTarget > boatCurrent) {
+			for (let i = boatCurrent; i < boatTarget; i++) {
+				this.addBoat();
+			}
+		}
+
+		if (boatTarget < boatCurrent) {
+			const removeCount = boatCurrent - boatTarget;
+			for (let i = 0; i < removeCount; i++) {
+				this.removeBoat();
 			}
 		}
 	}
