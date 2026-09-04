@@ -142,21 +142,13 @@ export default class BoidsScene extends BaseScene {
 	private addBoat() {
 		const index = this.boats.length;
 
-		const friendlyColors = [
-			0xffffff,
-			0xffffff,
-			0xffffff,
-			0xffffff,
-			0xffffff,
-		];
 		const myColor = 0xffffff;
-		const distanceFromCenter = 0.6;
+		const distanceFromCenter = 0.7;
 
 		const boat = new Boat(
 			this.boidsConfig,
 			distanceFromCenter,
-			myColor,
-			friendlyColors,
+			myColor
 		);
 
 		this.boats.push(boat);

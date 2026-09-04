@@ -90,27 +90,19 @@ export class TouchHandler extends EventEmitter {
 		let object = this.touchPoints.get(touchId);
 		if (!object) return console.warn("Unknown touch id:", touchId);
 
-		// Maintain previous position for touch-based camera movement.
-		if (object.hasPreviousPosition) {
-			object.previousPosition.copy(object.position).normalize();
-		} else {
-			object.hasPreviousPosition = true;
-		}
-
 		// Scale pitch to account for the globe's FOV constraint.
 		// Only the central FOVbelt is visible (e.g. 320 of 360 degrees),
 		// so we contract input pitch to that portion of the sphere.
 		const scaledPitch = pitch * (GLOBE_FOV_DEGREES / 360);
 
-		// Convert to camera-local spherical coordinates where +Z is center (screen center),
-		// +Y is up, +X is right.
+		// Convert to camera-local spherical coordinates
 		const direction = new THREE.Vector3(
 			Math.sin(scaledPitch) * Math.cos(yaw),
 			-Math.sin(scaledPitch) * Math.sin(yaw), // Flip
 			Math.cos(scaledPitch),
 		);
 
-		// Store camera-local direction for later recomputation when camera rotates
+		// Store camera-local direction
 		object.cameraLocalDirection.copy(direction);
 
 		// Apply camera quaternion to emit world-space direction
@@ -118,24 +110,35 @@ export class TouchHandler extends EventEmitter {
 			.clone()
 			.applyQuaternion(this.cameraQuaternion);
 
-		// Compute new world position and estimate velocity (units per second)
 		const newWorldPos = worldDirection.clone().multiplyScalar(TOUCH_DISTANCE);
 		const now = Date.now();
+
 		if (object.hasPreviousPosition) {
-			const oldPos = object.position.clone();
 			const dt = (now - object.lastUpdateTimestamp) / 1000; // seconds
-			console.log(dt);
-			if (dt > 0.01) {
-				const displacement = newWorldPos.clone().sub(oldPos);
-				object.velocity.copy(displacement.divideScalar(dt));
-			} else {
-				object.velocity.set(0, 0, 0);
+
+			// Ensure dt is valid (> 0) and not too small to avoid division spikes
+			if (dt > 0.001) {
+				const displacement = newWorldPos.clone().sub(object.position);
+				const calculatedVelocity = displacement.divideScalar(dt);
+
+				// Clamp touch velocity to prevent hardware touch noise spikes
+				const MAX_TOUCH_VELOCITY = 1000;
+				if (calculatedVelocity.length() > MAX_TOUCH_VELOCITY) {
+					calculatedVelocity.setLength(MAX_TOUCH_VELOCITY);
+				}
+
+				object.velocity.copy(calculatedVelocity);
+				object.previousPosition.copy(object.position).normalize();
 			}
 		} else {
+			// First update after touch down: initialize positions, zero velocity
+			object.hasPreviousPosition = true;
+			object.position.copy(newWorldPos);
+			object.previousPosition.copy(newWorldPos).normalize();
 			object.velocity.set(0, 0, 0);
 		}
-		object.lastUpdateTimestamp = now;
 
+		object.lastUpdateTimestamp = now;
 		object.position.copy(newWorldPos);
 		object.lookAt(ORIGIN);
 

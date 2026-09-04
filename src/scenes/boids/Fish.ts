@@ -29,7 +29,7 @@ export class Fish extends THREE.Mesh {
 		const textureLoader = new THREE.TextureLoader();
 		const material = new THREE.MeshBasicMaterial({
 			map: textureLoader.load(fishAsset),
-			color: 0x18327a,
+			color: 0x152e73,
 			transparent: true,
 			premultipliedAlpha: true,
 			depthWrite: false,

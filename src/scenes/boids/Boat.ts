@@ -22,7 +22,6 @@ export class Boat extends THREE.Mesh {
 		boidsConfig: BoidsUiConfig,
 		distanceFromCenter: number,
 		color: number,
-		friendlyColors: number[],
 	) {
 		const textureLoader = new THREE.TextureLoader();
 		const material = new THREE.MeshBasicMaterial({
@@ -106,19 +105,16 @@ export class Boat extends THREE.Mesh {
 		const alpha =
 			(clampedT - this.boidsConfig.calmSpeed) /
 			(this.boidsConfig.panicSpeed - this.boidsConfig.calmSpeed);
-		this.material.color
-			.copy(new THREE.Color(0xffffff))
-			.lerp(new THREE.Color(0xccffbb), alpha);
 	}
 
 	applyBoids(boats: Boat[], touchPoints: TouchPoint[]) {
 		const sightRadius = this.boidsConfig.sightRadius;
 		const neighborRadius = this.boidsConfig.neighborRadius;
-		const separationRadius = this.boidsConfig.separationRadius;
+		const separationRadius = this.boidsConfig.separationRadius * 1.25;
 
 		const cohesionWeight = this.boidsConfig.cohesionWeight * 0;
 		const alignmentWeight = this.boidsConfig.alignmentWeight * 0.01;
-		const separationWeight = this.boidsConfig.separationWeight / 2;
+		const separationWeight = this.boidsConfig.separationWeight * 0.3;
 
 		const sightAngle = Math.PI * 0.35;
 		const baseTurn = this.boidsConfig.baseTurn;
