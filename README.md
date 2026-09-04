@@ -28,7 +28,7 @@ python -m pip install python-osc websockets
 1. Download `PlanetBuilder.zip` from the [Latest Release](https://github.com/c-toolbox/TellUs-PlanetBuilder/releases/tag/latest)
 2. Extract the archive
 
-- **Install on TellUs:** Run `Planet Builder Installer.exe` to register the application to the Pufferfish launcher.
+- **Install on TellUs:** Run `Planet Builder Installer.exe` to register the application to PufferConsole.
 - **Run Standalone:** Execute `Planet Builder.exe` directly to test locally.
 
 
@@ -58,7 +58,7 @@ To switch scenarios and adjust settings on the fly, you must run **[SocketUI](ht
 1. Download and start **SocketUI** from the [SocketUI Releases](https://github.com/c-toolbox/TellUs-SocketUI/releases/tag/latest).
 2. Launch **Planet Builder** (via Pufferfish, `Planet Builder.exe` or `npm run dev`).
 3. Open [http://localhost:7000](http://localhost:7000) in any browser (or on a smartphone connected to the local network).
-	- If running on Pufferfish, locate the url used for the Pufferfish application launcher (typically http://pufferfish or 127.168.1.xx) and add `:7000` at the end of the url.
+	- If running on Pufferfish, locate the url used for the Pufferfish console (typically http://pufferfish or 127.168.1.xx) and add `:7000` at the end of the url.
 
 
 ## Testing Without a Physical Globe
