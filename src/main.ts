@@ -11,4 +11,4 @@ import { globalServices } from "@/network/GlobalServices";
 import { SceneKey, sceneManager, scenes } from "./scenes/SceneManager";
 
 globalServices.connectAll();
-sceneManager.setScene(scenes[SceneKey.World]);
+sceneManager.setScene(scenes[SceneKey.Boids]);

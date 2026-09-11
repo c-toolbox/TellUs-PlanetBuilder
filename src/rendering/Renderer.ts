@@ -55,11 +55,11 @@ export class Renderer extends THREE.WebGLRenderer {
 
 		// Debug toggle
 		this.debugMode = false;
-		window.addEventListener("keydown", (e) => {
-			if (e.key === " ") {
-				this.debugMode = !this.debugMode;
-			}
-		});
+		// window.addEventListener("keydown", (e) => {
+		// 	if (e.key === " ") {
+		// 		this.debugMode = !this.debugMode;
+		// 	}
+		// });
 
 		//
 		// Animation loop: update camera orientation from yaw/pitch and render

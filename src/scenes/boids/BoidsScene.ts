@@ -93,6 +93,15 @@ export default class BoidsScene extends BaseScene {
 		for (let i = 0; i < initialBoatCount; i++) {
 			this.addBoat();
 		}
+
+		/* Temporary */
+
+		window.addEventListener("keydown", (e) => {
+			if (e.key === " " || e.key === "Enter") {
+				this.fishes.forEach((fish) => fish.boost());
+				this.boats.forEach((boat) => boat.boost());
+			}
+		});
 	}
 
 	public setRendererSettings(renderer: Renderer): void {
@@ -143,13 +152,9 @@ export default class BoidsScene extends BaseScene {
 		const index = this.boats.length;
 
 		const myColor = 0xffffff;
-		const distanceFromCenter = 0.7;
+		const distanceFromCenter = 0.6;
 
-		const boat = new Boat(
-			this.boidsConfig,
-			distanceFromCenter,
-			myColor
-		);
+		const boat = new Boat(this.boidsConfig, distanceFromCenter, myColor);
 
 		this.boats.push(boat);
 		this.boatGroup.add(boat);

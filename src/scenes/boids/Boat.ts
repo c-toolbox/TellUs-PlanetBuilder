@@ -224,4 +224,17 @@ export class Boat extends THREE.Mesh {
 		const MAX_SAFE = 2 * panicSpeed;
 		if (this.velocity.length() > MAX_SAFE) this.velocity.setLength(MAX_SAFE);
 	}
+
+	public boost(boostAmount: number = 0.005) {
+        // Boost velocity in current facing direction
+        const currentSpeed = this.velocity.length();
+        const targetSpeed = Math.min(
+            currentSpeed + boostAmount,
+            this.boidsConfig.panicSpeed * 0.7 // Keep below full panic cap
+        );
+
+        if (this.facing.lengthSq() > 0) {
+            this.velocity.copy(this.facing).setLength(targetSpeed);
+        }
+    }
 }

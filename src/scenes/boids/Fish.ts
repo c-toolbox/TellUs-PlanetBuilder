@@ -29,7 +29,7 @@ export class Fish extends THREE.Mesh {
 		const textureLoader = new THREE.TextureLoader();
 		const material = new THREE.MeshBasicMaterial({
 			map: textureLoader.load(fishAsset),
-			color: 0x152e73,
+			color,
 			transparent: true,
 			premultipliedAlpha: true,
 			depthWrite: false,
@@ -236,5 +236,13 @@ export class Fish extends THREE.Mesh {
 
 		// Apply steering
 		this.facing.lerp(this.facing.clone().add(steering).normalize(), maxTurn);
+	}
+
+	public boost(boostAmount: number = 0.005) {
+		const maxBoostSpeed = this.boidsConfig.panicSpeed * 1.2;
+
+		// Instantly increase current speed and elevate targetSpeed
+		this.speed = Math.min(this.speed + boostAmount, maxBoostSpeed);
+		this.targetSpeed = Math.min(this.targetSpeed + boostAmount, maxBoostSpeed);
 	}
 }

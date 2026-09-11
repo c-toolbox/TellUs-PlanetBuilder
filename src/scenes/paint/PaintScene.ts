@@ -99,8 +99,8 @@ export default class PaintScene extends BaseScene {
 	}
 
 	public setRendererSettings(renderer: Renderer): void {
-		// renderer.setClearColor(new THREE.Color(255, 0, 0));
-		// renderer.clearColor();
+		renderer.setClearColor(new THREE.Color(0, 0, 0));
+		renderer.clearColor();
 		renderer.outputColorSpace = THREE.SRGBColorSpace;
 		renderer.toneMapping = THREE.NoToneMapping;
 		renderer.autoClear = true;

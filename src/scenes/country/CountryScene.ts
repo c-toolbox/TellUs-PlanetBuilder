@@ -8,7 +8,7 @@ import { UiConfigEvent } from "@/network/uiProtocol";
 import { BACKGROUND_DISTANCE, ORIGIN } from "@/constants";
 
 import worldGeodata from "@/assets/world.json";
-import backgroundAsset from "@/assets/square.png";
+import backgroundAsset from "@/assets/backgrounds/streetview/norrköping.jpg";
 
 import dayMapAsset from "@/assets/backgrounds/earth/8k_earth_daymap.jpg";
 import nightMapAsset from "@/assets/backgrounds/earth/8k_earth_nightmap.jpg";
@@ -41,7 +41,7 @@ export default class CountryScene extends BaseScene {
 		this.addBackground(backgroundAsset, 0xffffff);
 		// this.addEarthBackground();
 
-		this.drawCountries();
+		// this.drawCountries();
 
 		species.forEach((animal, index) => {
 			// const tint = Math.random() * 0xffffff;
@@ -57,7 +57,7 @@ export default class CountryScene extends BaseScene {
 				Color.Yellow500,
 				Color.Orange500,
 			][index % 6];
-			this.drawSpecies(animal, radius, tint);
+			// this.drawSpecies(animal, radius, tint);
 		});
 	}
 
