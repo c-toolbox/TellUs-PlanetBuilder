@@ -11,6 +11,8 @@ ArchitecturesInstallIn64BitMode=x64
 PrivilegesRequired=lowest
 SetupIconFile=src\public\icon.ico
 
+UninstallFilesDir={app}\uninst
+
 [Files]
 Source: "dist\win\planet-builder\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs; Excludes: "Planet Builder Installer.exe"
 Source: "src\public\thumbnail.png"; DestDir: "{app}"; Flags: ignoreversion

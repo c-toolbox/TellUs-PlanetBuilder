@@ -26,6 +26,7 @@ const BundleWinApp = () => {
 	mkdirSync(out_dir);
 	copyFileSync(`bin/resources.neu`, `${out_dir}/resources.neu`);
 	copyFileSync(`proxy.py`, `${out_dir}/proxy.py`);
+	copyFileSync(`src/public/thumbnail.png`, `${out_dir}/thumbnail.png`);
 
 	const data = readFileSync(`bin/neutralino-win_x64.exe`);
 	const exe = NtExecutable.from(data);
