@@ -12,7 +12,7 @@
 	"extensions": [
 		{
 			"id": "se.visualiseringscenter.tuio",
-			"commandWindows": "extensions\\tuio-extension.exe"
+			"commandWindows": "\"${NL_PATH}\\extensions\\tuio-extension.exe\""
 		}
 	],
 	"logging": {
