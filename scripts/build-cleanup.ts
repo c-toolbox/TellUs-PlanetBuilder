@@ -5,6 +5,7 @@ import { build_path, title_dashed } from './constants';
 
 const BuildCleanup = () => {
 	rimrafSync(build_path);
+	rimrafSync('./dist/web');
 	rimrafSync('./dist/neutralino.config.json');
 	rimrafSync('./neutralino.config.json');
 	writeFileSync('./dist/meta.json', JSON.stringify({title: title_dashed}));

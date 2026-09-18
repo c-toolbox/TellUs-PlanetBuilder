@@ -3,7 +3,7 @@ AppName=Planet Builder
 AppVersion=1.0
 DefaultDirName=C:\PufferConsole\applications\PlanetBuilder
 DisableProgramGroupPage=yes
-OutputDir=dist\win\planet-builder
+OutputDir=dist\win\PlanetBuilder
 OutputBaseFilename=Planet Builder Installer
 Compression=lzma
 SolidCompression=yes
@@ -14,8 +14,8 @@ SetupIconFile=src\public\icon.ico
 UninstallFilesDir={app}\uninst
 
 [Files]
-Source: "dist\win\planet-builder\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs; Excludes: "Planet Builder Installer.exe"
+Source: "dist\win\PlanetBuilder\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs; Excludes: "Planet Builder Installer.exe"
 Source: "src\public\thumbnail.png"; DestDir: "{app}"; Flags: ignoreversion
 
-[Run]
-Filename: "{app}\Planet Builder.exe"; Description: "Launch Planet Builder"; Flags: nowait postinstall skipifsilent
+[Messages]
+ClickFinish=Please go to the PufferConsole application portal to start PlanetBuilder.

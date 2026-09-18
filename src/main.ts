@@ -5,10 +5,9 @@ if (typeof globalThis.URL === "undefined") {
 
 import "@/utils/neu";
 import "@/utils/storage";
-import "./utils/proxy";
 
 import { globalServices } from "@/network/GlobalServices";
 import { SceneKey, sceneManager, scenes } from "./scenes/SceneManager";
 
 globalServices.connectAll();
-sceneManager.setScene(scenes[SceneKey.Boids]);
+sceneManager.setScene(scenes[SceneKey.World]);

@@ -1,7 +1,7 @@
 import { PluginOption } from "vite";
 import {
 	title,
-	title_dashed,
+	distribution_name,
 	git_count,
 	description,
 	git_version,
@@ -12,7 +12,6 @@ import {
 	copyFileSync,
 	readFileSync,
 	writeFileSync,
-	cpSync,
 } from "fs";
 import { NtExecutable, NtExecutableResource, Data, Resource } from "resedit";
 import { createICO, HERMITE } from "png2icons";
@@ -20,12 +19,13 @@ import { createICO, HERMITE } from "png2icons";
 const BundleWinApp = () => {
 	console.log(`Packaging Windows exe...`);
 
-	const out_dir = `./dist/win/${title_dashed}`;
+	const out_dir = `./dist/win/${distribution_name}`;
 
 	mkdirSync("./dist/win");
 	mkdirSync(out_dir);
 	copyFileSync(`bin/resources.neu`, `${out_dir}/resources.neu`);
-	copyFileSync(`proxy.py`, `${out_dir}/proxy.py`);
+	mkdirSync(`${out_dir}/extensions`);
+	copyFileSync(`extensions/tuio-extension.exe`, `${out_dir}/extensions/tuio-extension.exe`);
 	copyFileSync(`src/public/thumbnail.png`, `${out_dir}/thumbnail.png`);
 
 	const data = readFileSync(`bin/neutralino-win_x64.exe`);

@@ -5,12 +5,13 @@ import checker from "vite-plugin-checker";
 import tsconfigPaths from "vite-tsconfig-paths";
 import getGitVersion from "./scripts/git-version";
 import preImageOptimizer from "./scripts/pre-image-optimizer";
+import tuioExtension from "./scripts/tuio-extension";
 import neuBuild from "./scripts/neu-build";
 import neuInject from "./scripts/neu-inject";
 import bundleWinApp from "./scripts/win-bundle";
 import buildCleanup from "./scripts/build-cleanup";
 
-import { title, team, description, title_dashed } from "./scripts/constants";
+import { title, team, description, distribution_name } from "./scripts/constants";
 
 export default () => {
 	process.env.VITE_GAME_TITLE = title;
@@ -28,12 +29,13 @@ export default () => {
 			}),
 			preImageOptimizer(),
 			neuInject(),
+			tuioExtension(),
 			neuBuild(),
 			bundleWinApp(),
 			zip({
 				inDir: `./dist/win`,
 				outDir: "./dist",
-				outFileName: `${title_dashed}-win.zip`,
+				outFileName: `${distribution_name}.zip`,
 			}),
 			buildCleanup(),
 		],
@@ -51,6 +53,8 @@ export default () => {
 		},
 		server: {
 			host: "localhost",
+			port: 5173,
+			strictPort: true,
 		},
 	});
 };

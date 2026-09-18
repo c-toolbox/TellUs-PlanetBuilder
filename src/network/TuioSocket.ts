@@ -5,37 +5,44 @@ import {
 	TuioRemoveEvent,
 	TuioUpdateEvent,
 } from "./tuioProtocol";
+import { events } from "@neutralinojs/lib";
+import { isNeutralino } from "@/utils/neu";
 
-const TUIO_URL = "ws://localhost:8765";
+const TUIO_EVENT = "tuioMessage";
+
+type OscMessage = {
+	address: string;
+	args: [string, ...unknown[]];
+};
 
 export class TuioSocket extends EventEmitter {
-	private socket: WebSocket;
+	private activeIds = new Set<number>();
 
 	constructor() {
 		super();
 
-		this.socket = new WebSocket(TUIO_URL);
-
-		this.socket.onopen = (event) => {
-			console.debug("Socket Tuio opened");
-		};
-		this.socket.onclose = (event) => {
-			console.debug("Socket Tuio closed");
-		};
-		this.socket.onerror = (event) => {};
-		this.socket.onmessage = (event) => {
-			this.onMessage(event.data);
-		};
+		if (isNeutralino) {
+			events.on(TUIO_EVENT, (event) => this.onOscMessage(event.detail));
+		}
 	}
 
-	onMessage(data: string) {
-		data = data.replaceAll("Infinity", "0");
-		data = data.replaceAll("NaN", "0");
-		const touch: TuioEvent = JSON.parse(data);
+	private onOscMessage(message: OscMessage) {
+		if (message.address !== "/tuio/2Dcur") return;
 
-		if (touch.event == "add") this.onAdd(touch);
-		else if (touch.event == "remove") this.onRemove(touch);
-		else if (touch.event == "update") this.onUpdate(touch);
+		const [type, ...args] = message.args;
+		if (type === "alive") {
+			const currentIds = new Set(args as number[]);
+			for (const id of currentIds) {
+				if (!this.activeIds.has(id)) this.onAdd({ event: "add", id });
+			}
+			for (const id of this.activeIds) {
+				if (!currentIds.has(id)) this.onRemove({ event: "remove", id });
+			}
+			this.activeIds = currentIds;
+		} else if (type === "set") {
+			const [id, x, y, vx, vy, acc] = args as number[];
+			this.onUpdate({ event: "update", id, x, y, vx, vy, acc });
+		}
 	}
 
 	onAdd(touch: TuioAddEvent) {

@@ -26,6 +26,7 @@ export const year_copyright = year_initial == year_current
 
 export const team_dashed = team.toLowerCase().replace(/\s/gi, '-');
 export const title_dashed = title.toLowerCase().replace(/\s/gi, '-');
+export const distribution_name = title.replace(/\s/g, '');
 export const game_dir = `${team_dashed}-${title_dashed}`;
 export const build_path = `./dist/${game_dir}/`;
 

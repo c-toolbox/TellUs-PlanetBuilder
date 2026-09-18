@@ -10,15 +10,6 @@ A multi-demo application for [TellUs](https://visualiseringscenter.se/research-p
 Before running Planet Builder, your system must meet the following requirements:
 
 - **Windows 10/11** with Microsoft Edge & WebView2 (installed by default).
-- **Python 3.13+** (Required for touch interaction): The app runs a background proxy script (`proxy.py`) to bridge TuIO touch events over UDP from the TellUs globe.
-
-1. Download and install **[Python](https://www.python.org/downloads/)**
-	- Check **"Add python.exe to PATH"** during setup
-2. Install required dependencies:
-
-```powershell
-python -m pip install python-osc websockets
-```
 
 
 ## Installation
@@ -36,7 +27,7 @@ python -m pip install python-osc websockets
 
 If you want to modify code or develop new scenarios locally, follow these steps:
 
-1. **Install Node.js 20** (via [NVM for Windows](https://github.com/coreybutler/nvm-windows/releases)):
+1. **Install Node.js 20 or newer** (via [NVM for Windows](https://github.com/coreybutler/nvm-windows/releases)):
 
 ```powershell
 nvm install 20
@@ -66,4 +57,5 @@ To switch scenarios and adjust settings on the fly, you must run **[SocketUI](ht
 If testing locally without Pufferfish hardware:
 
 1. Download the [TUIO C++ Simulator](https://www.tuio.org/?cpp) and run `SimpleSimulator.exe`.
-2. Touch input will be sent over localhost UDP port 3333 and forwarded to Planet Builder automatically.
+2. Configure it to send TUIO to localhost UDP port `3333`.
+3. Launch Planet Builder; touch input is forwarded to the application automatically.

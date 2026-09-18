@@ -7,12 +7,19 @@
 	"url": "/",
 	"enableServer": true,
 	"enableNativeAPI": true,
+	"enableExtensions": true,
 	"tokenSecurity": "one-time",
+	"extensions": [
+		{
+			"id": "se.visualiseringscenter.tuio",
+			"commandWindows": "extensions\\tuio-extension.exe"
+		}
+	],
 	"logging": {
 		"enabled": true,
 		"writeToLogFile": false
 	},
-	"nativeAllowList": ["app.exit", "window.center"],
+	"nativeAllowList": ["app.exit", "app.broadcast", "extensions.dispatch", "extensions.getStats", "window.center"],
 	"modes": {
 		"window": {
 			"title": "Tellus Demo",

@@ -9,7 +9,7 @@ import {
 import neuConf from "./neu-template.json";
 import { writeFileSync } from "fs";
 
-export default function WriteNeuConfig(isProd = false) {
+export default function WriteNeuConfig(isProd = false, extensionCommand?: string) {
   neuConf.applicationId = `${team_dashed}.${title_dashed}`;
   neuConf.modes.window.title = title;
   neuConf.cli.binaryName = `${team_dashed}-${title_dashed}`;
@@ -21,6 +21,10 @@ export default function WriteNeuConfig(isProd = false) {
   } else {
     neuConf.tokenSecurity = "none";
   }
+
+	if (extensionCommand) {
+		neuConf.extensions[0].commandWindows = extensionCommand;
+	}
 
   neuConf.nativeAllowList = [...neuConf.nativeAllowList, ...neutralino.allow];
   neuConf.modes.window = { ...neuConf.modes.window, ...neutralino.window };

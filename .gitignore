@@ -33,6 +33,8 @@ dist-ssr
 
 # Neutralino files
 bin/
+extensions/*.exe
+extensions/.dev*/
 src/neutralino.js
 .tmp
 .storage
