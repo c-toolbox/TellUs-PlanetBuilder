@@ -8,6 +8,7 @@ import PaintScene from "./paint/PaintScene";
 // import DragDropScene from "./dragdrop/DragDropScene";
 import BoidsScene from "./boids/BoidsScene";
 import CountryScene from "./country/CountryScene";
+import VinjettScene from "./vinjett/VinjettScene";
 
 /* Scenes */
 
@@ -20,6 +21,7 @@ export enum SceneKey {
 	// DragDrop = "DragDrop",
 	Boids = "Boids",
 	Country = "Country",
+	Vinjett = "Vinjett",
 }
 
 export const scenes = {
@@ -31,6 +33,7 @@ export const scenes = {
 	// DragDrop: new DragDropScene(),
 	Boids: new BoidsScene(),
 	Country: new CountryScene(),
+	Vinjett: new VinjettScene(),
 } satisfies Record<SceneKey, BaseScene>;
 
 /* Manager */
