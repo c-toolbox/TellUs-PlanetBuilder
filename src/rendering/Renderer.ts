@@ -90,6 +90,7 @@ export class Renderer extends THREE.WebGLRenderer {
 	}
 
 	setScene(scene: BaseScene) {
+		this.projectionScene.setTransition(false);
 		this.currentScene = scene;
 		this.currentScene.setRendererSettings(this);
 	}

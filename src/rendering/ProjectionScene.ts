@@ -6,8 +6,10 @@ import { GLOBE_FOV_DEGREES } from "@/constants";
 
 export class ProjectionScene extends THREE.Scene {
 	public cubeCamera: THREE.CubeCamera;
+	public transitionCubeCamera: THREE.CubeCamera;
 	public screenCamera: THREE.OrthographicCamera;
 	public aepTarget: THREE.WebGLRenderTarget;
+	private aepMaterial: THREE.ShaderMaterial;
 
 	constructor() {
 		super();
@@ -19,6 +21,17 @@ export class ProjectionScene extends THREE.Scene {
 		cubeRenderTarget.texture.colorSpace = THREE.SRGBColorSpace;
 		this.cubeCamera = new THREE.CubeCamera(0.01, 1000, cubeRenderTarget);
 
+		const transitionCubeRenderTarget = new THREE.WebGLCubeRenderTarget(1024, {
+			generateMipmaps: true,
+			minFilter: THREE.LinearMipmapLinearFilter,
+		});
+		transitionCubeRenderTarget.texture.colorSpace = THREE.SRGBColorSpace;
+		this.transitionCubeCamera = new THREE.CubeCamera(
+			0.01,
+			1000,
+			transitionCubeRenderTarget,
+		);
+
 		this.screenCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
 		this.aepTarget = new THREE.WebGLRenderTarget(1024, 1024, {
@@ -27,10 +40,15 @@ export class ProjectionScene extends THREE.Scene {
 		});
 		this.aepTarget.texture.colorSpace = THREE.SRGBColorSpace;
 
-		const aepMaterial = new THREE.ShaderMaterial({
+		this.aepMaterial = new THREE.ShaderMaterial({
 			uniforms: {
 				envMap: { value: cubeRenderTarget.texture },
+				transitionEnvMap: { value: transitionCubeRenderTarget.texture },
 				globeFovDegrees: { value: GLOBE_FOV_DEGREES },
+				transitionProgress: { value: 0 },
+				transitionBorderWidth: { value: THREE.MathUtils.degToRad(1) },
+				transitionOrigin: { value: new THREE.Vector3(0, 0, 1) },
+				transitionActive: { value: false },
 			},
 			vertexShader: vertexShader,
 			fragmentShader: fragmentShader,
@@ -38,7 +56,18 @@ export class ProjectionScene extends THREE.Scene {
 			depthWrite: false,
 		});
 
-		const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), aepMaterial);
+		const quad = new THREE.Mesh(
+			new THREE.PlaneGeometry(2, 2),
+			this.aepMaterial,
+		);
 		this.add(quad);
+	}
+
+	setTransition(active: boolean, progress = 0, origin?: THREE.Vector3) {
+		this.aepMaterial.uniforms.transitionActive.value = active;
+		this.aepMaterial.uniforms.transitionProgress.value = progress;
+		if (origin) {
+			this.aepMaterial.uniforms.transitionOrigin.value.copy(origin);
+		}
 	}
 }

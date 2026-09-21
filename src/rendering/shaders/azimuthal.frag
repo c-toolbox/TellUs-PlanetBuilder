@@ -1,6 +1,11 @@
 precision highp float;
 uniform samplerCube envMap;
+uniform samplerCube transitionEnvMap;
 uniform float globeFovDegrees;
+uniform float transitionProgress;
+uniform float transitionBorderWidth;
+uniform vec3 transitionOrigin;
+uniform bool transitionActive;
 varying vec2 vUv;
 
 void main() {
@@ -24,8 +29,19 @@ void main() {
 		 cos_c
 	);
 
-	// gl_FragColor = textureCube(envMap, dir);
 	vec4 color = textureCube(envMap, dir);
+	if (transitionActive) {
+		float angle = acos(clamp(dot(normalize(dir), normalize(transitionOrigin)), -1.0, 1.0));
+		float wipeAngle = transitionProgress * 3.141592653589793;
+		float halfBorder = transitionBorderWidth * 0.5;
+
+		if (abs(angle - wipeAngle) <= halfBorder) {
+			color = vec4(1.0);
+		} else if (angle < wipeAngle) {
+			color = textureCube(transitionEnvMap, dir);
+		}
+	}
+
 	color.rgb = pow(color.rgb, vec3(1.0 / 1.9));
 	gl_FragColor = color;
 }
