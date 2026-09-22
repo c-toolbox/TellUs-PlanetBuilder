@@ -1,4 +1,4 @@
-import { species } from "./species";
+import { SpeciesKey } from "./species";
 
 import RainForest_nx from "@/assets/backgrounds/vinjett/RainForest_nx.jpg";
 import RainForest_ny from "@/assets/backgrounds/vinjett/RainForest_ny.jpg";
@@ -105,7 +105,11 @@ export interface Location {
 	ny: string;
 	pz: string;
 	nz: string;
-	species: { image: string; english: string; swedish: string }[];
+	species: {
+		species: SpeciesKey;
+		pitch: number;
+		yaw: number;
+	}[];
 }
 
 export const locations = {
@@ -120,7 +124,10 @@ export const locations = {
 		ny: RainForest_ny,
 		pz: RainForest_pz,
 		nz: RainForest_nz,
-		species: [species.fox, species.fox, species.fox],
+		species: [
+			{ species: "stickInsect", pitch: 0, yaw: -135 },
+			{ species: "chimpanzee", pitch: 24, yaw: -23 },
+		],
 	},
 	Wetlands: {
 		english: "Wetlands",
@@ -133,7 +140,10 @@ export const locations = {
 		ny: Wetlands_ny,
 		pz: Wetlands_pz,
 		nz: Wetlands_nz,
-		species: [species.fox, species.fox, species.fox],
+		species: [
+			{ species: "flyOrchid", pitch: -25, yaw: 1 },
+			{ species: "sundew", pitch: -20, yaw: 116 },
+		],
 	},
 	City: {
 		english: "City",
@@ -146,7 +156,13 @@ export const locations = {
 		ny: City_ny,
 		pz: City_pz,
 		nz: City_nz,
-		species: [species.fox, species.fox, species.fox],
+		species: [
+			{ species: "yeast", pitch: 1, yaw: -168 },
+			{ species: "eColi", pitch: -21, yaw: -14 },
+			{ species: "staphylococci", pitch: -33, yaw: -9 },
+			{ species: "mold", pitch: 32, yaw: -101 },
+			{ species: "lacticAcidBacterium", pitch: 23, yaw: 38 },
+		],
 	},
 	Cliffs: {
 		english: "Cliffs",
@@ -159,7 +175,13 @@ export const locations = {
 		ny: Cliffs_ny,
 		pz: Cliffs_pz,
 		nz: Cliffs_nz,
-		species: [species.fox, species.fox, species.fox],
+		species: [
+			{ species: "graniteBoulder", pitch: 3, yaw: 172 },
+			{ species: "mapLichen", pitch: 1, yaw: 143 },
+			{ species: "rockCrystal", pitch: 23, yaw: 83 },
+			{ species: "slag", pitch: 28, yaw: 109 },
+			{ species: "fossil", pitch: 16, yaw: 10 },
+		],
 	},
 	Desert: {
 		english: "Desert",
@@ -172,7 +194,11 @@ export const locations = {
 		ny: Desert_ny,
 		pz: Desert_pz,
 		nz: Desert_nz,
-		species: [species.fox, species.fox, species.fox],
+		species: [
+			{ species: "rattlesnake", pitch: 0, yaw: -45 },
+			{ species: "brownLivingStone", pitch: 5, yaw: 20 },
+			{ species: "saguaroCactus", pitch: -6, yaw: -70 },
+		],
 	},
 	Glaciers: {
 		english: "Glaciers",
@@ -185,11 +211,11 @@ export const locations = {
 		ny: Glaciers_ny,
 		pz: Glaciers_pz,
 		nz: Glaciers_nz,
-		species: [species.fox, species.fox, species.fox],
+		species: [{ species: "polarBear", pitch: -3, yaw: -130 }],
 	},
 	Home: {
-		english: "Home",
-		swedish: "Hem",
+		english: "Back",
+		swedish: "Tillbaka",
 		color: "#f2f2f2",
 		px: Home_px,
 		nx: Home_nx,
@@ -197,7 +223,7 @@ export const locations = {
 		ny: Home_ny,
 		pz: Home_pz,
 		nz: Home_nz,
-		species: [species.fox, species.fox, species.fox],
+		species: [],
 	},
 	HotSpring: {
 		english: "Hot Spring",
@@ -210,7 +236,10 @@ export const locations = {
 		ny: HotSpring_ny,
 		pz: HotSpring_pz,
 		nz: HotSpring_nz,
-		species: [species.fox, species.fox, species.fox],
+		species: [
+			{ species: "thermusAquaticus", pitch: -11, yaw: 44 },
+			{ species: "roughRedAlga", pitch: -16, yaw: -38 },
+		],
 	},
 	Lake: {
 		english: "Lake",
@@ -223,7 +252,11 @@ export const locations = {
 		ny: Lake_ny,
 		pz: Lake_pz,
 		nz: Lake_nz,
-		species: [species.fox, species.fox, species.fox],
+		species: [
+			{ species: "perch", pitch: -8, yaw: -48 },
+			{ species: "diatom", pitch: -7, yaw: 0 },
+			{ species: "northernPike", pitch: -19, yaw: 2 },
+		],
 	},
 	LeafyForest: {
 		english: "Deciduous Forest",
@@ -236,7 +269,12 @@ export const locations = {
 		ny: LeafyForest_ny,
 		pz: LeafyForest_pz,
 		nz: LeafyForest_nz,
-		species: [species.fox, species.fox, species.fox],
+		species: [
+			{ species: "woodAnemone", pitch: -5, yaw: 27 },
+			{ species: "greatGreenBushCricket", pitch: -9, yaw: 60 },
+			{ species: "scarletElfCup", pitch: 5, yaw: -58 },
+			{ species: "hepatica", pitch: -2, yaw: -30 },
+		],
 	},
 	Meadow: {
 		english: "Meadow",
@@ -249,7 +287,14 @@ export const locations = {
 		ny: Meadow_ny,
 		pz: Meadow_pz,
 		nz: Meadow_nz,
-		species: [species.fox, species.fox, species.fox],
+		species: [
+			{ species: "rabbit", pitch: -3, yaw: 140 },
+			{ species: "earthworm", pitch: -15, yaw: -120 },
+			{ species: "dandelion", pitch: 3, yaw: 170 },
+			{ species: "caperSpurge", pitch: -16, yaw: 31 },
+			{ species: "ladysSlipperOrchid", pitch: 0, yaw: 140 },
+			{ species: "dogRose", pitch: -17, yaw: -52 },
+		],
 	},
 	MixedForest: {
 		english: "Mixed Forest",
@@ -262,7 +307,12 @@ export const locations = {
 		ny: MixedForest_ny,
 		pz: MixedForest_pz,
 		nz: MixedForest_nz,
-		species: [species.fox, species.fox, species.fox],
+		species: [
+			{ species: "gardenSpider", pitch: -6, yaw: -41 },
+			{ species: "chanterelle", pitch: -18, yaw: -16 },
+			{ species: "linden", pitch: 3, yaw: 18 },
+			{ species: "blackbird", pitch: -17, yaw: 30 },
+		],
 	},
 	Ocean: {
 		english: "Ocean Floor",
@@ -275,7 +325,12 @@ export const locations = {
 		ny: Ocean_ny,
 		pz: Ocean_pz,
 		nz: Ocean_nz,
-		species: [species.fox, species.fox, species.fox],
+		species: [
+			{ species: "seaSquirt", pitch: -5, yaw: 20 },
+			{ species: "barnacle", pitch: -12, yaw: 110 },
+			{ species: "seahorse", pitch: -10, yaw: 68 },
+			{ species: "orca", pitch: 3, yaw: 5 },
+		],
 	},
 	OceanSurface: {
 		english: "Ocean Surface",
@@ -288,7 +343,7 @@ export const locations = {
 		ny: OceanSurface_ny,
 		pz: OceanSurface_pz,
 		nz: OceanSurface_nz,
-		species: [species.fox, species.fox, species.fox],
+		species: [{ species: "moonJellyfish", pitch: -19, yaw: 21 }],
 	},
 	PineForest: {
 		english: "Coniferous Forest",
@@ -301,7 +356,10 @@ export const locations = {
 		ny: PineForest_ny,
 		pz: PineForest_pz,
 		nz: PineForest_nz,
-		species: [species.fox, species.fox, species.fox],
+		species: [
+			{ species: "haircapMoss", pitch: -8, yaw: -35 },
+			{ species: "flyAgaric", pitch: -13, yaw: -8 },
+		],
 	},
 } satisfies Record<string, Location>;
 

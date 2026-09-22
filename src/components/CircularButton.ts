@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { ORIGIN } from "@/constants";
+import TextLabel from "@/components/TextLabel";
 
 export interface CircularButtonOptions {
 	position: THREE.Vector3;
@@ -7,6 +8,7 @@ export interface CircularButtonOptions {
 	radius?: number;
 	texture?: THREE.Texture | string;
 	color?: THREE.ColorRepresentation;
+	label?: string;
 }
 
 export default class CircularButton extends THREE.Mesh<
@@ -21,6 +23,7 @@ export default class CircularButton extends THREE.Mesh<
 		radius = 0.08,
 		texture,
 		color = 0xffffff,
+		label,
 	}: CircularButtonOptions) {
 		const map =
 			typeof texture === "string"
@@ -56,7 +59,7 @@ export default class CircularButton extends THREE.Mesh<
 
 		if (map) {
 			const icon = new THREE.Mesh(
-				new THREE.CircleGeometry(radius * 0.7, 48),
+				new THREE.CircleGeometry(radius * 1.0, 48),
 				new THREE.MeshBasicMaterial({
 					map,
 					transparent: true,
@@ -67,6 +70,12 @@ export default class CircularButton extends THREE.Mesh<
 			icon.raycast = () => {};
 			this.add(icon);
 		}
+
+		if (label) {
+			const textLabel = new TextLabel(label, 0.1, 0.8);
+			textLabel.position.set(0, -radius - 0.1, 0.003);
+			this.add(textLabel);
+		}
 	}
 
 	click() {
@@ -76,6 +85,10 @@ export default class CircularButton extends THREE.Mesh<
 	dispose() {
 		this.traverse((object) => {
 			if (!(object instanceof THREE.Mesh)) return;
+			if (object instanceof TextLabel) {
+				object.dispose();
+				return;
+			}
 
 			object.geometry.dispose();
 			const materials = Array.isArray(object.material)
