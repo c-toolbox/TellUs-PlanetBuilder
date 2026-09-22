@@ -4,6 +4,10 @@ import vertexShader from "@/rendering/shaders/basic.vert?raw";
 import fragmentShader from "@/rendering/shaders/azimuthal.frag?raw";
 import { GLOBE_FOV_DEGREES } from "@/constants";
 
+const CUBE_RENDER_RESOLUTION = 2048;
+const PROJECTION_RESOLUTION = 1024;
+const PROJECTION_MSAA_SAMPLES = 4;
+
 export class ProjectionScene extends THREE.Scene {
 	public cubeCamera: THREE.CubeCamera;
 	public transitionCubeCamera: THREE.CubeCamera;
@@ -14,17 +18,23 @@ export class ProjectionScene extends THREE.Scene {
 	constructor() {
 		super();
 
-		const cubeRenderTarget = new THREE.WebGLCubeRenderTarget(1024, {
-			generateMipmaps: true,
-			minFilter: THREE.LinearMipmapLinearFilter,
-		});
+		const cubeRenderTarget = new THREE.WebGLCubeRenderTarget(
+			CUBE_RENDER_RESOLUTION,
+			{
+				generateMipmaps: true,
+				minFilter: THREE.LinearMipmapLinearFilter,
+			},
+		);
 		cubeRenderTarget.texture.colorSpace = THREE.SRGBColorSpace;
 		this.cubeCamera = new THREE.CubeCamera(0.01, 1000, cubeRenderTarget);
 
-		const transitionCubeRenderTarget = new THREE.WebGLCubeRenderTarget(1024, {
-			generateMipmaps: true,
-			minFilter: THREE.LinearMipmapLinearFilter,
-		});
+		const transitionCubeRenderTarget = new THREE.WebGLCubeRenderTarget(
+			CUBE_RENDER_RESOLUTION,
+			{
+				generateMipmaps: true,
+				minFilter: THREE.LinearMipmapLinearFilter,
+			},
+		);
 		transitionCubeRenderTarget.texture.colorSpace = THREE.SRGBColorSpace;
 		this.transitionCubeCamera = new THREE.CubeCamera(
 			0.01,
@@ -34,10 +44,15 @@ export class ProjectionScene extends THREE.Scene {
 
 		this.screenCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
-		this.aepTarget = new THREE.WebGLRenderTarget(1024, 1024, {
-			format: THREE.RGBAFormat,
-			type: THREE.UnsignedByteType,
-		});
+		this.aepTarget = new THREE.WebGLRenderTarget(
+			PROJECTION_RESOLUTION,
+			PROJECTION_RESOLUTION,
+			{
+				format: THREE.RGBAFormat,
+				type: THREE.UnsignedByteType,
+				samples: PROJECTION_MSAA_SAMPLES,
+			},
+		);
 		this.aepTarget.texture.colorSpace = THREE.SRGBColorSpace;
 
 		this.aepMaterial = new THREE.ShaderMaterial({
