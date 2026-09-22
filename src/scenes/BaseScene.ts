@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { FontLoader } from "three/examples/jsm/loaders/FontLoader.js";
+import latoBlackFontUrl from "@/assets/fonts/Lato/Black.json?url";
 
 import { Renderer } from "../rendering/Renderer";
 import { globalServices } from "@/network/GlobalServices";
@@ -126,7 +127,7 @@ export default abstract class BaseScene extends THREE.Scene {
 		position: THREE.Vector3;
 	}) {
 		const loader = new FontLoader();
-		loader.load("../assets/fonts/Lato/Black.json", (font) => {
+		loader.load(latoBlackFontUrl, (font) => {
 			const material = new THREE.MeshBasicMaterial({ color: color });
 
 			const shapes = font.generateShapes(text, size);

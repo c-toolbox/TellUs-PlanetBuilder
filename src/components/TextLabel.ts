@@ -3,13 +3,14 @@ import {
 	Font,
 	FontLoader,
 } from "three/examples/jsm/loaders/FontLoader.js";
+import latoBlackFontUrl from "@/assets/fonts/Lato/Black.json?url";
 
 let fontPromise: Promise<Font> | undefined;
 
 function loadFont() {
 	fontPromise ??= new Promise<Font>((resolve, reject) => {
 		new FontLoader().load(
-			"../assets/fonts/Lato/Black.json",
+			latoBlackFontUrl,
 			resolve,
 			undefined,
 			reject,
