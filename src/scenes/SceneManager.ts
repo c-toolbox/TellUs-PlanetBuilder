@@ -8,7 +8,6 @@ import PaintScene from "./paint/PaintScene";
 import InteractionTestScene from "./interaction_test/InteractionTestScene";
 import BoidsScene from "./boids/BoidsScene";
 import CountryScene from "./country/CountryScene";
-import IucnScene from "./iucn/IucnScene";
 import VinjettScene from "./vinjett/VinjettScene";
 import MusicScene from "./music/MusicScene";
 
@@ -22,7 +21,6 @@ export enum SceneKey {
 	// Dom = "Dom",
 	Boids = "Boids",
 	Country = "Country",
-	Iucn = "IUCN",
 	Vinjett = "Vinjett",
 	Music = "Music",
 	InteractionTest = "InteractionTest",
@@ -36,7 +34,6 @@ export const scenes = {
 	// Dom: new DomScene(),
 	Boids: new BoidsScene(),
 	Country: new CountryScene(),
-	IUCN: new IucnScene(),
 	Vinjett: new VinjettScene(),
 	Music: new MusicScene(),
 	InteractionTest: new InteractionTestScene(),

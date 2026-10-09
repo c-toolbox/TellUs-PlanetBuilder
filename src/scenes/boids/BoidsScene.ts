@@ -1,6 +1,5 @@
 import * as THREE from "three";
 import BaseScene from "@/scenes/BaseScene";
-import { Renderer } from "@/rendering/Renderer";
 import { SceneKey } from "@/scenes/SceneManager";
 
 import { TouchPoint } from "@/network/TouchPoint";
@@ -75,7 +74,8 @@ export default class BoidsScene extends BaseScene {
 	constructor() {
 		super();
 
-		this.addBackground(backgroundAsset, Color.Blue900);
+		this.setClearColor(Color.Blue950);
+		this.setBackground(backgroundAsset, 1.5, Color.Blue900);
 
 		this.fishGroup = new THREE.Group();
 		this.add(this.fishGroup);
@@ -102,10 +102,6 @@ export default class BoidsScene extends BaseScene {
 				this.boats.forEach((boat) => boat.boost());
 			}
 		});
-	}
-
-	public setRendererSettings(renderer: Renderer): void {
-		renderer.setClearColor(Color.Blue900);
 	}
 
 	update(delta: number) {

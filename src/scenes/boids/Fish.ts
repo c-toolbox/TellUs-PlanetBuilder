@@ -1,11 +1,11 @@
 import * as THREE from "three";
 import { createNoise3D } from "simplex-noise";
 import { TouchPoint } from "@/network/TouchPoint";
-import { ORIGIN, FISH_SIZE } from "@/constants";
+import { ORIGIN } from "@/constants";
+import { FISH_SIZE } from "./constants";
 
 import fishAsset from "@/assets/fish.png";
 import { BoidsUiConfig } from "./BoidsScene";
-import { Color } from "@/utils/colors";
 
 const noise = createNoise3D();
 

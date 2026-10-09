@@ -8,7 +8,7 @@ import { TouchId } from "@/network/tuioProtocol";
 import { Tile, tileManager, Tiles } from "@/scenes/world/TileManager";
 import { UiConfigEvent } from "@/network/uiProtocol";
 import { Polyhedra } from "@/scenes/world/Polyhedra";
-import { ORIGIN, SHOW_EDGES, SHOW_FACES, SHOW_VERTICES } from "@/constants";
+import { ORIGIN } from "@/constants";
 import {
 	DistributionType,
 	DistributionTypes,
@@ -120,9 +120,9 @@ export default class WorldScene extends BaseScene {
 		});
 
 		// Add Polyhedra groups to scene
-		if (SHOW_VERTICES) this.add(this.globe.vertexGroup);
-		if (SHOW_EDGES) this.add(this.globe.edgeGroup);
-		if (SHOW_FACES) this.add(this.globe.faceGroup);
+		this.add(this.globe.vertexGroup);
+		this.add(this.globe.edgeGroup);
+		this.add(this.globe.faceGroup);
 		this.makeClickable(this.globe.faceGroup);
 
 		// Handle invisible tiles
@@ -204,7 +204,7 @@ export default class WorldScene extends BaseScene {
 		this.targetCameraQuaternion.copy(renderer.centerCamera.quaternion);
 		super.onEnter(renderer);
 
-		this.addBackground(backgroundAsset);
+		this.setBackground(backgroundAsset, 2);
 
 		// Set tileManager variables
 		tileManager.worldConfig = this.worldConfig;

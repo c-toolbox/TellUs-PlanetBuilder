@@ -4,32 +4,79 @@ import { SceneKey } from "@/scenes/SceneManager";
 
 import { UiConfigEvent } from "@/network/uiProtocol";
 import { TouchInteraction } from "@/network/TouchInteraction";
+import { Color } from "@/utils/colors";
 
-import backgroundAsset from "@/assets/backgrounds/globe/heightmap.png";
+const INTERACTION_SPHERE_COUNT = 6;
+
+interface ScaleTween {
+	scale: THREE.Vector3;
+	start: number;
+	target: number;
+	elapsed: number;
+	duration: number;
+	ease: (value: number) => number;
+}
 
 export default class InteractionTestScene extends BaseScene {
 	private dragOffset = new THREE.Vector3();
+	private scaleTween?: ScaleTween;
 
 	constructor() {
 		super();
 
-		this.addBackground(backgroundAsset);
-		this.add(new THREE.HemisphereLight(0xffffff, 0x304050, 3));
+		this.setClearColor(Color.Stone800);
 		this.addInteractionSpheres();
 	}
 
-	override update() {
+	override update(delta: number) {
 		this.dragOffset.multiplyScalar(0.9);
+
+		if (!this.scaleTween) return;
+		this.scaleTween.elapsed += delta;
+		const progress = Math.min(
+			this.scaleTween.elapsed / this.scaleTween.duration,
+			1,
+		);
+		this.scaleTween.scale.setScalar(
+			THREE.MathUtils.lerp(
+				this.scaleTween.start,
+				this.scaleTween.target,
+				this.scaleTween.ease(progress),
+			),
+		);
+		if (progress === 1) this.scaleTween = undefined;
+	}
+
+	private tweenScale(
+		scale: THREE.Vector3,
+		target: number,
+		duration: number,
+		ease: (value: number) => number,
+	) {
+		this.scaleTween = {
+			scale,
+			start: scale.x,
+			target,
+			elapsed: 0,
+			duration,
+			ease,
+		};
 	}
 
 	private addInteractionSpheres() {
+		let sphereIndex = 0;
+		const nextPosition = () => {
+			const angle = (sphereIndex++ / INTERACTION_SPHERE_COUNT) * Math.PI * 2;
+			return new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle));
+		};
+
 		const enter = this.addInteractionSphere(
-			"ENTER / LEAVE",
-			new THREE.Vector3(-0.5, 0.28, 1),
-			0x247ba0,
+			"Hover",
+			nextPosition(),
+			Color.Blue600,
 		);
 		enter.interaction.on("enter", () => {
-			enter.material.color.setHex(0x70c1b3);
+			enter.material.color.setHex(Color.Sky400);
 			enter.scale.setScalar(1.25);
 		});
 		enter.interaction.on("leave", () => {
@@ -42,27 +89,67 @@ export default class InteractionTestScene extends BaseScene {
 		});
 
 		const press = this.addInteractionSphere(
-			"PRESS / RELEASE",
-			new THREE.Vector3(0, 0.32, 1),
-			0x50514f,
+			"Toggle",
+			nextPosition(),
+			Color.Yellow600,
 		);
-		press.interaction.on("press", () => {
-			press.material.color.setHex(0xf25f5c);
-			press.scale.setScalar(1.25);
+		let isPressedToggled = false;
+		let isPressHeld = false;
+		let pressTouchId: number | undefined;
+		const setPressRestingState = () => {
+			press.material.color.setHex(
+				isPressedToggled ? Color.Orange600 : press.baseColor,
+			);
+		};
+		const setPressHeld = (held: boolean) => {
+			if (isPressHeld === held) return;
+			isPressHeld = held;
+			if (held) {
+				press.material.color.setHex(Color.Amber700);
+				this.tweenScale(
+					press.scale,
+					0.9,
+					100,
+					(value) => 1 - Math.pow(1 - value, 3),
+				);
+				return;
+			}
+
+			setPressRestingState();
+			this.tweenScale(press.scale, 1, 500, (value) => {
+				if (value === 0 || value === 1) return value;
+				const amplitude = 1.5;
+				const period = 0.5;
+				const phase =
+					(period / (2 * Math.PI)) * Math.asin(1 / amplitude);
+				return (
+					amplitude *
+					Math.pow(2, -10 * value) *
+					Math.sin(((value - phase) * 2 * Math.PI) / period) +
+					1
+				);
+			});
+		};
+		press.interaction.on("press", ({ touchId }) => {
+			if (pressTouchId !== undefined) return;
+			pressTouchId = touchId;
+			setPressHeld(true);
 		});
-		press.interaction.on("release", () => {
-			press.material.color.setHex(press.baseColor);
-			press.scale.setScalar(1);
+		press.interaction.on("hold", ({ touchId, isHovered }) => {
+			if (pressTouchId !== touchId) return;
+			setPressHeld(isHovered);
 		});
-		press.interaction.on("leave", () => {
-			press.material.color.setHex(press.baseColor);
-			press.scale.setScalar(1);
+		press.interaction.on("release", ({ touchId, isHovered }) => {
+			if (pressTouchId !== touchId) return;
+			pressTouchId = undefined;
+			if (isHovered) isPressedToggled = !isPressedToggled;
+			setPressHeld(false);
 		});
 
 		const hold = this.addInteractionSphere(
 			"HOLD",
-			new THREE.Vector3(0.5, 0.28, 1),
-			0x9b5de5,
+			nextPosition(),
+			Color.Violet500,
 		);
 		let holdUpdates = 0;
 		const heldTouchIds = new Set<number>();
@@ -73,11 +160,9 @@ export default class InteractionTestScene extends BaseScene {
 			if (!heldTouchIds.has(touchId)) return;
 			holdUpdates += 1;
 			hold.scale.setScalar(
-				isHovered
-					? 1.1 + Math.sin(holdUpdates * 0.08) * 0.15
-					: 1,
+				isHovered ? 1.1 + Math.sin(holdUpdates * 0.08) * 0.15 : 1,
 			);
-			hold.material.color.setHex(0x3a165a);
+			hold.material.color.setHex(Color.Violet900);
 		});
 		const stopHolding = ({ touchId }: { touchId: number }) => {
 			heldTouchIds.delete(touchId);
@@ -89,8 +174,8 @@ export default class InteractionTestScene extends BaseScene {
 
 		const drag = this.addInteractionSphere(
 			"DRAG",
-			new THREE.Vector3(-0.45, -0.26, 1),
-			0xff9f1c,
+			nextPosition(),
+			Color.Orange500,
 		);
 		let activeDrag:
 			| {
@@ -100,9 +185,7 @@ export default class InteractionTestScene extends BaseScene {
 		drag.interaction.on("press", ({ touchId, direction }) => {
 			if (activeDrag) return;
 			activeDrag = { touchId };
-			this.dragOffset
-				.copy(drag.position)
-				.sub(direction.clone().normalize());
+			this.dragOffset.copy(drag.position).sub(direction.clone().normalize());
 		});
 		drag.interaction.on("hold", ({ touchId, direction }) => {
 			if (!activeDrag || activeDrag.touchId !== touchId) return;
@@ -120,8 +203,8 @@ export default class InteractionTestScene extends BaseScene {
 
 		const joystick = this.addInteractionSphere(
 			"JOYSTICK",
-			new THREE.Vector3(0, -0.3, 1),
-			0xe84855,
+			nextPosition(),
+			Color.Rose500,
 		);
 		const joystickOrigin = joystick.position.clone();
 		const maximumJoystickDistance = THREE.MathUtils.degToRad(5);
@@ -161,13 +244,13 @@ export default class InteractionTestScene extends BaseScene {
 
 		const click = this.addInteractionSphere(
 			"CLICK",
-			new THREE.Vector3(0.45, -0.26, 1),
-			0x00a896,
+			nextPosition(),
+			Color.Teal500,
 		);
 		let clicked = false;
 		click.interaction.on("click", () => {
 			clicked = !clicked;
-			click.material.color.setHex(clicked ? 0xffd166 : click.baseColor);
+			click.material.color.setHex(clicked ? Color.Amber400 : click.baseColor);
 		});
 	}
 
@@ -192,10 +275,10 @@ export default class InteractionTestScene extends BaseScene {
 		this.addText({
 			text: label,
 			color: baseColor,
-			size: 0.035,
+			size: 0.04,
 			position: sphere.position
 				.clone()
-				.add(new THREE.Vector3(0, -0.15, 0))
+				.add(new THREE.Vector3(0, -0.2, 0))
 				.normalize(),
 		});
 

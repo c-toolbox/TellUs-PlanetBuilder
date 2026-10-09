@@ -6,15 +6,17 @@ import { Renderer } from "../rendering/Renderer";
 import { globalServices } from "@/network/GlobalServices";
 import { TouchId } from "@/network/tuioProtocol";
 import Player from "@/network/Player";
-import { BACKGROUND_DISTANCE, ORIGIN } from "@/constants";
+import { ORIGIN } from "@/constants";
 import { SceneKey, sceneManager, scenes } from "./SceneManager";
 import { UiConfigEvent } from "@/network/uiProtocol";
 import { TouchInteraction } from "@/network/TouchInteraction";
+import { Color } from "@/utils/colors";
 
 export default abstract class BaseScene extends THREE.Scene {
 	protected omniSocket = globalServices.omniSocket;
 	protected touchHandler = globalServices.touchHandler;
 	protected uiSocket = globalServices.uiSocket;
+	private clearColor: THREE.ColorRepresentation = Color.Black;
 
 	protected raycaster: THREE.Raycaster;
 	protected clickable: THREE.Object3D[];
@@ -40,7 +42,16 @@ export default abstract class BaseScene extends THREE.Scene {
 		this.onRemove = this.onRemove.bind(this);
 	}
 
+	public applyRendererSettings(renderer: Renderer) {
+		renderer.setClearColor(this.clearColor);
+		this.setRendererSettings(renderer);
+	}
+
 	public setRendererSettings(renderer: Renderer) {}
+
+	protected setClearColor(color: THREE.ColorRepresentation) {
+		this.clearColor = color;
+	}
 
 	/* Touch input */
 
@@ -118,15 +129,16 @@ export default abstract class BaseScene extends THREE.Scene {
 
 	/* 3D helpers */
 
-	protected addBackground(
+	protected setBackground(
 		assetPath: string,
+		distance: number,
 		tintColor: THREE.ColorRepresentation = 0xffffff,
 	) {
 		const loader = new THREE.TextureLoader();
 		loader.load(assetPath, (texture) => {
 			texture.colorSpace = THREE.SRGBColorSpace;
 
-			const geometry = new THREE.SphereGeometry(BACKGROUND_DISTANCE, 64, 64);
+			const geometry = new THREE.SphereGeometry(distance, 64, 64);
 			const material = new THREE.MeshBasicMaterial({
 				map: texture,
 				// side: THREE.DoubleSide,

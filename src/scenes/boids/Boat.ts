@@ -1,7 +1,8 @@
 import * as THREE from "three";
 import { createNoise3D } from "simplex-noise";
 import { TouchPoint } from "@/network/TouchPoint";
-import { FISH_SIZE, ORIGIN, UP } from "@/constants";
+import { ORIGIN, UP } from "@/constants";
+import { FISH_SIZE } from "./constants";
 
 import boatAsset from "@/assets/boat.png";
 import { BoidsUiConfig } from "./BoidsScene";

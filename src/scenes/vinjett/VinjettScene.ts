@@ -4,7 +4,7 @@ import { SceneKey } from "@/scenes/SceneManager";
 import { Renderer } from "@/rendering/Renderer";
 
 import { UiConfigEvent } from "@/network/uiProtocol";
-import { BACKGROUND_DISTANCE, ORIGIN } from "@/constants";
+import { ORIGIN } from "@/constants";
 import CircularButton from "@/components/CircularButton";
 import SpeciesBillboard from "@/components/SpeciesBillboard";
 import pinIcon from "@/assets/icons/pin.png";
@@ -51,6 +51,7 @@ interface PendingLocationChange {
 
 const BUTTON_ANIMATION_DURATION = 250;
 const BILLBOARD_ANIMATION_DURATION = 250;
+const BACKGROUND_DISTANCE = 3;
 const BUTTON_DISTANCE = 2;
 const BUTTON_RADIUS = 0.16;
 const BILLBOARD_DISTANCE = 1.5;
@@ -83,7 +84,7 @@ export default class VinjettScene extends BaseScene {
 	constructor() {
 		super();
 
-		this.addBackground(this.vinjettConfig.location);
+		this.setBackground(this.vinjettConfig.location);
 		this.addCircularButtons();
 	}
 
@@ -125,10 +126,7 @@ export default class VinjettScene extends BaseScene {
 		);
 
 		for (const placement of location.species) {
-			const position = this.pitchYawToVector3(
-				placement.pitch,
-				placement.yaw,
-			);
+			const position = this.pitchYawToVector3(placement.pitch, placement.yaw);
 			this.addCircularButton(
 				position,
 				location.color,
@@ -143,7 +141,9 @@ export default class VinjettScene extends BaseScene {
 		const cached = this.speciesTextures.get(speciesKey);
 		if (cached) return cached;
 
-		const texture = new THREE.TextureLoader().load(species[speciesKey].thumbnail);
+		const texture = new THREE.TextureLoader().load(
+			species[speciesKey].thumbnail,
+		);
 		texture.colorSpace = THREE.SRGBColorSpace;
 		this.speciesTextures.set(speciesKey, texture);
 		return texture;
@@ -242,8 +242,7 @@ export default class VinjettScene extends BaseScene {
 			const scale =
 				activeBillboard.phase === "opening"
 					? this.easeOutBack(progress)
-					: activeBillboard.closingScale *
-						(1 - this.easeInBack(progress));
+					: activeBillboard.closingScale * (1 - this.easeInBack(progress));
 			activeBillboard.billboard.scale.setScalar(scale);
 
 			if (progress !== 1) continue;
@@ -262,10 +261,7 @@ export default class VinjettScene extends BaseScene {
 			this.speciesBillboards.delete(activeBillboard.speciesKey);
 		}
 
-		if (
-			this.speciesBillboards.size === 0 &&
-			this.pendingLocationChange
-		) {
+		if (this.speciesBillboards.size === 0 && this.pendingLocationChange) {
 			const { locationKey, origin } = this.pendingLocationChange;
 			this.pendingLocationChange = undefined;
 			this.beginLocationTransition(locationKey, origin);
@@ -290,20 +286,20 @@ export default class VinjettScene extends BaseScene {
 		label: string,
 		onClick: () => void,
 	) {
-			const button = new CircularButton({
-				position,
-				color,
-				texture,
-				radius: BUTTON_RADIUS,
-				label,
-				onClick,
-			});
-			button.touchInteraction.enabled = () =>
-				this.transitionPhase === "idle" && !this.pendingLocationChange;
-			this.registerTouchInteraction(button.touchInteraction);
+		const button = new CircularButton({
+			position,
+			color,
+			texture,
+			radius: BUTTON_RADIUS,
+			label,
+			onClick,
+		});
+		button.touchInteraction.enabled = () =>
+			this.transitionPhase === "idle" && !this.pendingLocationChange;
+		this.registerTouchInteraction(button.touchInteraction);
 
-			this.circularButtons.push(button);
-			this.add(button);
+		this.circularButtons.push(button);
+		this.add(button);
 	}
 
 	private setLocation(
@@ -377,7 +373,7 @@ export default class VinjettScene extends BaseScene {
 		return this.pitchYawToVector3(pitch, yaw);
 	}
 
-	protected override addBackground(locationKey: LocationKey) {
+	protected override setBackground(locationKey: LocationKey) {
 		this.applyBackground(this.getBackground(locationKey).materials);
 	}
 
@@ -425,7 +421,7 @@ export default class VinjettScene extends BaseScene {
 			return;
 		}
 
-		const size = BACKGROUND_DISTANCE * 2;
+		const size = 2 * BACKGROUND_DISTANCE;
 		this.backgroundCube = new THREE.Mesh(
 			new THREE.BoxGeometry(size, size, size),
 			materials,
@@ -582,10 +578,7 @@ export default class VinjettScene extends BaseScene {
 			this.speciesBillboards.forEach(({ speciesKey, billboard }) => {
 				billboard.setLabel(species[speciesKey][value]);
 			});
-			if (
-				this.transitionPhase === "idle" &&
-				!this.pendingLocationChange
-			) {
+			if (this.transitionPhase === "idle" && !this.pendingLocationChange) {
 				this.addCircularButtons();
 			}
 			this.sendUiConfig();

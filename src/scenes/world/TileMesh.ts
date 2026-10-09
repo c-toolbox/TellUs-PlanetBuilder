@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { Tile, tileManager, Tiles } from "./TileManager";
-import { FACE_DISTANCE } from "@/constants";
+import { FACE_DISTANCE } from "./constants";
 
 export class TileMesh extends THREE.Mesh {
 	public material: THREE.MeshBasicMaterial;

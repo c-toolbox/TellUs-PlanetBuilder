@@ -9,7 +9,7 @@ import {
 	EDGE_DISTANCE,
 	FACE_DISTANCE,
 	DOUBLE_SIDE,
-} from "@/constants";
+} from "./constants";
 import { TileMesh } from "./TileMesh";
 
 export class Polyhedra {
