@@ -43,3 +43,12 @@ body {
 	border: none;
 	border-radius: 16px;
 }
+
+.debug-controls {
+	position: fixed;
+	top: 0.5em;
+	left: 0.5em;
+
+	font-family: "Trebuchet MS";
+	color: #666;
+}
