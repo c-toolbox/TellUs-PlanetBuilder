@@ -672,22 +672,6 @@ export default class WorldScene extends BaseScene {
 					hint_title: "Planet creation",
 				},
 				{
-					type: "dropdown",
-					id: "model",
-					hint_title: "Planet model",
-					hint_text: "Defines the planet's shape and number of tiles",
-					value: this.worldConfig.model,
-					options: ModelNames,
-				},
-				{
-					type: "dropdown",
-					id: "distribution",
-					hint_title: "Distribution",
-					hint_text: "How tiles are arranged across the planet",
-					value: this.worldConfig.distribution,
-					options: DistributionTypes,
-				},
-				{
 					type: "grid",
 					columns: 3,
 					elements: [
@@ -749,6 +733,22 @@ export default class WorldScene extends BaseScene {
 							value: count,
 							color: "#" + Tiles[tile as Tile].color.getHexString(),
 						})),
+				},
+				{
+					type: "dropdown",
+					id: "model",
+					hint_title: "Planet model",
+					hint_text: "Defines the planet's shape and number of tiles",
+					value: this.worldConfig.model,
+					options: ModelNames,
+				},
+				{
+					type: "dropdown",
+					id: "distribution",
+					hint_title: "Distribution",
+					hint_text: "How tiles are arranged across the planet",
+					value: this.worldConfig.distribution,
+					options: DistributionTypes,
 				},
 				{
 					type: "switch",

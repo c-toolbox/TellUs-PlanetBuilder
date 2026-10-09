@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { ORIGIN } from "@/constants";
 import TextLabel from "@/components/TextLabel";
+import { TouchInteraction } from "@/network/TouchInteraction";
 
 interface SpeciesBillboardOptions {
 	position: THREE.Vector3;
@@ -19,6 +20,7 @@ export default class SpeciesBillboard extends THREE.Mesh<
 > {
 	private readonly clickCallback: () => void;
 	private readonly textLabel: TextLabel;
+	public readonly touchInteraction: TouchInteraction;
 
 	constructor({
 		position,
@@ -42,6 +44,8 @@ export default class SpeciesBillboard extends THREE.Mesh<
 		);
 
 		this.clickCallback = onClick;
+		this.touchInteraction = new TouchInteraction(this);
+		this.touchInteraction.on("press", () => this.click());
 		this.position.copy(position);
 		this.lookAt(ORIGIN);
 

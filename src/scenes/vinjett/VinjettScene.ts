@@ -3,7 +3,6 @@ import BaseScene from "@/scenes/BaseScene";
 import { SceneKey } from "@/scenes/SceneManager";
 import { Renderer } from "@/rendering/Renderer";
 
-import { TouchId } from "@/network/tuioProtocol";
 import { UiConfigEvent } from "@/network/uiProtocol";
 import { BACKGROUND_DISTANCE, ORIGIN } from "@/constants";
 import CircularButton from "@/components/CircularButton";
@@ -90,6 +89,7 @@ export default class VinjettScene extends BaseScene {
 
 	private addCircularButtons() {
 		this.circularButtons.forEach((button) => {
+			this.unregisterTouchInteraction(button.touchInteraction);
 			this.remove(button);
 			button.dispose();
 		});
@@ -199,6 +199,10 @@ export default class VinjettScene extends BaseScene {
 					label: species[speciesKey][this.vinjettConfig.language],
 					onClick: () => this.closeSpeciesBillboard(speciesKey),
 				});
+				billboard.touchInteraction.enabled = () =>
+					this.transitionPhase === "idle" &&
+					this.speciesBillboards.get(speciesKey)?.phase === "open";
+				this.registerTouchInteraction(billboard.touchInteraction);
 				billboard.scale.setScalar(0);
 				this.add(billboard);
 				this.speciesBillboards.set(speciesKey, {
@@ -251,6 +255,9 @@ export default class VinjettScene extends BaseScene {
 			}
 
 			this.remove(activeBillboard.billboard);
+			this.unregisterTouchInteraction(
+				activeBillboard.billboard.touchInteraction,
+			);
 			activeBillboard.billboard.dispose();
 			this.speciesBillboards.delete(activeBillboard.speciesKey);
 		}
@@ -291,6 +298,9 @@ export default class VinjettScene extends BaseScene {
 				label,
 				onClick,
 			});
+			button.touchInteraction.enabled = () =>
+				this.transitionPhase === "idle" && !this.pendingLocationChange;
+			this.registerTouchInteraction(button.touchInteraction);
 
 			this.circularButtons.push(button);
 			this.add(button);
@@ -540,34 +550,6 @@ export default class VinjettScene extends BaseScene {
 	// setRendererSettings(renderer: Renderer) {
 	// 	renderer.outputColorSpace = THREE.SRGBColorSpace;
 	// }
-
-	/* Touch input */
-
-	protected onClick(touchId: TouchId, vector: THREE.Vector3) {
-		if (this.transitionPhase !== "idle" || this.pendingLocationChange) return;
-
-		this.raycaster.set(ORIGIN, vector.clone().normalize());
-		const [billboardIntersection] = this.raycaster.intersectObjects(
-			Array.from(this.speciesBillboards.values(), ({ billboard }) => billboard),
-		);
-		if (billboardIntersection) {
-			const activeBillboard = Array.from(
-				this.speciesBillboards.values(),
-			).find(({ billboard }) => billboard === billboardIntersection.object);
-			if (activeBillboard?.phase === "open") {
-				activeBillboard.billboard.click();
-			}
-			return;
-		}
-
-		const [intersection] = this.raycaster.intersectObjects(
-			this.circularButtons,
-		);
-
-		if (intersection) {
-			(intersection.object as CircularButton).click();
-		}
-	}
 
 	/* Coordinates */
 

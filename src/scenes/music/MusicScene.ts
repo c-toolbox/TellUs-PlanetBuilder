@@ -7,8 +7,8 @@ import { TouchId } from "@/network/tuioProtocol";
 import { UiConfigEvent } from "@/network/uiProtocol";
 import pianoUrl from "@/assets/models/piano.fbx?url";
 import { curvePanel } from "@/utils/curvePanel";
-import { TouchTargetTracker } from "@/network/TouchTargetTracker";
 import { Renderer } from "@/rendering/Renderer";
+import { TouchInteraction } from "@/network/TouchInteraction";
 
 const PIANO_WIDTH = 2.4;
 const PIANO_DISTANCE = 2;
@@ -17,10 +17,6 @@ const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", 
 export default class MusicScene extends BaseScene {
 	private piano?: THREE.Group;
 	private keyNotes = new Map<THREE.Object3D, string>();
-	private keyTouches = new TouchTargetTracker<THREE.Object3D>(
-		(key, touchId) => console.log("Pressed piano key:", this.keyNotes.get(key), key.name, "touch:", touchId),
-		(key, touchId) => console.log("Released piano key:", this.keyNotes.get(key), key.name, "touch:", touchId),
-	);
 
 	constructor() {
 		super();
@@ -61,17 +57,22 @@ export default class MusicScene extends BaseScene {
 			}
 			// In this asset, Cube001–Cube025 are keys and Plane is the casing.
 			if (object instanceof THREE.Mesh && /^Cube\d{3}$/.test(object.name)) {
-				const center = new THREE.Box3().setFromObject(object).getCenter(new THREE.Vector3());
+				const center = new THREE.Box3()
+					.setFromObject(object)
+					.getCenter(new THREE.Vector3());
 				keys.push({ mesh: object, x: center.x });
 			}
 		});
 		helpers.forEach((object) => object.removeFromParent());
 		keys.sort((a, b) => a.x - b.x);
 		keys.forEach(({ mesh }, index) => {
-			this.keyNotes.set(mesh, `${NOTE_NAMES[index % 12]}${3 + Math.floor(index / 12)}`);
+			this.keyNotes.set(
+				mesh,
+				`${NOTE_NAMES[index % 12]}${3 + Math.floor(index / 12)}`,
+			);
 		});
 		if (keys.length !== 25) {
-			console.warn(`Expected 25 piano keys (C3–C5), found ${keys.length}`);
+			console.warn(`Expected 25 piano keys (C3-C5), found ${keys.length}`);
 		}
 
 		// Center and normalize before bending in the piano group's coordinates.
@@ -93,43 +94,51 @@ export default class MusicScene extends BaseScene {
 		this.add(piano);
 		piano.updateMatrixWorld(true);
 		this.piano = piano;
-	}
 
-	protected override onTouch(touchId: TouchId, vector: THREE.Vector3) {
-		this.keyTouches.update(touchId, this.getKeyAtDirection(vector));
-	}
+		keys.forEach(({ mesh }) => {
+			const interaction = this.registerTouchInteraction(
+				new TouchInteraction(mesh, { raycastRoot: piano }),
+			);
+			const onEnter = ({ touchId }: { touchId: TouchId }) => {
+				console.log(
+					"Pressed piano key:",
+					this.keyNotes.get(mesh),
+					mesh.name,
+					"touch:",
+					touchId,
+				);
+			};
+			const onRelease = ({ touchId }: { touchId: TouchId }) => {
+				if (interaction.activeTouchIds.size > 0) return;
+				console.log(
+					"Released piano key:",
+					this.keyNotes.get(mesh),
+					mesh.name,
+					"touch:",
+					touchId,
+				);
+			};
 
-	protected override onRemove(touchId: TouchId) {
-		this.keyTouches.remove(touchId);
-	}
-
-	override onExit(renderer: Renderer) {
-		this.keyTouches.clear();
-		super.onExit(renderer);
-	}
-
-	private getKeyAtDirection(vector: THREE.Vector3): THREE.Object3D | undefined {
-		if (!this.piano || vector.lengthSq() === 0) return;
-		this.piano.updateWorldMatrix(true, true);
-		this.raycaster.set(ORIGIN, vector.clone().normalize());
-		// Include the casing so a key behind it cannot be clicked through it.
-		const [hit] = this.raycaster.intersectObject(this.piano, true);
-		if (!hit) return;
-		return this.keyNotes.has(hit.object) ? hit.object : undefined;
+			interaction.on("enter", onEnter);
+			interaction.on("leave", onRelease);
+			interaction.on("release", onRelease);
+		});
 	}
 
 	protected override get uiConfig(): UiConfigEvent {
 		return {
 			type: "config",
 			title: "Music",
-			elements: [{
-				type: "dropdown",
-				id: "scene",
-				hint_title: "Scene",
-				hint_text: "Switch to a different scene",
-				value: SceneKey.Music,
-				options: Object.values(SceneKey),
-			}],
+			elements: [
+				{
+					type: "dropdown",
+					id: "scene",
+					hint_title: "Scene",
+					hint_text: "Switch to a different scene",
+					value: SceneKey.Music,
+					options: Object.values(SceneKey),
+				},
+			],
 		};
 	}
 }

@@ -248,6 +248,7 @@ export class Renderer extends THREE.WebGLRenderer {
 	redraw(delta: number) {
 		if (!this.currentScene) return;
 
+		globalServices.touchHandler.update();
 		this.currentScene.update(delta);
 		this.debugControls.update();
 		this.sphericalDisplayControls.update();

@@ -9,6 +9,7 @@ import Player from "@/network/Player";
 import { BACKGROUND_DISTANCE, ORIGIN } from "@/constants";
 import { SceneKey, sceneManager, scenes } from "./SceneManager";
 import { UiConfigEvent } from "@/network/uiProtocol";
+import { TouchInteraction } from "@/network/TouchInteraction";
 
 export default abstract class BaseScene extends THREE.Scene {
 	protected omniSocket = globalServices.omniSocket;
@@ -20,6 +21,8 @@ export default abstract class BaseScene extends THREE.Scene {
 
 	protected playerGroup: THREE.Group;
 	protected players: Map<string, Player>;
+	private touchInteractions = new Set<TouchInteraction>();
+	private touchInteractionsActive = false;
 
 	constructor() {
 		super();
@@ -45,6 +48,19 @@ export default abstract class BaseScene extends THREE.Scene {
 		group.children.forEach((mesh) => this.clickable.push(mesh));
 	}
 
+	protected registerTouchInteraction(interaction: TouchInteraction) {
+		this.touchInteractions.add(interaction);
+		if (this.touchInteractionsActive) {
+			this.touchHandler.registerInteraction(interaction);
+		}
+		return interaction;
+	}
+
+	protected unregisterTouchInteraction(interaction: TouchInteraction) {
+		this.touchInteractions.delete(interaction);
+		this.touchHandler.unregisterInteraction(interaction);
+	}
+
 	/* Scene management */
 
 	onEnter(renderer: Renderer) {
@@ -55,9 +71,17 @@ export default abstract class BaseScene extends THREE.Scene {
 		this.touchHandler.on("touch", this.onTouch);
 		this.touchHandler.on("click", this.onClick);
 		this.touchHandler.on("remove", this.onRemove);
+		this.touchInteractionsActive = true;
+		this.touchInteractions.forEach((interaction) =>
+			this.touchHandler.registerInteraction(interaction),
+		);
 	}
 
 	onExit(renderer: Renderer) {
+		this.touchInteractionsActive = false;
+		this.touchInteractions.forEach((interaction) =>
+			this.touchHandler.unregisterInteraction(interaction),
+		);
 		this.touchHandler.off("touch", this.onTouch);
 		this.touchHandler.off("click", this.onClick);
 		this.touchHandler.off("remove", this.onRemove);
@@ -146,7 +170,7 @@ export default abstract class BaseScene extends THREE.Scene {
 		});
 	}
 
-	/* Touch events */
+	/* Global touch events, not aimed at specific objects */
 
 	protected onTouch(touchId: TouchId, vector: THREE.Vector3) {}
 

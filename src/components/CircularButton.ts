@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { ORIGIN } from "@/constants";
 import TextLabel from "@/components/TextLabel";
+import { TouchInteraction } from "@/network/TouchInteraction";
 
 export interface CircularButtonOptions {
 	position: THREE.Vector3;
@@ -16,6 +17,7 @@ export default class CircularButton extends THREE.Mesh<
 	THREE.MeshBasicMaterial
 > {
 	private readonly clickCallback: () => void;
+	public readonly touchInteraction: TouchInteraction;
 
 	constructor({
 		position,
@@ -43,6 +45,8 @@ export default class CircularButton extends THREE.Mesh<
 		);
 
 		this.clickCallback = onClick;
+		this.touchInteraction = new TouchInteraction(this);
+		this.touchInteraction.on("press", () => this.click());
 		this.position.copy(position);
 		this.lookAt(ORIGIN);
 
