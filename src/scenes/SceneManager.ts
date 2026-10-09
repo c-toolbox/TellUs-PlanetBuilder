@@ -10,6 +10,7 @@ import BoidsScene from "./boids/BoidsScene";
 import CountryScene from "./country/CountryScene";
 import IucnScene from "./iucn/IucnScene";
 import VinjettScene from "./vinjett/VinjettScene";
+import MusicScene from "./music/MusicScene";
 
 /* Scenes */
 
@@ -24,6 +25,7 @@ export enum SceneKey {
 	Country = "Country",
 	Iucn = "IUCN",
 	Vinjett = "Vinjett",
+	Music = "Music",
 }
 
 export const scenes = {
@@ -37,6 +39,7 @@ export const scenes = {
 	Country: new CountryScene(),
 	IUCN: new IucnScene(),
 	Vinjett: new VinjettScene(),
+	Music: new MusicScene(),
 } satisfies Record<SceneKey, BaseScene>;
 
 /* Manager */
