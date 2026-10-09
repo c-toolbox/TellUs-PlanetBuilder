@@ -617,14 +617,14 @@ export default class VinjettScene extends BaseScene {
 	get uiConfig(): UiConfigEvent {
 		return {
 			type: "config",
-			title: "Country",
+			title: "Vinjett",
 			elements: [
 				{
 					type: "dropdown",
 					id: "scene",
 					hint_title: "Scene",
 					hint_text: "Switch to a different scene",
-					value: SceneKey.Country,
+					value: SceneKey.Vinjett,
 					options: Object.values(SceneKey),
 				},
 

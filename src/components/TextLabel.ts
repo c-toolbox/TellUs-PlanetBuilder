@@ -3,7 +3,7 @@ import {
 	Font,
 	FontLoader,
 } from "three/examples/jsm/loaders/FontLoader.js";
-import latoBlackFontUrl from "@/assets/fonts/Lato/Black.json?url";
+import latoBlackFontUrl from "@/assets/fonts/Lato/Bold.json?url";
 
 let fontPromise: Promise<Font> | undefined;
 
