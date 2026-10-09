@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { Group, Tween } from "@tweenjs/tween.js";
 import { FontLoader } from "three/examples/jsm/loaders/FontLoader.js";
 import latoBlackFontUrl from "@/assets/fonts/Lato/Black.json?url";
 
@@ -23,6 +24,7 @@ export default abstract class BaseScene extends THREE.Scene {
 
 	protected playerGroup: THREE.Group;
 	protected players: Map<string, Player>;
+	private tweenGroup = new Group();
 	private touchInteractions = new Set<TouchInteraction>();
 	private touchInteractionsActive = false;
 
@@ -89,6 +91,9 @@ export default abstract class BaseScene extends THREE.Scene {
 	}
 
 	onExit(renderer: Renderer) {
+		this.tweenGroup.getAll().forEach((tween) => tween.stop());
+		this.tweenGroup.removeAll();
+
 		this.touchInteractionsActive = false;
 		this.touchInteractions.forEach((interaction) =>
 			this.touchHandler.unregisterInteraction(interaction),
@@ -117,6 +122,14 @@ export default abstract class BaseScene extends THREE.Scene {
 		renderer.render(projectionScene, projectionScene.screenCamera);
 	}
 
+	updateTweens() {
+		this.tweenGroup.update();
+		this.tweenGroup
+			.getAll()
+			.filter((tween) => !tween.isPlaying())
+			.forEach((tween) => this.tweenGroup.remove(tween));
+	}
+
 	update(delta: number) {}
 
 	updateFixed(delta: number) {}
@@ -125,6 +138,12 @@ export default abstract class BaseScene extends THREE.Scene {
 
 	postRender(renderer: Renderer) {
 		this.touchHandler.setCameraQuaternion(renderer.centerCamera.quaternion);
+	}
+
+	protected createTween<T extends object>(target: T) {
+		const tween = new Tween(target);
+		this.tweenGroup.add(tween);
+		return tween;
 	}
 
 	/* 3D helpers */

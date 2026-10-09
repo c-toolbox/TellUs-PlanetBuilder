@@ -249,6 +249,7 @@ export class Renderer extends THREE.WebGLRenderer {
 		if (!this.currentScene) return;
 
 		globalServices.touchHandler.update();
+		this.currentScene.updateTweens();
 		this.currentScene.update(delta);
 		this.debugControls.update();
 		this.sphericalDisplayControls.update();
