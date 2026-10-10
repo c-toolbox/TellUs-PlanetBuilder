@@ -3,7 +3,7 @@ import BaseScene from "./BaseScene";
 import WorldScene from "./world/WorldScene";
 import PaintScene from "./paint/PaintScene";
 // import DistortionScene from "./distortion/DistortionScene";
-// import ReactionDiffusionScene from "./reactiondiffusion/ReactionDiffusionScene";
+import ReactionDiffusionScene from "./reaction/ReactionDiffusionScene";
 // import DomScene from "./dom/DomScene";
 import BoidsScene from "./boids/BoidsScene";
 import CountryScene from "./country/CountryScene";
