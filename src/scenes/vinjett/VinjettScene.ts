@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { Easing, Tween } from "@tweenjs/tween.js";
 import BaseScene from "@/scenes/BaseScene";
 import { SceneKey } from "@/scenes/SceneManager";
 import { Renderer } from "@/rendering/Renderer";
@@ -9,6 +10,7 @@ import CircularButton from "@/components/CircularButton";
 import SpeciesBillboard from "@/components/SpeciesBillboard";
 import pinIcon from "@/assets/icons/pin.png";
 import homeIcon from "@/assets/icons/home.png";
+import questionIcon from "@/assets/icons/question.png";
 import {
 	LocationKey,
 	LocationKeys,
@@ -40,8 +42,7 @@ interface ActiveBillboard {
 	speciesKey: SpeciesKey;
 	billboard: SpeciesBillboard;
 	phase: BillboardPhase;
-	elapsed: number;
-	closingScale: number;
+	tween?: Tween<THREE.Vector3>;
 }
 
 interface PendingLocationChange {
@@ -69,6 +70,9 @@ export default class VinjettScene extends BaseScene {
 	private circularButtons: CircularButton[] = [];
 	private pinTexture = new THREE.TextureLoader().load(pinIcon);
 	private homeTexture = new THREE.TextureLoader().load(homeIcon);
+	private questionTexture = new THREE.TextureLoader().load(questionIcon);
+	private discoveredSpecies = new Set<SpeciesKey>();
+	private speciesButtons = new Map<CircularButton, SpeciesKey>();
 	private speciesTextures = new Map<SpeciesKey, THREE.Texture>();
 	private speciesImageCache = new Map<SpeciesKey, SpeciesImageCacheEntry>();
 	private speciesBillboards = new Map<SpeciesKey, ActiveBillboard>();
@@ -80,12 +84,32 @@ export default class VinjettScene extends BaseScene {
 	private transitionTarget?: LocationKey;
 	private transitionOrigin = new THREE.Vector3(0, 0, 1);
 	private pendingBackground?: THREE.MeshBasicMaterial[];
+	private buttonTween?: Tween<{ scale: number }>;
 
 	constructor() {
 		super();
 
 		this.setBackground(this.vinjettConfig.location);
 		this.addCircularButtons();
+	}
+
+	override onExit(renderer: Renderer) {
+		this.buttonTween?.stop();
+		this.buttonTween = undefined;
+		this.loadingSpecies.clear();
+		this.speciesBillboards.forEach((activeBillboard) => {
+			this.removeSpeciesBillboard(activeBillboard);
+		});
+		this.pendingLocationChange = undefined;
+		this.transitionTarget = undefined;
+		this.pendingBackground = undefined;
+		this.transitionPhase = "idle";
+		this.transitionElapsed = 0;
+		this.circularButtons.forEach((button) => {
+			button.visible = true;
+			button.scale.setScalar(1);
+		});
+		super.onExit(renderer);
 	}
 
 	private addCircularButtons() {
@@ -95,6 +119,7 @@ export default class VinjettScene extends BaseScene {
 			button.dispose();
 		});
 		this.circularButtons = [];
+		this.speciesButtons.clear();
 
 		if (this.vinjettConfig.location === "Home") {
 			for (const locationKey of LocationKeys) {
@@ -116,7 +141,7 @@ export default class VinjettScene extends BaseScene {
 
 		const location = locations[this.vinjettConfig.location];
 		const { pitch, yaw } = location.homeButtonRotation;
-		const position = this.pitchYawToVector3(pitch, yaw);
+		const position = this.pitchYawToVector3(pitch, yaw).negate();
 		this.addCircularButton(
 			position,
 			0x808080,
@@ -127,14 +152,42 @@ export default class VinjettScene extends BaseScene {
 
 		for (const placement of location.species) {
 			const position = this.pitchYawToVector3(placement.pitch, placement.yaw);
-			this.addCircularButton(
+			const button = this.addCircularButton(
 				position,
 				location.color,
-				this.getSpeciesTexture(placement.species),
+				this.getSpeciesButtonTexture(placement.species),
 				species[placement.species][this.vinjettConfig.language],
 				() => this.openSpeciesBillboard(placement.species, position),
 			);
+			button.setLabelVisible(this.discoveredSpecies.has(placement.species));
+			this.speciesButtons.set(button, placement.species);
 		}
+	}
+
+	private discoverSpecies(speciesKey: SpeciesKey) {
+		if (this.discoveredSpecies.has(speciesKey)) return;
+
+		this.discoveredSpecies.add(speciesKey);
+		this.refreshSpeciesButtons();
+	}
+
+	private resetDiscoveredSpecies() {
+		this.discoveredSpecies.clear();
+		this.refreshSpeciesButtons();
+	}
+
+	private getSpeciesButtonTexture(speciesKey: SpeciesKey) {
+		return this.discoveredSpecies.has(speciesKey)
+			? this.getSpeciesTexture(speciesKey)
+			: this.questionTexture;
+	}
+
+	private refreshSpeciesButtons() {
+		this.speciesButtons.forEach((speciesKey, button) => {
+			button.setTexture(this.getSpeciesButtonTexture(speciesKey));
+			button.setLabel(species[speciesKey][this.vinjettConfig.language]);
+			button.setLabelVisible(this.discoveredSpecies.has(speciesKey));
+		});
 	}
 
 	private getSpeciesTexture(speciesKey: SpeciesKey) {
@@ -176,6 +229,8 @@ export default class VinjettScene extends BaseScene {
 		speciesKey: SpeciesKey,
 		buttonPosition: THREE.Vector3,
 	) {
+		this.discoverSpecies(speciesKey);
+
 		if (
 			this.speciesBillboards.has(speciesKey) ||
 			this.loadingSpecies.has(speciesKey)
@@ -205,13 +260,20 @@ export default class VinjettScene extends BaseScene {
 				this.registerTouchInteraction(billboard.touchInteraction);
 				billboard.scale.setScalar(0);
 				this.add(billboard);
-				this.speciesBillboards.set(speciesKey, {
+				const activeBillboard: ActiveBillboard = {
 					speciesKey,
 					billboard,
 					phase: "opening",
-					elapsed: 0,
-					closingScale: 1,
-				});
+				};
+				this.speciesBillboards.set(speciesKey, activeBillboard);
+				activeBillboard.tween = this.createTween(billboard.scale)
+					.to({ x: 1, y: 1, z: 1 }, BILLBOARD_ANIMATION_DURATION)
+					.easing(Easing.Back.Out)
+					.onComplete(() => {
+						activeBillboard.phase = "open";
+						activeBillboard.tween = undefined;
+					})
+					.start();
 			},
 			(error) => {
 				console.error(`Failed to load species ${speciesKey}`, error);
@@ -223,44 +285,29 @@ export default class VinjettScene extends BaseScene {
 
 	private closeSpeciesBillboard(speciesKey: SpeciesKey) {
 		const activeBillboard = this.speciesBillboards.get(speciesKey);
-		if (!activeBillboard || activeBillboard.phase !== "open") return;
+		if (!activeBillboard || activeBillboard.phase === "closing") return;
 
-		activeBillboard.elapsed = 0;
-		activeBillboard.closingScale = activeBillboard.billboard.scale.x;
+		activeBillboard.tween?.stop();
 		activeBillboard.phase = "closing";
+		activeBillboard.tween = this.createTween(activeBillboard.billboard.scale)
+			.to({ x: 0, y: 0, z: 0 }, BILLBOARD_ANIMATION_DURATION)
+			.easing(Easing.Cubic.Out)
+			.onComplete(() => {
+				this.removeSpeciesBillboard(activeBillboard);
+				this.beginPendingLocationChange();
+			})
+			.start();
 	}
 
-	private updateSpeciesBillboards(delta: number) {
-		for (const activeBillboard of this.speciesBillboards.values()) {
-			if (activeBillboard.phase === "open") continue;
+	private removeSpeciesBillboard(activeBillboard: ActiveBillboard) {
+		activeBillboard.tween?.stop();
+		this.remove(activeBillboard.billboard);
+		this.unregisterTouchInteraction(activeBillboard.billboard.touchInteraction);
+		activeBillboard.billboard.dispose();
+		this.speciesBillboards.delete(activeBillboard.speciesKey);
+	}
 
-			activeBillboard.elapsed += delta;
-			const progress = Math.min(
-				activeBillboard.elapsed / BILLBOARD_ANIMATION_DURATION,
-				1,
-			);
-			const scale =
-				activeBillboard.phase === "opening"
-					? this.easeOutBack(progress)
-					: activeBillboard.closingScale * (1 - this.easeInBack(progress));
-			activeBillboard.billboard.scale.setScalar(scale);
-
-			if (progress !== 1) continue;
-
-			if (activeBillboard.phase === "opening") {
-				activeBillboard.billboard.scale.setScalar(1);
-				activeBillboard.phase = "open";
-				continue;
-			}
-
-			this.remove(activeBillboard.billboard);
-			this.unregisterTouchInteraction(
-				activeBillboard.billboard.touchInteraction,
-			);
-			activeBillboard.billboard.dispose();
-			this.speciesBillboards.delete(activeBillboard.speciesKey);
-		}
-
+	private beginPendingLocationChange() {
 		if (this.speciesBillboards.size === 0 && this.pendingLocationChange) {
 			const { locationKey, origin } = this.pendingLocationChange;
 			this.pendingLocationChange = undefined;
@@ -270,12 +317,8 @@ export default class VinjettScene extends BaseScene {
 
 	private closeAllSpeciesBillboards() {
 		this.loadingSpecies.clear();
-		this.speciesBillboards.forEach((activeBillboard) => {
-			if (activeBillboard.phase === "closing") return;
-
-			activeBillboard.elapsed = 0;
-			activeBillboard.closingScale = activeBillboard.billboard.scale.x;
-			activeBillboard.phase = "closing";
+		this.speciesBillboards.forEach(({ speciesKey }) => {
+			this.closeSpeciesBillboard(speciesKey);
 		});
 	}
 
@@ -300,6 +343,7 @@ export default class VinjettScene extends BaseScene {
 
 		this.circularButtons.push(button);
 		this.add(button);
+		return button;
 	}
 
 	private setLocation(
@@ -336,11 +380,13 @@ export default class VinjettScene extends BaseScene {
 		this.pendingBackground = undefined;
 		this.transitionPhase = "loading";
 		this.transitionElapsed = 0;
+		this.animateCircularButtons(0, () => this.beginBackgroundWipe());
 
 		this.getBackground(locationKey).ready.then(
 			(materials) => {
 				if (this.transitionTarget === locationKey) {
 					this.pendingBackground = materials;
+					this.beginBackgroundWipe();
 				}
 			},
 			(error) => {
@@ -348,15 +394,23 @@ export default class VinjettScene extends BaseScene {
 				this.backgroundCache.delete(locationKey);
 				if (this.transitionTarget === locationKey) {
 					this.transitionTarget = undefined;
-					this.transitionPhase = "reveal";
-					this.transitionElapsed = 0;
-					this.circularButtons.forEach((button) => {
-						button.visible = true;
-						button.scale.setScalar(0);
-					});
+					this.revealCircularButtons();
 				}
 			},
 		);
+	}
+
+	private beginBackgroundWipe() {
+		if (
+			this.transitionPhase !== "loading" ||
+			!this.pendingBackground ||
+			this.buttonTween
+		) {
+			return;
+		}
+
+		this.transitionPhase = "wipe";
+		this.transitionElapsed = 0;
 	}
 
 	private getTransitionOrigin(locationKey: LocationKey) {
@@ -370,7 +424,8 @@ export default class VinjettScene extends BaseScene {
 		}
 
 		const { pitch, yaw } = location.homeButtonRotation;
-		return this.pitchYawToVector3(pitch, yaw);
+		const origin = this.pitchYawToVector3(pitch, yaw);
+		return this.vinjettConfig.location === "Home" ? origin : origin.negate();
 	}
 
 	protected override setBackground(locationKey: LocationKey) {
@@ -440,68 +495,44 @@ export default class VinjettScene extends BaseScene {
 		this.addCircularButtons();
 		this.circularButtons.forEach((button) => button.scale.setScalar(0));
 		this.sendUiConfig();
+		this.revealCircularButtons();
+	}
+
+	private revealCircularButtons() {
 		this.transitionPhase = "reveal";
-		this.transitionElapsed = 0;
+		this.circularButtons.forEach((button) => (button.visible = true));
+		this.animateCircularButtons(1, () => {
+			this.transitionPhase = "idle";
+		});
 	}
 
-	private easeInBack(progress: number) {
-		const overshoot = 1.70158;
-		return (overshoot + 1) * progress ** 3 - overshoot * progress ** 2;
-	}
-
-	private easeOutBack(progress: number) {
-		const overshoot = 1.70158;
-		return (
-			1 +
-			(overshoot + 1) * (progress - 1) ** 3 +
-			overshoot * (progress - 1) ** 2
-		);
+	private animateCircularButtons(targetScale: 0 | 1, onComplete: () => void) {
+		this.buttonTween?.stop();
+		const buttons = this.circularButtons;
+		this.buttonTween = this.createTween({
+			scale: buttons[0]?.scale.x ?? targetScale,
+		})
+			.to({ scale: targetScale }, BUTTON_ANIMATION_DURATION)
+			.easing(targetScale === 1 ? Easing.Back.Out : Easing.Cubic.Out)
+			.onUpdate(({ scale }) => {
+				buttons.forEach((button) => button.scale.setScalar(scale));
+			})
+			.onComplete(() => {
+				this.buttonTween = undefined;
+				if (targetScale === 0) {
+					buttons.forEach((button) => (button.visible = false));
+				}
+				onComplete();
+			})
+			.start();
 	}
 
 	override update(delta: number) {
-		if (this.transitionPhase === "idle") {
-			this.updateSpeciesBillboards(delta);
-			return;
-		}
-
-		if (this.transitionPhase === "loading") {
-			this.transitionElapsed += delta;
-			const progress = Math.min(
-				this.transitionElapsed / BUTTON_ANIMATION_DURATION,
-				1,
-			);
-			const scale = 1 - this.easeInBack(progress);
-			this.circularButtons.forEach((button) => button.scale.setScalar(scale));
-
-			if (progress === 1) {
-				this.circularButtons.forEach((button) => (button.visible = false));
-				if (this.pendingBackground) {
-					this.transitionPhase = "wipe";
-					this.transitionElapsed = 0;
-				}
-			}
-			return;
-		}
-
-		this.transitionElapsed += delta;
 		if (this.transitionPhase === "wipe") {
-			const progress = Math.min(this.transitionElapsed / WIPE_DURATION, 1);
-			if (progress === 1) {
+			this.transitionElapsed += delta;
+			if (this.transitionElapsed >= WIPE_DURATION) {
 				this.finishBackgroundSwap();
 			}
-			return;
-		}
-
-		const progress = Math.min(
-			this.transitionElapsed / BUTTON_ANIMATION_DURATION,
-			1,
-		);
-		const scale = this.easeOutBack(progress);
-		this.circularButtons.forEach((button) => button.scale.setScalar(scale));
-
-		if (progress === 1) {
-			this.circularButtons.forEach((button) => button.scale.setScalar(1));
-			this.transitionPhase = "idle";
 		}
 	}
 
@@ -580,9 +611,13 @@ export default class VinjettScene extends BaseScene {
 			});
 			if (this.transitionPhase === "idle" && !this.pendingLocationChange) {
 				this.addCircularButtons();
+			} else {
+				this.refreshSpeciesButtons();
 			}
 			this.sendUiConfig();
 		});
+
+		this.uiSocket.on("reset_progress", () => this.resetDiscoveredSpecies());
 	}
 
 	sendUiConfig() {
@@ -618,6 +653,14 @@ export default class VinjettScene extends BaseScene {
 					hint_text: "Select the language for names",
 					value: this.vinjettConfig.language,
 					options: ["swedish", "english"],
+				},
+				{
+					type: "button",
+					id: "reset_progress",
+					text: "Reset progress",
+					hint_title: "Reset discoveries",
+					hint_text: "Clear all discovered species and start fresh",
+					color: "#c70036",
 				},
 			],
 		};

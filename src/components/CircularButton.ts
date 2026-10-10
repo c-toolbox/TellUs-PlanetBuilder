@@ -17,6 +17,8 @@ export default class CircularButton extends THREE.Mesh<
 	THREE.MeshBasicMaterial
 > {
 	private readonly clickCallback: () => void;
+	private icon?: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
+	private textLabel?: TextLabel;
 	public readonly touchInteraction: TouchInteraction;
 
 	constructor({
@@ -31,10 +33,6 @@ export default class CircularButton extends THREE.Mesh<
 			typeof texture === "string"
 				? new THREE.TextureLoader().load(texture)
 				: texture;
-
-		if (map) {
-			map.colorSpace = THREE.SRGBColorSpace;
-		}
 
 		super(
 			new THREE.CircleGeometry(radius, 48),
@@ -62,24 +60,52 @@ export default class CircularButton extends THREE.Mesh<
 		this.add(outline);
 
 		if (map) {
-			const icon = new THREE.Mesh(
-				new THREE.CircleGeometry(radius * 1.0, 48),
-				new THREE.MeshBasicMaterial({
-					map,
-					transparent: true,
-					side: THREE.DoubleSide,
-				}),
-			);
-			icon.position.z = 0.002;
-			icon.raycast = () => {};
-			this.add(icon);
+			this.setTexture(map);
 		}
 
 		if (label) {
-			const textLabel = new TextLabel(label, 0.1, 0.8);
-			textLabel.position.set(0, -radius - 0.1, 0.003);
-			this.add(textLabel);
+			this.setLabel(label);
 		}
+	}
+
+	setLabel(label: string) {
+		if (this.textLabel) {
+			this.textLabel.setText(label);
+			return;
+		}
+
+		this.textLabel = new TextLabel(label, 0.1, 0.8);
+		this.textLabel.position.set(
+			0,
+			-this.geometry.parameters.radius - 0.1,
+			0.003,
+		);
+		this.add(this.textLabel);
+	}
+
+	setLabelVisible(visible: boolean) {
+		if (this.textLabel) this.textLabel.visible = visible;
+	}
+
+	setTexture(texture: THREE.Texture) {
+		texture.colorSpace = THREE.SRGBColorSpace;
+		if (this.icon) {
+			this.icon.material.map = texture;
+			this.icon.material.needsUpdate = true;
+			return;
+		}
+
+		this.icon = new THREE.Mesh(
+			new THREE.CircleGeometry(this.geometry.parameters.radius, 48),
+			new THREE.MeshBasicMaterial({
+				map: texture,
+				transparent: true,
+				side: THREE.DoubleSide,
+			}),
+		);
+		this.icon.position.z = 0.002;
+		this.icon.raycast = () => {};
+		this.add(this.icon);
 	}
 
 	click() {
