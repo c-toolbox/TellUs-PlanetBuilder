@@ -8,6 +8,7 @@ import { Color, GoogleColor } from "@/utils/colors";
 
 import { Fish } from "./Fish";
 import { Boat } from "./Boat";
+import { FISH_BOIDS_CONFIG } from "./constants";
 import backgroundAsset from "@/assets/square.png";
 
 const FISH_COLORS = [
@@ -31,15 +32,8 @@ const FISH_COLORS = [
 
 export interface BoidsUiConfig {
 	fishCount: number;
+	boatCount: number;
 	colorAffinity: boolean;
-	sightRadius: number;
-	neighborRadius: number;
-	separationRadius: number;
-	fearRadius: number;
-	cohesionWeight: number;
-	alignmentWeight: number;
-	separationWeight: number;
-	fearWeight: number;
 	baseTurn: number;
 	panicTurn: number;
 	calmSpeed: number;
@@ -56,19 +50,12 @@ export default class BoidsScene extends BaseScene {
 
 	private boidsConfig: BoidsUiConfig = {
 		fishCount: 300,
+		boatCount: 0,
 		colorAffinity: true,
-		sightRadius: 0.25,
-		neighborRadius: 0.16,
-		separationRadius: 0.09,
-		fearRadius: 0.3,
-		cohesionWeight: 0.25,
-		alignmentWeight: 0.07,
-		separationWeight: 0.35,
-		fearWeight: 1.5,
-		baseTurn: 0.06,
-		panicTurn: 0.15,
-		calmSpeed: 0.0015,
-		panicSpeed: 0.02,
+		baseTurn: FISH_BOIDS_CONFIG.baseTurn,
+		panicTurn: FISH_BOIDS_CONFIG.panicTurn,
+		calmSpeed: FISH_BOIDS_CONFIG.calmSpeed,
+		panicSpeed: FISH_BOIDS_CONFIG.panicSpeed,
 	};
 
 	constructor() {
@@ -89,8 +76,7 @@ export default class BoidsScene extends BaseScene {
 			this.addFish();
 		}
 
-		const initialBoatCount = Math.floor(this.boidsConfig.fishCount / 5);
-		for (let i = 0; i < initialBoatCount; i++) {
+		for (let i = 0; i < this.boidsConfig.boatCount; i++) {
 			this.addBoat();
 		}
 
@@ -105,8 +91,9 @@ export default class BoidsScene extends BaseScene {
 	}
 
 	update(delta: number) {
-		// Check if config.fishCount has changed and add/remove fish
+		// Keep populations in sync with their independent UI counts.
 		this.syncFishCount();
+		this.syncBoatCount();
 
 		const touchPoints = this.touchHandler.touchGroup.children as TouchPoint[];
 
@@ -145,12 +132,10 @@ export default class BoidsScene extends BaseScene {
 	}
 
 	private addBoat() {
-		const index = this.boats.length;
-
 		const myColor = 0xffffff;
 		const distanceFromCenter = 0.6;
 
-		const boat = new Boat(this.boidsConfig, distanceFromCenter, myColor);
+		const boat = new Boat(distanceFromCenter, myColor);
 
 		this.boats.push(boat);
 		this.boatGroup.add(boat);
@@ -193,9 +178,10 @@ export default class BoidsScene extends BaseScene {
 				this.removeFish();
 			}
 		}
+	}
 
-		// Boats: 5x less than fish
-		const boatTarget = Math.floor(this.boidsConfig.fishCount / 5);
+	private syncBoatCount() {
+		const boatTarget = this.boidsConfig.boatCount;
 		const boatCurrent = this.boats.length;
 
 		if (boatTarget > boatCurrent) {
@@ -219,15 +205,8 @@ export default class BoidsScene extends BaseScene {
 
 		const configKeys: BoidsConfigKey[] = [
 			"fishCount",
+			"boatCount",
 			"colorAffinity",
-			"sightRadius",
-			"neighborRadius",
-			"separationRadius",
-			"fearRadius",
-			"cohesionWeight",
-			"alignmentWeight",
-			"separationWeight",
-			"fearWeight",
 			"baseTurn",
 			"panicTurn",
 			"calmSpeed",
@@ -270,6 +249,16 @@ export default class BoidsScene extends BaseScene {
 					step: 1,
 				},
 				{
+					type: "slider",
+					id: "boatCount",
+					hint_title: "Boat count",
+					hint_text: "The number of boats in the globe. Swipe to give them wind.",
+					value: this.boidsConfig.boatCount,
+					min: 0,
+					max: 100,
+					step: 1,
+				},
+				{
 					type: "switch",
 					id: "colorAffinity",
 					hint_title: "Color affinity",
@@ -279,110 +268,7 @@ export default class BoidsScene extends BaseScene {
 
 				{
 					type: "hr",
-					hint_title: "Behavior",
-				},
-				{
-					type: "grid",
-					columns: 2,
-					elements: [
-						{
-							type: "slider",
-							id: "sightRadius",
-							hint_title: "Sight radius",
-							hint_text: "How far a fish can see and react to others.",
-							value: this.boidsConfig.sightRadius,
-							min: 0.05,
-							max: 1,
-							step: 0.01,
-						},
-						{
-							type: "slider",
-							id: "neighborRadius",
-							hint_title: "Neighbor radius",
-							hint_text: "Range for cohesion and alignment.",
-							value: this.boidsConfig.neighborRadius,
-							min: 0.05,
-							max: 0.5,
-							step: 0.01,
-						},
-						{
-							type: "slider",
-							id: "separationRadius",
-							hint_title: "Separation radius",
-							hint_text: "Minimum distance fish try to keep from each other.",
-							value: this.boidsConfig.separationRadius,
-							min: 0.01,
-							max: 0.2,
-							step: 0.005,
-						},
-						{
-							type: "slider",
-							id: "fearRadius",
-							hint_title: "Fear radius",
-							hint_text: "How close a touch must be to scare nearby fish.",
-							value: this.boidsConfig.fearRadius,
-							min: 0.05,
-							max: 0.6,
-							step: 0.01,
-						},
-					],
-				},
-
-				{
-					type: "hr",
-					hint_title: "Forces",
-				},
-				{
-					type: "grid",
-					columns: 2,
-					elements: [
-						{
-							type: "slider",
-							id: "cohesionWeight",
-							hint_title: "Cohesion",
-							hint_text: "How strongly fish are drawn toward nearby groups.",
-							value: this.boidsConfig.cohesionWeight,
-							min: 0,
-							max: 1,
-							step: 0.01,
-						},
-						{
-							type: "slider",
-							id: "alignmentWeight",
-							hint_title: "Alignment",
-							hint_text:
-								"How strongly fish match the direction of nearby fish.",
-							value: this.boidsConfig.alignmentWeight,
-							min: 0,
-							max: 0.5,
-							step: 0.01,
-						},
-						{
-							type: "slider",
-							id: "separationWeight",
-							hint_title: "Separation",
-							hint_text: "How strongly fish avoid crowding each other.",
-							value: this.boidsConfig.separationWeight,
-							min: 0,
-							max: 1,
-							step: 0.01,
-						},
-						{
-							type: "slider",
-							id: "fearWeight",
-							hint_title: "Fear",
-							hint_text: "How strongly fish flee from touches.",
-							value: this.boidsConfig.fearWeight,
-							min: 0,
-							max: 3,
-							step: 0.05,
-						},
-					],
-				},
-
-				{
-					type: "hr",
-					hint_title: "Movement",
+					hint_title: "Fish movement",
 				},
 				{
 					type: "grid",

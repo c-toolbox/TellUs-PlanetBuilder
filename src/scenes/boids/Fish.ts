@@ -2,10 +2,10 @@ import * as THREE from "three";
 import { createNoise3D } from "simplex-noise";
 import { TouchPoint } from "@/network/TouchPoint";
 import { ORIGIN } from "@/constants";
-import { FISH_SIZE } from "./constants";
+import { FISH_BOIDS_CONFIG, FISH_SIZE } from "./constants";
 
 import fishAsset from "@/assets/fish.png";
-import { BoidsUiConfig } from "./BoidsScene";
+import type { BoidsUiConfig } from "./BoidsScene";
 
 const noise = createNoise3D();
 
@@ -90,17 +90,18 @@ export class Fish extends THREE.Mesh {
 	}
 
 	applyBoids(fishes: Fish[], touchPoints: TouchPoint[]) {
-		const sightRadius = this.boidsConfig.sightRadius;
-		const neighborRadius = this.boidsConfig.neighborRadius;
-		const separationRadius = this.boidsConfig.separationRadius;
-		const fearRadius = this.boidsConfig.fearRadius;
+		const {
+			sightRadius,
+			neighborRadius,
+			separationRadius,
+			fearRadius,
+			cohesionWeight,
+			alignmentWeight,
+			separationWeight,
+			fearWeight,
+			sightAngle,
+		} = FISH_BOIDS_CONFIG;
 
-		const cohesionWeight = this.boidsConfig.cohesionWeight;
-		const alignmentWeight = this.boidsConfig.alignmentWeight;
-		const separationWeight = this.boidsConfig.separationWeight;
-		const fearWeight = this.boidsConfig.fearWeight;
-
-		const sightAngle = Math.PI * 0.35;
 		const baseTurn = this.boidsConfig.baseTurn;
 		const panicTurn = this.boidsConfig.panicTurn;
 		const calmSpeed = this.boidsConfig.calmSpeed;

@@ -2,10 +2,9 @@ import * as THREE from "three";
 import { createNoise3D } from "simplex-noise";
 import { TouchPoint } from "@/network/TouchPoint";
 import { ORIGIN, UP } from "@/constants";
-import { FISH_SIZE } from "./constants";
+import { BOAT_BOIDS_CONFIG, FISH_SIZE } from "./constants";
 
 import boatAsset from "@/assets/boat.png";
-import { BoidsUiConfig } from "./BoidsScene";
 
 const noise = createNoise3D();
 
@@ -13,17 +12,12 @@ export class Boat extends THREE.Mesh {
 	public material: THREE.MeshBasicMaterial;
 	public color: number;
 
-	private boidsConfig: BoidsUiConfig;
 	private distanceFromCenter: number;
 	private speed: number;
 	private facing: THREE.Vector3;
 	private velocity: THREE.Vector3;
 
-	constructor(
-		boidsConfig: BoidsUiConfig,
-		distanceFromCenter: number,
-		color: number,
-	) {
+	constructor(distanceFromCenter: number, color: number) {
 		const textureLoader = new THREE.TextureLoader();
 		const material = new THREE.MeshBasicMaterial({
 			map: textureLoader.load(boatAsset),
@@ -35,10 +29,8 @@ export class Boat extends THREE.Mesh {
 		});
 
 		const geometry = new THREE.PlaneGeometry(1, 1);
-		// geometry.rotateZ(Math.PI / 2);
 
 		super(geometry, material);
-		this.boidsConfig = boidsConfig;
 		this.material = material;
 		this.distanceFromCenter = distanceFromCenter;
 		this.color = color;
@@ -74,13 +66,14 @@ export class Boat extends THREE.Mesh {
 		this.speed = this.velocity.length();
 
 		// If below calmSpeed, slowly recover toward calmSpeed
-		const calmSpeed = this.boidsConfig.calmSpeed;
-		const panicSpeed = this.boidsConfig.panicSpeed;
+		const { calmSpeed, damping, speedRecovery } = BOAT_BOIDS_CONFIG;
 		if (this.speed < calmSpeed) {
-			this.velocity.setLength(THREE.MathUtils.lerp(this.speed, calmSpeed, 0.1));
+			this.velocity.setLength(
+				THREE.MathUtils.lerp(this.speed, calmSpeed, speedRecovery),
+			);
 		}
 
-		this.velocity.multiplyScalar(0.97);
+		this.velocity.multiplyScalar(damping);
 
 		this.position.add(this.velocity.clone());
 		this.position.normalize().multiplyScalar(this.distanceFromCenter);
@@ -94,40 +87,29 @@ export class Boat extends THREE.Mesh {
 		}
 
 		// Boats should face up (world +Y) rather than the direction of travel.
-		// Orient so the plane faces toward the world-up direction from its position.
-		// const localNorth = UP.clone().projectOnPlane(normal).normalize();
 		this.up.copy(UP);
 		this.lookAt(ORIGIN);
-
-		const clampedT = Math.max(
-			this.boidsConfig.calmSpeed,
-			Math.min(this.boidsConfig.panicSpeed, this.speed),
-		);
-		const alpha =
-			(clampedT - this.boidsConfig.calmSpeed) /
-			(this.boidsConfig.panicSpeed - this.boidsConfig.calmSpeed);
 	}
 
 	applyBoids(boats: Boat[], touchPoints: TouchPoint[]) {
-		const sightRadius = this.boidsConfig.sightRadius;
-		const neighborRadius = this.boidsConfig.neighborRadius;
-		const separationRadius = this.boidsConfig.separationRadius * 1.25;
+		const {
+			sightRadius,
+			neighborRadius,
+			separationRadius,
+			alignmentWeight,
+			separationWeight,
+			sightAngle,
+			calmSpeed,
+			panicSpeed,
+			windRadius,
+			steeringStrength,
+			windStrength,
+		} = BOAT_BOIDS_CONFIG;
 
-		const cohesionWeight = this.boidsConfig.cohesionWeight * 0;
-		const alignmentWeight = this.boidsConfig.alignmentWeight * 0.01;
-		const separationWeight = this.boidsConfig.separationWeight * 0.3;
-
-		const sightAngle = Math.PI * 0.35;
-		const baseTurn = this.boidsConfig.baseTurn;
-		const panicTurn = this.boidsConfig.panicTurn;
-		const calmSpeed = this.boidsConfig.calmSpeed;
-		const panicSpeed = this.boidsConfig.panicSpeed;
-
-		let cohesion = new THREE.Vector3();
-		let alignment = new THREE.Vector3();
-		let separation = new THREE.Vector3();
+		const alignment = new THREE.Vector3();
+		const separation = new THREE.Vector3();
 		// Aggregate wind vector from touch points (world-space)
-		let wind = new THREE.Vector3();
+		const wind = new THREE.Vector3();
 
 		let count = 0;
 
@@ -145,15 +127,14 @@ export class Boat extends THREE.Mesh {
 			}
 
 			// If within sight range, check sight angle
-			if (distance < sightRadius / 2) {
+			if (distance < sightRadius) {
 				const toOther = other.position.clone().sub(this.position).normalize();
 				const angleBetween = this.facing.angleTo(toOther);
 
-				// If within sight cone, or cohesion/alignment radius
-				if (distance < neighborRadius / 2 || angleBetween < sightAngle) {
-					let factor = Math.pow(other.speed, 2);
+				// If within sight cone, or alignment radius
+				if (distance < neighborRadius || angleBetween < sightAngle) {
+					const factor = Math.pow(other.speed, 2);
 
-					cohesion.add(other.position.clone().multiplyScalar(factor));
 					alignment.add(other.facing.clone().multiplyScalar(factor));
 					count += factor;
 				}
@@ -168,8 +149,8 @@ export class Boat extends THREE.Mesh {
 			const distance = this.position.distanceTo(touchPosition);
 
 			// Treat touch velocity as a gust of wind that changes direction.
-			if (distance < sightRadius) {
-				const proximity = 1 - distance / sightRadius;
+			if (distance < windRadius) {
+				const proximity = 1 - distance / windRadius;
 				const normal = this.position.clone().normalize();
 				const contribution = point.velocity
 					.clone()
@@ -180,15 +161,11 @@ export class Boat extends THREE.Mesh {
 		}
 
 		if (count > 0) {
-			cohesion.divideScalar(count);
-			cohesion.sub(this.position);
-
 			alignment.divideScalar(count);
 		}
 
 		const steering = new THREE.Vector3();
 		steering
-			.addScaledVector(cohesion, cohesionWeight)
 			.addScaledVector(alignment, alignmentWeight)
 			.addScaledVector(separation, separationWeight);
 
@@ -208,34 +185,28 @@ export class Boat extends THREE.Mesh {
 		steering.add(sideways);
 
 		// Steering affects direction: add scaled steering to velocity.
-		const STEER_SCALE = 0.00004;
-		const steerContribution = steering.clone().multiplyScalar(STEER_SCALE);
-
+		this.velocity.addScaledVector(steering, steeringStrength);
 		// Wind adds directly to velocity (projected to tangent plane earlier).
-		const WIND_SCALE = 0.0006;
-
-		// Apply steering and wind to velocity (they act as instantaneous impulses).
-		this.velocity.add(steerContribution);
-		this.velocity.add(wind.multiplyScalar(WIND_SCALE));
+		this.velocity.addScaledVector(wind, windStrength);
 
 		// Ensure velocity remains on the sphere tangent plane
 		this.velocity.projectOnPlane(normal);
 
-		// Keep a sane upper cap; real speed clamping/recovery happens in update().
+		// Cap gust-driven speed; damping and recovery happen in update().
 		const MAX_SAFE = 2 * panicSpeed;
 		if (this.velocity.length() > MAX_SAFE) this.velocity.setLength(MAX_SAFE);
 	}
 
 	public boost(boostAmount: number = 0.005) {
-        // Boost velocity in current facing direction
-        const currentSpeed = this.velocity.length();
-        const targetSpeed = Math.min(
-            currentSpeed + boostAmount,
-            this.boidsConfig.panicSpeed * 0.7 // Keep below full panic cap
-        );
+		// Boost velocity in current facing direction
+		const currentSpeed = this.velocity.length();
+		const targetSpeed = Math.min(
+			currentSpeed + boostAmount,
+			BOAT_BOIDS_CONFIG.panicSpeed * 0.7, // Keep below full panic cap
+		);
 
-        if (this.facing.lengthSq() > 0) {
-            this.velocity.copy(this.facing).setLength(targetSpeed);
-        }
-    }
+		if (this.facing.lengthSq() > 0) {
+			this.velocity.copy(this.facing).setLength(targetSpeed);
+		}
+	}
 }
