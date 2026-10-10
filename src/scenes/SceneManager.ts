@@ -5,11 +5,12 @@ import PaintScene from "./paint/PaintScene";
 // import DistortionScene from "./distortion/DistortionScene";
 // import ReactionDiffusionScene from "./reactiondiffusion/ReactionDiffusionScene";
 // import DomScene from "./dom/DomScene";
-import InteractionTestScene from "./interaction_test/InteractionTestScene";
 import BoidsScene from "./boids/BoidsScene";
 import CountryScene from "./country/CountryScene";
 import VinjettScene from "./vinjett/VinjettScene";
 import MusicScene from "./music/MusicScene";
+import InteractionTestScene from "./interaction_test/InteractionTestScene";
+import FluidScene from "./fluid/FluidScene";
 
 /* Scenes */
 
@@ -24,6 +25,7 @@ export enum SceneKey {
 	Vinjett = "Vinjett",
 	Music = "Music",
 	InteractionTest = "InteractionTest",
+	Fluid = "Fluid",
 }
 
 export const scenes = {
@@ -37,6 +39,7 @@ export const scenes = {
 	Vinjett: new VinjettScene(),
 	Music: new MusicScene(),
 	InteractionTest: new InteractionTestScene(),
+	Fluid: new FluidScene(),
 } satisfies Record<SceneKey, BaseScene>;
 
 /* Manager */
