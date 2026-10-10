@@ -2,44 +2,38 @@ import { Renderer } from "../rendering/Renderer";
 import BaseScene from "./BaseScene";
 import WorldScene from "./world/WorldScene";
 import PaintScene from "./paint/PaintScene";
-// import DistortionScene from "./distortion/DistortionScene";
 import ReactionDiffusionScene from "./reaction/ReactionDiffusionScene";
-// import DomScene from "./dom/DomScene";
 import BoidsScene from "./boids/BoidsScene";
 import CountryScene from "./country/CountryScene";
 import VinjettScene from "./vinjett/VinjettScene";
 import MusicScene from "./music/MusicScene";
-import InteractionTestScene from "./interaction_test/InteractionTestScene";
+import InteractionScene from "./interaction/InteractionScene";
 import FluidScene from "./fluid/FluidScene";
 
 /* Scenes */
 
 export enum SceneKey {
-	World = "World",
+	World = "Planet",
 	Paint = "Paint",
-	// Distortion = "Distortion",
-	// ReactionDiffusion = "ReactionDiffusion",
-	// Dom = "Dom",
-	Boids = "Boids",
+	Boids = "Fish",
 	Country = "Country",
-	Vinjett = "Vinjett",
+	Vinjett = "Wildlife",
 	Music = "Music",
-	InteractionTest = "InteractionTest",
+	Interaction = "Interaction",
 	Fluid = "Fluid",
+	ReactionDiffusion = "ReactionDiffusion",
 }
 
 export const scenes = {
-	World: new WorldScene(),
-	Paint: new PaintScene(),
-	// Distortion: new DistortionScene(),
-	// ReactionDiffusion: new ReactionDiffusionScene(),
-	// Dom: new DomScene(),
-	Boids: new BoidsScene(),
-	Country: new CountryScene(),
-	Vinjett: new VinjettScene(),
-	Music: new MusicScene(),
-	InteractionTest: new InteractionTestScene(),
-	Fluid: new FluidScene(),
+	[SceneKey.World]: new WorldScene(),
+	[SceneKey.Paint]: new PaintScene(),
+	[SceneKey.Boids]: new BoidsScene(),
+	[SceneKey.Country]: new CountryScene(),
+	[SceneKey.Vinjett]: new VinjettScene(),
+	[SceneKey.Music]: new MusicScene(),
+	[SceneKey.Interaction]: new InteractionScene(),
+	[SceneKey.Fluid]: new FluidScene(),
+	[SceneKey.ReactionDiffusion]: new ReactionDiffusionScene(),
 } satisfies Record<SceneKey, BaseScene>;
 
 /* Manager */

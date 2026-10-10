@@ -11,7 +11,7 @@ import { Renderer } from "@/rendering/Renderer";
 
 const INTERACTION_SPHERE_COUNT = 7;
 
-export default class InteractionTestScene extends BaseScene {
+export default class InteractionScene extends BaseScene {
 	private readonly interactionSpheres: InteractionSphere[];
 	private readonly slider: SphericalSlider;
 
@@ -81,14 +81,14 @@ export default class InteractionTestScene extends BaseScene {
 	protected get uiConfig(): UiConfigEvent {
 		return {
 			type: "config",
-			title: "Interaction Test",
+			title: "Interaction ",
 			elements: [
 				{
 					type: "dropdown",
 					id: "scene",
 					hint_title: "Scene",
 					hint_text: "Switch to a different scene",
-					value: SceneKey.InteractionTest,
+					value: SceneKey.Interaction,
 					options: Object.values(SceneKey),
 				},
 			],
