@@ -6,6 +6,42 @@ colours. Desktop input uses the existing sphere preview (`3`), where dragging th
 globe sends the same touch events as the display. Brush radius, stir strength,
 swirl, colour fade, ambient flow, pause, reset, and clear are exposed in the socket UI.
 
+## Inspecting simulation steps
+
+Use **Simulation output** in the socket UI to choose what is drawn on the sphere.
+All views show fields from the latest completed step. **Pause** freezes those
+fields; switching the dropdown still updates the display immediately. The selection
+is retained when leaving and returning to the scene.
+
+| Output | What it shows |
+| --- | --- |
+| Dye (final) | The usual display after transport, fading and ink injection (default). |
+| Velocity after advection | `advect.frag`: transported and damped momentum. |
+| Velocity after forces | `forces.frag`: velocity including touch impulses, ambient flow and confinement. |
+| Forces added | The difference between forced and advected velocity, including the speed limit. |
+| Vorticity | `derivatives.frag`: signed surface curl after forces, before projection. |
+| Divergence before projection | `derivatives.frag`: the input to the pressure solve. |
+| Pressure | `pressure.frag`: pressure impulse after all Jacobi iterations. |
+| Pressure correction | The difference between projected and forced velocity, including the speed limit. |
+| Velocity after projection | `project.frag`: the corrected velocity used for dye transport. |
+| Divergence after projection | `derivatives.frag` evaluated on the corrected velocity. |
+| Divergence comparison | Before on the -X hemisphere, after on +X, with a white dividing meridian. |
+| Dye after advection | `advect.frag`: transported and faded ink before injection. |
+| Dye added | The difference made by `dye.frag` during this step. |
+| Dye + flow arrows | Final ink overlaid with the projected velocity direction. |
+
+Signed scalar fields use blue for negative, orange for positive, and a dark
+background near zero. Divergence views share a fixed scale so projection can be
+compared fairly. Velocity colours encode signed world X/Y/Z components as RGB;
+brightness shows magnitude, and arrows indicate direction in the local tangent
+plane. Force and pressure-correction differences are amplified. These are visual
+colour scales, not numerical measurements. Each selection includes a key in the UI.
+
+`FluidDisplay.ts` defines the options, source fields, colour scales and descriptions.
+`display.frag` converts those numerical fields into visible colours and arrows.
+`seed.frag` supplies the reset state, visible through **Reset colours** in any view.
+The full solver keeps running when an intermediate output is selected.
+
 The solver follows the advection / forces / pressure projection pipeline explored
 in [Misaki Nakano's fluid-three](https://github.com/mnmxmx/fluid-three/tree/master)
 (see [blog](https://mofu-dev.com/en/blog/stable-fluids/)), but does not reuse its
@@ -72,20 +108,23 @@ required; the scene reports missing support in its UI. Targets, geometry, and
 materials are allocated on entry and disposed on exit. Offscreen passes restore
 the renderer's target, cube face, mip level, viewport, scissor, and XR/clear settings.
 
-The default grid takes about 6 MiB for the seven simulation textures. Lowering
+The default grid takes about 7 MiB for nine simulation textures. Inspection retains
+advected velocity separately and adds one derivative pass after projection; the
+other views reuse the existing fields without copying textures. Lowering
 the resolutions or pressure iteration count in `SphericalFluid.ts` reduces GPU cost.
 
 ## Validation
 
 ```sh
 npx tsc --noEmit
-node --test scripts/fluid.test.mjs
 node scripts/fluid-webgl.test.mjs
 ```
 
 The WebGL check uses an installed Chromium browser (or `CHROME_BIN`) in headless
 mode and the existing Vite dependency. It compiles and exercises the actual shaders,
-checks pressure correction, tangency, tile edges/poles, rendering, and disposal.
+checks all display modes, preservation of intermediate fields, paused switching,
+pressure correction, reset/clear, and disposal. Pass an optional PNG path to save
+a contact sheet of the views, e.g. `node scripts/fluid-webgl.test.mjs .tmp/fluid-outputs.png`.
 It does not launch Neutralino or require the TuIO hardware.
 
 Background references: [GPU Gems, Fast Fluid Dynamics Simulation on the GPU](https://developer.nvidia.com/gpugems/gpugems/part-vi-beyond-triangles/chapter-38-fast-fluid-dynamics-simulation-gpu)

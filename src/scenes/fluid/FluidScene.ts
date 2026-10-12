@@ -6,11 +6,13 @@ import { Renderer } from "@/rendering/Renderer";
 import { TouchId } from "@/network/tuioProtocol";
 import { FluidTouches } from "./FluidTouches";
 import { FluidSettings, SphericalFluid } from "./SphericalFluid";
+import { DEFAULT_FLUID_OUTPUT, FLUID_OUTPUT_OPTIONS, FLUID_OUTPUTS, FluidOutput } from "./FluidDisplay";
 
 export default class FluidScene extends BaseScene {
 	private fluid?: SphericalFluid;
 	private touches = new FluidTouches();
 	private paused = false;
+	private output: FluidOutput = DEFAULT_FLUID_OUTPUT;
 	private accumulator = 0;
 	private settings: FluidSettings = {
 		touchRadius: 0.13,
@@ -32,6 +34,7 @@ export default class FluidScene extends BaseScene {
 			!renderer.extensions.has("EXT_color_buffer_half_float");
 		if (!this.unavailable) {
 			this.fluid = new SphericalFluid(renderer);
+			this.fluid.setOutput(this.output);
 			this.add(this.fluid.surface);
 		} else {
 			console.warn("Fluid simulation unavailable: renderable half-float textures are required.");
@@ -79,6 +82,12 @@ export default class FluidScene extends BaseScene {
 
 	protected override initializeUi() {
 		super.initializeUi();
+		this.uiSocket.on("output", (value: unknown) => {
+			if (typeof value !== "string" || !Object.prototype.hasOwnProperty.call(FLUID_OUTPUTS, value)) return;
+			this.output = value as FluidOutput;
+			this.fluid?.setOutput(this.output);
+			this.sendUiConfig();
+		});
 		const slider = (key: "touchRadius" | "touchForce" | "swirl" | "dyeDecay", min: number, max: number) => {
 			this.uiSocket.on(key, (value: number) => {
 				if (typeof value !== "number" || !Number.isFinite(value)) return;
@@ -125,6 +134,15 @@ export default class FluidScene extends BaseScene {
 					value: SceneKey.Fluid,
 					options: Object.values(SceneKey),
 				},
+				{
+					type: "dropdown",
+					id: "output",
+					hint_title: "Simulation output",
+					hint_text: "Inspect a stage of the latest simulation step. Switch views while paused to compare fields.",
+					value: this.output,
+					options: FLUID_OUTPUT_OPTIONS,
+				},
+				{ type: "text", hint_title: this.output, hint_text: FLUID_OUTPUTS[this.output].hint },
 				{ type: "slider", id: "touchRadius", hint_title: "Brush radius", value: this.settings.touchRadius, min: 0.04, max: 0.35, step: 0.01 },
 				{ type: "slider", id: "touchForce", hint_title: "Stir strength", value: this.settings.touchForce, min: 0, max: 20, step: 0.5 },
 				{ type: "slider", id: "swirl", hint_title: "Swirl", value: this.settings.swirl, min: 0, max: 12, step: 0.5 },

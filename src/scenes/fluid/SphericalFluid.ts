@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { FluidSplat, MAX_FLUID_TOUCHES } from "./FluidTouches";
+import { DEFAULT_FLUID_OUTPUT, FLUID_DISPLAY_STYLES, FLUID_OUTPUTS, FluidDisplayField, FluidDisplayOption, FluidOutput } from "./FluidDisplay";
 
 import sphere from "./shaders/sphere.glsl?raw";
 import fullscreenVertex from "./shaders/fullscreen.vert?raw";
@@ -58,11 +59,14 @@ export class SphericalFluid {
 	private velocity: Field;
 	private dye: Field;
 	private pressure: Field;
+	private advectedVelocity: THREE.WebGLRenderTarget;
 	private derivatives: THREE.WebGLRenderTarget;
+	private projectedDerivatives: THREE.WebGLRenderTarget;
 	private passScene = new THREE.Scene();
 	private camera = new THREE.Camera();
 	private quad: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>;
 	private time = 0;
+	private output: FluidOutput = DEFAULT_FLUID_OUTPUT;
 	private readonly pressureIterations = 28;
 	private readonly uniforms = {
 		velocity: { value: null as THREE.Texture | null },
@@ -101,7 +105,9 @@ export class SphericalFluid {
 		this.velocity = new Field(velocityResolution);
 		this.dye = new Field(dyeResolution);
 		this.pressure = new Field(velocityResolution);
+		this.advectedVelocity = createTarget(velocityResolution);
 		this.derivatives = createTarget(velocityResolution);
+		this.projectedDerivatives = createTarget(velocityResolution);
 		this.uniforms.velocityResolution.value = velocityResolution;
 		this.uniforms.cellSize.value = Math.PI / (2 * velocityResolution);
 		this.uniforms.derivatives.value = this.derivatives.texture;
@@ -121,9 +127,17 @@ export class SphericalFluid {
 			new THREE.SphereGeometry(10, 64, 48),
 			new THREE.ShaderMaterial({
 				name: "Spherical fluid display",
+				defines: FLUID_DISPLAY_STYLES,
 				uniforms: {
-					dye: { value: this.dye.read.texture },
+					field: { value: this.dye.read.texture },
+					reference: { value: this.dye.read.texture },
+					velocity: { value: this.velocity.read.texture },
 					resolution: { value: dyeResolution },
+					velocityResolution: { value: velocityResolution },
+					displayStyle: { value: 0 },
+					subtractReference: { value: false },
+					scale: { value: 1 },
+					channel: { value: 0 },
 				},
 				vertexShader: displayVertex,
 				fragmentShader: sphere + displayFragment,
@@ -133,6 +147,37 @@ export class SphericalFluid {
 			}),
 		);
 		this.reset();
+	}
+
+	/** Rebind the latest completed step immediately, including while paused. */
+	setOutput(output: FluidOutput) {
+		this.output = output;
+		this.updateDisplay();
+	}
+
+	private updateDisplay() {
+		const option: FluidDisplayOption = FLUID_OUTPUTS[this.output];
+		const fields: Record<FluidDisplayField, THREE.Texture> = {
+			dye: this.dye.read.texture,
+			advectedDye: this.dye.write.texture,
+			advectedVelocity: this.advectedVelocity.texture,
+			forcedVelocity: this.velocity.write.texture,
+			velocity: this.velocity.read.texture,
+			derivatives: this.derivatives.texture,
+			projectedDerivatives: this.projectedDerivatives.texture,
+			pressure: this.pressure.read.texture,
+		};
+		const u = this.surface.material.uniforms;
+		u.field.value = fields[option.field];
+		u.reference.value = fields[option.reference ?? option.field];
+		u.velocity.value = this.velocity.read.texture;
+		u.resolution.value = option.field === "dye" || option.field === "advectedDye"
+			? this.dyeResolution : this.velocityResolution;
+		u.displayStyle.value = option.style;
+		u.subtractReference.value = option.reference !== undefined &&
+			option.style !== FLUID_DISPLAY_STYLES.DISPLAY_SCALAR_COMPARISON;
+		u.scale.value = option.scale;
+		u.channel.value = option.channel ?? 0;
 	}
 
 	private createMaterial(name: string, fragment: string) {
@@ -181,11 +226,11 @@ export class SphericalFluid {
 		}
 	}
 
-	reset(seed = true) {
+	reset(seed = false) {
 		this.time = 0;
 		this.offscreen(() => {
 			this.uniforms.seedMode.value = seed ? 1 : 0;
-			for (const target of [this.velocity.read, this.velocity.write]) {
+			for (const target of [this.velocity.read, this.velocity.write, this.advectedVelocity]) {
 				this.pass(this.materials.seed, target);
 			}
 			this.uniforms.seedMode.value = seed ? 2 : 0;
@@ -193,11 +238,15 @@ export class SphericalFluid {
 				this.pass(this.materials.seed, target);
 			}
 			this.uniforms.seedMode.value = 0;
-			for (const target of [this.pressure.read, this.pressure.write, this.derivatives]) {
+			for (const target of [this.pressure.read, this.pressure.write]) {
 				this.pass(this.materials.seed, target);
 			}
+			this.uniforms.velocity.value = this.velocity.read.texture;
+			for (const target of [this.derivatives, this.projectedDerivatives]) {
+				this.pass(this.materials.derivatives, target);
+			}
 		});
-		this.surface.material.uniforms.dye.value = this.dye.read.texture;
+		this.updateDisplay();
 	}
 
 	step(dt: number, splats: readonly FluidSplat[], settings: FluidSettings) {
@@ -226,9 +275,10 @@ export class SphericalFluid {
 			u.source.value = this.velocity.read.texture;
 			u.isVelocity.value = true;
 			u.dissipation.value = 0.12;
-			this.pass(this.materials.advect, this.velocity.write);
-			this.velocity.swap();
-			u.velocity.value = this.velocity.read.texture;
+			// Preserve this stage for inspection; the ping-pong pair ends the step
+			// holding the forced velocity in write and projected velocity in read.
+			this.pass(this.materials.advect, this.advectedVelocity);
+			u.velocity.value = this.advectedVelocity.texture;
 			this.pass(this.materials.derivatives, this.derivatives);
 			this.pass(this.materials.forces, this.velocity.write);
 			this.velocity.swap();
@@ -250,6 +300,8 @@ export class SphericalFluid {
 
 			// Transport colour at twice the velocity field resolution.
 			u.velocity.value = this.velocity.read.texture;
+			// Keep the pressure solve's input derivatives intact for comparison.
+			this.pass(this.materials.derivatives, this.projectedDerivatives);
 			u.source.value = this.dye.read.texture;
 			u.isVelocity.value = false;
 			u.dissipation.value = settings.dyeDecay;
@@ -259,14 +311,16 @@ export class SphericalFluid {
 			this.pass(this.materials.dye, this.dye.write);
 			this.dye.swap();
 		});
-		this.surface.material.uniforms.dye.value = this.dye.read.texture;
+		this.updateDisplay();
 	}
 
 	dispose() {
 		this.velocity.dispose();
 		this.dye.dispose();
 		this.pressure.dispose();
+		this.advectedVelocity.dispose();
 		this.derivatives.dispose();
+		this.projectedDerivatives.dispose();
 		Object.values(this.materials).forEach((material) => material.dispose());
 		this.quad.geometry.dispose();
 		this.surface.geometry.dispose();
