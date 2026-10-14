@@ -26,223 +26,198 @@ export interface Species {
 }
 
 const speciesData = {
-	rattlesnake: {
+	skallerorm: {
 		file: "skallerorm.jpg",
 		english: "Rattlesnake",
 		swedish: "Skallerorm",
 	},
-	yeast: {
-		file: "jast_kylskap.jpg",
-		english: "Yeast",
-		swedish: "Jäst",
-	},
-	eColi: {
-		file: "ecoli.jpg",
+	kolibakterie: {
+		file: "kolibakterie.jpg",
 		english: "E. coli",
 		swedish: "Kolibakterie",
 	},
-	graniteBoulder: {
+	granitblock: {
 		file: "granitblock.jpg",
 		english: "Granite boulder",
 		swedish: "Granitblock",
 	},
-	gardenSpider: {
+	korsspindel: {
 		file: "korsspindel.jpg",
 		english: "European garden spider",
 		swedish: "Korsspindel",
 	},
-	chanterelle: {
+	kantarell: {
 		file: "kantarell.jpg",
 		english: "Chanterelle",
 		swedish: "Kantarell",
 	},
-	rabbit: {
+	kanin: {
 		file: "kanin.jpg",
 		english: "Rabbit",
 		swedish: "Kanin",
 	},
-	earthworm: {
-		file: "stordaggmask.jpg",
+	stor_daggmask: {
+		file: "stor_daggmask.jpg",
 		english: "Common earthworm",
 		swedish: "Stor daggmask",
 	},
-	dandelion: {
+	maskros: {
 		file: "maskros.jpg",
 		english: "Dandelion",
 		swedish: "Maskros",
 	},
-	moonJellyfish: {
-		file: "oronmanet.jpg",
+	öronmanet: {
+		file: "öronmanet.jpg",
 		english: "Moon jellyfish",
 		swedish: "Öronmanet",
 	},
-	polarBear: {
-		file: "isbjorn.jpg",
+	isbjörn: {
+		file: "isbjörn.jpg",
 		english: "Polar bear",
 		swedish: "Isbjörn",
 	},
-	perch: {
+	abborre: {
 		file: "abborre.jpg",
 		english: "European perch",
 		swedish: "Abborre",
 	},
-	woodAnemone: {
+	vitsippa: {
 		file: "vitsippa.jpg",
 		english: "Wood anemone",
 		swedish: "Vitsippa",
 	},
-	haircapMoss: {
-		file: "bjornmossa.jpg",
+	björnmossa: {
+		file: "björnmossa.jpg",
 		english: "Haircap moss",
 		swedish: "Björnmossa",
 	},
-	brownLivingStone: {
-		file: "bruntstenblad.jpg",
+	brunt_stenblad: {
+		file: "brunt_stenblad.jpg",
 		english: "Brown living stone",
 		swedish: "Brunt stenblad",
 	},
-	stickInsect: {
-		file: "vandrandepinne.jpg",
+	vandrande_pinne: {
+		file: "vandrande_pinne.jpg",
 		english: "Stick insect",
 		swedish: "Vandrande pinne",
 	},
-	staphylococci: {
-		file: "svinkoppor.jpg",
+	stafylokocker: {
+		file: "stafylokocker.jpg",
 		english: "Staphylococci",
 		swedish: "Stafylokocker",
 	},
-	mapLichen: {
+	kartlav: {
 		file: "kartlav.jpg",
 		english: "Map lichen",
 		swedish: "Kartlav",
 	},
-	rockCrystal: {
+	bergskristall: {
 		file: "bergskristall.jpg",
 		english: "Rock crystal",
 		swedish: "Bergskristall",
 	},
-	slag: {
+	slagg: {
 		file: "slagg.jpg",
 		english: "Slag",
 		swedish: "Slagg",
 	},
-	caperSpurge: {
-		file: "revormstorel.jpg",
+	revormstörel: {
+		file: "revormstörel.jpg",
 		english: "Caper spurge",
 		swedish: "Revormstörel",
 	},
-	ladysSlipperOrchid: {
+	guckusko: {
 		file: "guckusko.jpg",
 		english: "Lady's-slipper orchid",
 		swedish: "Guckusko",
 	},
-	seaSquirt: {
-		file: "sjopung.jpg",
+	sjöpung: {
+		file: "sjöpung.jpg",
 		english: "Sea squirt",
 		swedish: "Sjöpung",
 	},
-	barnacle: {
+	havstulpan: {
 		file: "havstulpan.jpg",
 		english: "Barnacle",
 		swedish: "Havstulpan",
 	},
-	diatom: {
+	kiselalg: {
 		file: "kiselalg.jpg",
 		english: "Diatom",
 		swedish: "Kiselalg",
 	},
-	flyOrchid: {
+	flugblomster: {
 		file: "flugblomster.jpg",
 		english: "Fly orchid",
 		swedish: "Flugblomster",
 	},
-	greatGreenBushCricket: {
-		file: "vartbitare.jpg",
+	grön_vårtbitare: {
+		file: "grön_vårtbitare.jpg",
 		english: "Great green bush-cricket",
 		swedish: "Grön vårtbitare",
 	},
-	scarletElfCup: {
-		file: "skalsvamp.jpg",
+	vårskål: {
+		file: "vårskål.jpg",
 		english: "Scarlet elf cup",
 		swedish: "Vårskål",
 	},
-	thermusAquaticus: {
-		file: "thermusaquaticus.jpg",
+	thermus_aquaticus: {
+		file: "thermus_aquaticus.jpg",
 		english: "Thermus aquaticus",
 		swedish: "Thermus aquaticus",
 	},
-	saguaroCactus: {
+	saguarokaktus: {
 		file: "saguarokaktus.jpg",
 		english: "Saguaro cactus",
 		swedish: "Saguarokaktus",
 	},
-	chimpanzee: {
+	schimpans: {
 		file: "schimpans.jpg",
 		english: "Chimpanzee",
 		swedish: "Schimpans",
-	},
-	mold: {
-		file: "mogel_ost_kylskap.jpg",
-		english: "Mold",
-		swedish: "Mögelsvamp",
-	},
-	lacticAcidBacterium: {
-		file: "mjolksyrabakterie_yoghurt_kylskap.jpg",
-		english: "Lactic acid bacterium",
-		swedish: "Mjölksyrabakterie",
 	},
 	fossil: {
 		file: "fossil.jpg",
 		english: "Fossil",
 		swedish: "Fossil",
 	},
-	linden: {
-		file: "lind.jpg",
-		english: "Linden tree",
-		swedish: "Lind",
-	},
-	blackbird: {
+	koltrast: {
 		file: "koltrast.jpg",
 		english: "Common blackbird",
 		swedish: "Koltrast",
 	},
-	dogRose: {
+	nyponros: {
 		file: "nyponros.jpg",
 		english: "Dog rose",
 		swedish: "Nyponros",
 	},
-	seahorse: {
-		file: "sjohast.jpg",
-		english: "Seahorse",
-		swedish: "Sjöhäst",
-	},
-	orca: {
-		file: "spackhuggare.jpg",
+	späckhuggare: {
+		file: "späckhuggare.jpg",
 		english: "Orca",
 		swedish: "Späckhuggare",
 	},
-	northernPike: {
-		file: "gadda.jpg",
+	gädda: {
+		file: "gädda.jpg",
 		english: "Northern pike",
 		swedish: "Gädda",
 	},
-	sundew: {
-		file: "sileshar.jpg",
+	sileshår: {
+		file: "sileshår.jpg",
 		english: "Sundew",
 		swedish: "Sileshår",
 	},
-	hepatica: {
-		file: "blasippa.jpg",
+	blåsippa: {
+		file: "blåsippa.jpg",
 		english: "Hepatica",
 		swedish: "Blåsippa",
 	},
-	flyAgaric: {
-		file: "rodflugsvamp.jpg",
+	röd_flugsvamp: {
+		file: "röd_flugsvamp.jpg",
 		english: "Fly agaric",
 		swedish: "Röd flugsvamp",
 	},
-	roughRedAlga: {
-		file: "rodalg.jpg",
+	grovslick: {
+		file: "grovslick.jpg",
 		english: "Rough red alga",
 		swedish: "Grovslick",
 	},
@@ -250,6 +225,231 @@ const speciesData = {
 		file: "jaguar.jpg",
 		english: "Jaguar",
 		swedish: "Jaguar",
+	},
+	gräsand: {
+		file: "gräsand.jpg",
+		english: "Mallard",
+		swedish: "Gräsand",
+	},
+	kaveldun: {
+		file: "kaveldun.jpg",
+		english: "Cattail",
+		swedish: "Kaveldun",
+	},
+	trollslända: {
+		file: "trollslända.jpg",
+		english: "Dragonfly",
+		swedish: "Trollslända",
+	},
+	svavelkristall: {
+		file: "svavelkristall.jpg",
+		english: "Sulfur crystal",
+		swedish: "Svavelkristall",
+	},
+	prärievarg: {
+		file: "prärievarg.jpg",
+		english: "Coyote",
+		swedish: "Prärievarg",
+	},
+	pilempid: {
+		file: "pilempid.jpg",
+		english: "Willow flycatcher",
+		swedish: "Pilempid",
+	},
+	moapaspigg: {
+		file: "moapaspigg.jpg",
+		english: "Moapa dace",
+		swedish: "Moapaspigg",
+	},
+	fjällräv: {
+		file: "fjällräv.jpg",
+		english: "Arctic fox",
+		swedish: "Fjällräv",
+	},
+	tamduva: {
+		file: "tamduva.jpg",
+		english: "Domestic pigeon",
+		swedish: "Tamduva",
+	},
+	brunråtta: {
+		file: "brunråtta.jpg",
+		english: "Brown rat",
+		swedish: "Brunråtta",
+	},
+	mögel: {
+		file: "mögel.jpg",
+		english: "Mold",
+		swedish: "Mögel",
+	},
+	lind: {
+		file: "lind.jpg",
+		english: "Linden",
+		swedish: "Lind",
+	},
+	älg: {
+		file: "älg.jpg",
+		english: "Moose",
+		swedish: "Älg",
+	},
+	rödräv: {
+		file: "rödräv.jpg",
+		english: "Red fox",
+		swedish: "Rödräv",
+	},
+	blåbär: {
+		file: "blåbär.jpg",
+		english: "Bilberry",
+		swedish: "Blåbär",
+	},
+	björk: {
+		file: "björk.jpg",
+		english: "Birch",
+		swedish: "Björk",
+	},
+	ekorre: {
+		file: "ekorre.jpg",
+		english: "Red squirrel",
+		swedish: "Ekorre",
+	},
+	skogsmyra: {
+		file: "skogsmyra.jpg",
+		english: "Wood ant",
+		swedish: "Skogsmyra",
+	},
+	fisktärna: {
+		file: "fisktärna.jpg",
+		english: "Common tern",
+		swedish: "Fisktärna",
+	},
+	plast: {
+		file: "plast.jpg",
+		english: "Plastic",
+		swedish: "Plast",
+	},
+	makrill: {
+		file: "makrill.jpg",
+		english: "Mackerel",
+		swedish: "Makrill",
+	},
+	havstrut: {
+		file: "havstrut.jpg",
+		english: "Great black-backed gull",
+		swedish: "Havstrut",
+	},
+	sargassotång: {
+		file: "sargassotång.jpg",
+		english: "Sargassum",
+		swedish: "Sargassotång",
+	},
+	vit_näckros: {
+		file: "vit_näckros.jpg",
+		english: "White water lily",
+		swedish: "Vit näckros",
+	},
+	valross: {
+		file: "valross.jpg",
+		english: "Walrus",
+		swedish: "Valross",
+	},
+	isalger: {
+		file: "isalger.jpg",
+		english: "Ice algae",
+		swedish: "Isalger",
+	},
+	ismask: {
+		file: "ismask.jpg",
+		english: "Ice worm",
+		swedish: "Ismask",
+	},
+	isranunkel: {
+		file: "isranunkel.jpg",
+		english: "Glacier buttercup",
+		swedish: "Isranunkel",
+	},
+	skorpion: {
+		file: "skorpion.jpg",
+		english: "Scorpion",
+		swedish: "Skorpion",
+	},
+	sandsten: {
+		file: "sandsten.jpg",
+		english: "Sandstone",
+		swedish: "Sandsten",
+	},
+	härfågellärka: {
+		file: "härfågellärka.jpg",
+		english: "Greater hoopoe-lark",
+		swedish: "Härfågellärka",
+	},
+	tukan: {
+		file: "tukan.jpg",
+		english: "Toucan",
+		swedish: "Tukan",
+	},
+	passionsblomma: {
+		file: "passionsblomma.jpg",
+		english: "Passionflower",
+		swedish: "Passionsblomma",
+	},
+	glasgroda: {
+		file: "glasgroda.jpg",
+		english: "Glass frog",
+		swedish: "Glasgroda",
+	},
+	rådjur: {
+		file: "rådjur.jpg",
+		english: "Roe deer",
+		swedish: "Rådjur",
+	},
+	mindre_skogsmus: {
+		file: "mindre_skogsmus.jpg",
+		english: "Wood mouse",
+		swedish: "Mindre skogsmus",
+	},
+	vanlig_groda: {
+		file: "vanlig_groda.jpg",
+		english: "Common frog",
+		swedish: "Vanlig groda",
+	},
+	strandkrabba: {
+		file: "strandkrabba.jpg",
+		english: "Short crab",
+		swedish: "Strandkrabba",
+	},
+	vittrut: {
+		file: "vittrut.jpg",
+		english: "Glaucous gull",
+		swedish: "Vittrut",
+	},
+	gråhäger: {
+		file: "gråhäger.jpg",
+		english: "Grey heron",
+		swedish: "Gråhäger",
+	},
+	älggräs: {
+		file: "älggräs.jpg",
+		english: "Meadowsweet",
+		swedish: "Älggräs",
+	},
+	stensopp: {
+		file: "stensopp.jpg",
+		english: "Penny bun",
+		swedish: "Stensopp",
+	},
+	marulk: {
+		file: "marulk.jpg",
+		english: "Angler",
+		swedish: "Marulk",
+	},
+	torsk: {
+		file: "torsk.jpg",
+		english: "Atlantic cod",
+		swedish: "Torsk",
+	},
+	glassvamp: {
+		file: "glassvamp.jpg",
+		english: "Glass sponge",
+		swedish: "Glassvamp",
 	},
 } as const;
 
