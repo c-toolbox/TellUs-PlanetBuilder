@@ -11,7 +11,7 @@ interface CurvePanelOptions {
  * Call once after positioning/scaling the model inside its panel group.
  * Panel +Z faces the viewer; the plane z=0 becomes a cylinder of radius R.
  */
-export function curvePanel(panel: THREE.Group, {
+export function curvePanel(panel: THREE.Object3D, {
 	radius,
 	maxSegmentWidth = 0.04,
 }: CurvePanelOptions): void {

@@ -35,7 +35,7 @@ interface SpeciesImageCacheEntry {
 	ready: Promise<number>;
 }
 
-type TransitionPhase = "idle" | "loading" | "wipe" | "reveal";
+type TransitionPhase = "idle" | "wipe" | "reveal";
 type BillboardPhase = "opening" | "open" | "closing";
 
 interface ActiveBillboard {
@@ -45,18 +45,13 @@ interface ActiveBillboard {
 	tween?: Tween<THREE.Vector3>;
 }
 
-interface PendingLocationChange {
-	locationKey: LocationKey;
-	origin: THREE.Vector3;
-}
-
-const BUTTON_ANIMATION_DURATION = 250;
-const BILLBOARD_ANIMATION_DURATION = 250;
+const APPEAR_DURATION = 300;
+const DISAPPEAR_DURATION = 200;
 const BACKGROUND_DISTANCE = 3;
 const BUTTON_DISTANCE = 2;
 const BUTTON_RADIUS = 0.16;
-const BILLBOARD_DISTANCE = 1.5;
-const WIPE_DURATION = 1000;
+const BILLBOARD_DISTANCE = 1.8;
+const WIPE_DURATION = 750;
 
 export default class VinjettScene extends BaseScene {
 	private vinjettConfig: VinjettUiConfig = {
@@ -77,14 +72,14 @@ export default class VinjettScene extends BaseScene {
 	private speciesImageCache = new Map<SpeciesKey, SpeciesImageCacheEntry>();
 	private speciesBillboards = new Map<SpeciesKey, ActiveBillboard>();
 	private loadingSpecies = new Set<SpeciesKey>();
-	private pendingLocationChange?: PendingLocationChange;
 	private backgroundCache = new Map<LocationKey, BackgroundCacheEntry>();
 	private transitionPhase: TransitionPhase = "idle";
 	private transitionElapsed = 0;
 	private transitionTarget?: LocationKey;
 	private transitionOrigin = new THREE.Vector3(0, 0, 1);
 	private pendingBackground?: THREE.MeshBasicMaterial[];
-	private buttonTween?: Tween<{ scale: number }>;
+	private outgoingButtons: CircularButton[] = [];
+	private outgoingScales = new Map<THREE.Object3D, number>();
 
 	constructor() {
 		super();
@@ -94,13 +89,16 @@ export default class VinjettScene extends BaseScene {
 	}
 
 	override onExit(renderer: Renderer) {
-		this.buttonTween?.stop();
-		this.buttonTween = undefined;
+		if (this.pendingBackground) {
+			this.applyBackground(this.pendingBackground);
+		}
 		this.loadingSpecies.clear();
 		this.speciesBillboards.forEach((activeBillboard) => {
 			this.removeSpeciesBillboard(activeBillboard);
 		});
-		this.pendingLocationChange = undefined;
+		this.disposeCircularButtons(this.outgoingButtons);
+		this.outgoingButtons = [];
+		this.outgoingScales.clear();
 		this.transitionTarget = undefined;
 		this.pendingBackground = undefined;
 		this.transitionPhase = "idle";
@@ -113,11 +111,7 @@ export default class VinjettScene extends BaseScene {
 	}
 
 	private addCircularButtons() {
-		this.circularButtons.forEach((button) => {
-			this.unregisterTouchInteraction(button.touchInteraction);
-			this.remove(button);
-			button.dispose();
-		});
+		this.disposeCircularButtons(this.circularButtons);
 		this.circularButtons = [];
 		this.speciesButtons.clear();
 
@@ -162,6 +156,14 @@ export default class VinjettScene extends BaseScene {
 			button.setLabelVisible(this.discoveredSpecies.has(placement.species));
 			this.speciesButtons.set(button, placement.species);
 		}
+	}
+
+	private disposeCircularButtons(buttons: CircularButton[]) {
+		buttons.forEach((button) => {
+			this.unregisterTouchInteraction(button.touchInteraction);
+			this.remove(button);
+			button.dispose();
+		});
 	}
 
 	private discoverSpecies(speciesKey: SpeciesKey) {
@@ -267,7 +269,7 @@ export default class VinjettScene extends BaseScene {
 				};
 				this.speciesBillboards.set(speciesKey, activeBillboard);
 				activeBillboard.tween = this.createTween(billboard.scale)
-					.to({ x: 1, y: 1, z: 1 }, BILLBOARD_ANIMATION_DURATION)
+					.to({ x: 1, y: 1, z: 1 }, APPEAR_DURATION)
 					.easing(Easing.Back.Out)
 					.onComplete(() => {
 						activeBillboard.phase = "open";
@@ -290,11 +292,10 @@ export default class VinjettScene extends BaseScene {
 		activeBillboard.tween?.stop();
 		activeBillboard.phase = "closing";
 		activeBillboard.tween = this.createTween(activeBillboard.billboard.scale)
-			.to({ x: 0, y: 0, z: 0 }, BILLBOARD_ANIMATION_DURATION)
+			.to({ x: 0, y: 0, z: 0 }, DISAPPEAR_DURATION)
 			.easing(Easing.Cubic.Out)
 			.onComplete(() => {
 				this.removeSpeciesBillboard(activeBillboard);
-				this.beginPendingLocationChange();
 			})
 			.start();
 	}
@@ -305,21 +306,6 @@ export default class VinjettScene extends BaseScene {
 		this.unregisterTouchInteraction(activeBillboard.billboard.touchInteraction);
 		activeBillboard.billboard.dispose();
 		this.speciesBillboards.delete(activeBillboard.speciesKey);
-	}
-
-	private beginPendingLocationChange() {
-		if (this.speciesBillboards.size === 0 && this.pendingLocationChange) {
-			const { locationKey, origin } = this.pendingLocationChange;
-			this.pendingLocationChange = undefined;
-			this.beginLocationTransition(locationKey, origin);
-		}
-	}
-
-	private closeAllSpeciesBillboards() {
-		this.loadingSpecies.clear();
-		this.speciesBillboards.forEach(({ speciesKey }) => {
-			this.closeSpeciesBillboard(speciesKey);
-		});
 	}
 
 	private addCircularButton(
@@ -338,7 +324,7 @@ export default class VinjettScene extends BaseScene {
 			onClick,
 		});
 		button.touchInteraction.enabled = () =>
-			this.transitionPhase === "idle" && !this.pendingLocationChange;
+			this.transitionPhase === "idle";
 		this.registerTouchInteraction(button.touchInteraction);
 
 		this.circularButtons.push(button);
@@ -352,22 +338,12 @@ export default class VinjettScene extends BaseScene {
 	) {
 		if (
 			this.transitionPhase !== "idle" ||
-			this.pendingLocationChange ||
 			locationKey === this.vinjettConfig.location
 		) {
 			return;
 		}
 
 		const normalizedOrigin = origin.clone().normalize();
-		this.closeAllSpeciesBillboards();
-		if (this.speciesBillboards.size > 0) {
-			this.pendingLocationChange = {
-				locationKey,
-				origin: normalizedOrigin,
-			};
-			return;
-		}
-
 		this.beginLocationTransition(locationKey, normalizedOrigin);
 	}
 
@@ -377,40 +353,39 @@ export default class VinjettScene extends BaseScene {
 	) {
 		this.transitionTarget = locationKey;
 		this.transitionOrigin.copy(origin);
-		this.pendingBackground = undefined;
-		this.transitionPhase = "loading";
+		const background = this.getBackground(locationKey);
+		this.pendingBackground = background.materials;
+		this.transitionPhase = "wipe";
 		this.transitionElapsed = 0;
-		this.animateCircularButtons(0, () => this.beginBackgroundWipe());
+		this.loadingSpecies.clear();
+		this.outgoingButtons = this.circularButtons;
+		this.outgoingScales.clear();
+		this.outgoingButtons.forEach((button) => {
+			this.outgoingScales.set(button, button.scale.x);
+		});
+		this.speciesBillboards.forEach((activeBillboard) => {
+			activeBillboard.tween?.stop();
+			activeBillboard.tween = undefined;
+			activeBillboard.phase = "closing";
+			this.outgoingScales.set(
+				activeBillboard.billboard,
+				activeBillboard.billboard.scale.x,
+			);
+		});
 
-		this.getBackground(locationKey).ready.then(
-			(materials) => {
-				if (this.transitionTarget === locationKey) {
-					this.pendingBackground = materials;
-					this.beginBackgroundWipe();
-				}
-			},
+		this.circularButtons = [];
+		this.speciesButtons.clear();
+		this.vinjettConfig.location = locationKey;
+		this.addCircularButtons();
+		this.circularButtons.forEach((button) => button.scale.setScalar(0));
+
+		background.ready.then(
+			() => {},
 			(error) => {
 				console.error(`Failed to load location ${locationKey}`, error);
 				this.backgroundCache.delete(locationKey);
-				if (this.transitionTarget === locationKey) {
-					this.transitionTarget = undefined;
-					this.revealCircularButtons();
-				}
 			},
 		);
-	}
-
-	private beginBackgroundWipe() {
-		if (
-			this.transitionPhase !== "loading" ||
-			!this.pendingBackground ||
-			this.buttonTween
-		) {
-			return;
-		}
-
-		this.transitionPhase = "wipe";
-		this.transitionElapsed = 0;
 	}
 
 	private getTransitionOrigin(locationKey: LocationKey) {
@@ -489,49 +464,89 @@ export default class VinjettScene extends BaseScene {
 		if (!this.transitionTarget || !this.pendingBackground) return;
 
 		this.applyBackground(this.pendingBackground);
-		this.vinjettConfig.location = this.transitionTarget;
 		this.transitionTarget = undefined;
 		this.pendingBackground = undefined;
-		this.addCircularButtons();
-		this.circularButtons.forEach((button) => button.scale.setScalar(0));
+		this.disposeCircularButtons(this.outgoingButtons);
+		this.outgoingButtons = [];
+		this.speciesBillboards.forEach((activeBillboard) => {
+			this.removeSpeciesBillboard(activeBillboard);
+		});
+		this.outgoingScales.clear();
 		this.sendUiConfig();
-		this.revealCircularButtons();
+		this.transitionPhase = "reveal";
 	}
 
-	private revealCircularButtons() {
-		this.transitionPhase = "reveal";
-		this.circularButtons.forEach((button) => (button.visible = true));
-		this.animateCircularButtons(1, () => {
-			this.transitionPhase = "idle";
+	private getWipeArrival(position: THREE.Vector3) {
+		const direction = position.clone().normalize();
+		return (
+			(this.transitionOrigin.angleTo(direction) / Math.PI) * WIPE_DURATION
+		);
+	}
+
+	private getWipeArrivalElapsed(position: THREE.Vector3) {
+		const arrival = this.getWipeArrival(position);
+		return Math.cbrt(arrival / WIPE_DURATION) * WIPE_DURATION;
+	}
+
+	private get easedTransitionElapsed() {
+		const wipeElapsed = Math.min(this.transitionElapsed, WIPE_DURATION);
+		const revealElapsed = Math.max(
+			this.transitionElapsed - WIPE_DURATION,
+			0,
+		);
+		return (
+			Easing.Cubic.In(wipeElapsed / WIPE_DURATION) * WIPE_DURATION +
+			revealElapsed
+		);
+	}
+
+	private updateTransitionObjects() {
+		const transitionElapsed = this.easedTransitionElapsed;
+		this.outgoingScales.forEach((initialScale, object) => {
+			const arrivalElapsed = this.getWipeArrivalElapsed(object.position);
+			const duration = Math.min(
+				DISAPPEAR_DURATION,
+				arrivalElapsed,
+			);
+			const startElapsed = arrivalElapsed - duration;
+			const progress = THREE.MathUtils.clamp(
+				(this.transitionElapsed - startElapsed) / duration,
+				0,
+				1,
+			);
+			object.scale.setScalar(
+				initialScale * (1 - Easing.Cubic.In(progress)),
+			);
+		});
+
+		this.circularButtons.forEach((button) => {
+			const arrival = this.getWipeArrival(button.position);
+			const progress = THREE.MathUtils.clamp(
+				(transitionElapsed - arrival) / APPEAR_DURATION,
+				0,
+				1,
+			);
+			button.scale.setScalar(Easing.Back.Out(progress));
 		});
 	}
 
-	private animateCircularButtons(targetScale: 0 | 1, onComplete: () => void) {
-		this.buttonTween?.stop();
-		const buttons = this.circularButtons;
-		this.buttonTween = this.createTween({
-			scale: buttons[0]?.scale.x ?? targetScale,
-		})
-			.to({ scale: targetScale }, BUTTON_ANIMATION_DURATION)
-			.easing(targetScale === 1 ? Easing.Back.Out : Easing.Cubic.Out)
-			.onUpdate(({ scale }) => {
-				buttons.forEach((button) => button.scale.setScalar(scale));
-			})
-			.onComplete(() => {
-				this.buttonTween = undefined;
-				if (targetScale === 0) {
-					buttons.forEach((button) => (button.visible = false));
-				}
-				onComplete();
-			})
-			.start();
-	}
-
 	override update(delta: number) {
-		if (this.transitionPhase === "wipe") {
+		if (this.transitionPhase !== "idle") {
 			this.transitionElapsed += delta;
-			if (this.transitionElapsed >= WIPE_DURATION) {
+			this.updateTransitionObjects();
+			if (
+				this.transitionPhase === "wipe" &&
+				this.transitionElapsed >= WIPE_DURATION
+			) {
 				this.finishBackgroundSwap();
+			}
+			if (
+				this.transitionPhase === "reveal" &&
+				this.transitionElapsed >= WIPE_DURATION + APPEAR_DURATION
+			) {
+				this.circularButtons.forEach((button) => button.scale.setScalar(1));
+				this.transitionPhase = "idle";
+				this.transitionElapsed = 0;
 			}
 		}
 	}
@@ -563,7 +578,7 @@ export default class VinjettScene extends BaseScene {
 				.applyQuaternion(cameraQuaternion.clone().invert());
 			projectionScene.setTransition(
 				true,
-				Math.min(this.transitionElapsed / WIPE_DURATION, 1),
+				Math.min(this.easedTransitionElapsed / WIPE_DURATION, 1),
 				localOrigin,
 			);
 		} else {
@@ -609,7 +624,7 @@ export default class VinjettScene extends BaseScene {
 			this.speciesBillboards.forEach(({ speciesKey, billboard }) => {
 				billboard.setLabel(species[speciesKey][value]);
 			});
-			if (this.transitionPhase === "idle" && !this.pendingLocationChange) {
+			if (this.transitionPhase === "idle") {
 				this.addCircularButtons();
 			} else {
 				this.refreshSpeciesButtons();
