@@ -246,6 +246,11 @@ const speciesData = {
 		english: "Rough red alga",
 		swedish: "Grovslick",
 	},
+	jaguar: {
+		file: "jaguar.jpg",
+		english: "Jaguar",
+		swedish: "Jaguar",
+	},
 } as const;
 
 export const species = Object.fromEntries(
