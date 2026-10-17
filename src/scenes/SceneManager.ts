@@ -8,6 +8,7 @@ import CountryScene from "./country/CountryScene";
 import VinjettScene from "./vinjett/VinjettScene";
 import MusicScene from "./music/MusicScene";
 import InteractionScene from "./interaction/InteractionScene";
+import MeasuringScene from "./measuring/MeasuringScene";
 import FluidScene from "./fluid/FluidScene";
 
 /* Scenes */
@@ -20,6 +21,7 @@ export enum SceneKey {
 	Vinjett = "Wildlife",
 	Music = "Music",
 	Interaction = "Interaction",
+	Measuring = "Measuring",
 	Fluid = "Fluid",
 	ReactionDiffusion = "ReactionDiffusion",
 }
@@ -32,6 +34,7 @@ export const scenes = {
 	[SceneKey.Vinjett]: new VinjettScene(),
 	[SceneKey.Music]: new MusicScene(),
 	[SceneKey.Interaction]: new InteractionScene(),
+	[SceneKey.Measuring]: new MeasuringScene(),
 	[SceneKey.Fluid]: new FluidScene(),
 	[SceneKey.ReactionDiffusion]: new ReactionDiffusionScene(),
 } satisfies Record<SceneKey, BaseScene>;
