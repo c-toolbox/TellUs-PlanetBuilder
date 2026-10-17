@@ -34,7 +34,6 @@ export class Fish extends THREE.Mesh {
 			premultipliedAlpha: true,
 			depthWrite: false,
 			side: THREE.FrontSide,
-			// side: THREE.DoubleSide,
 		});
 
 		const geometry = new THREE.PlaneGeometry(1, 1);

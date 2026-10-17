@@ -282,7 +282,7 @@ class DragRopeSphere extends InteractionSphere {
 			ropeGeometry,
 			new THREE.MeshBasicMaterial({
 				color: dragOriginMarker.material.color,
-				side: THREE.DoubleSide,
+				side: THREE.FrontSide,
 			}),
 		);
 		rope.visible = false;

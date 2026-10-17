@@ -71,13 +71,13 @@ export default class SphericalSlider extends THREE.Group<SphericalSliderEventMap
 		const halfWidth = Math.asin(knobRadius / radius);
 		const bar = new THREE.Mesh(
 			this.createRibbon(normal, radius + knobRadius * 1.1, halfWidth * 0.25),
-			new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide }),
+			new THREE.MeshBasicMaterial({ color, side: THREE.FrontSide }),
 		);
 		this.background = new THREE.Mesh(
 			// Extend the hitbox past both endpoints so the entire knob remains pressable.
 			this.createRibbon(normal, radius + knobRadius * 1.2, halfWidth, halfWidth),
 			new THREE.MeshBasicMaterial({
-				color, side: THREE.DoubleSide, transparent: true,
+				color, side: THREE.FrontSide, transparent: true,
 				opacity: backgroundOpacity, depthWrite: false,
 			}),
 		);

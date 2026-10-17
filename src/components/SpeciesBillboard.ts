@@ -39,7 +39,7 @@ export default class SpeciesBillboard extends THREE.Mesh<
 				map: texture,
 				transparent: true,
 				alphaTest: 0.01,
-				side: THREE.DoubleSide,
+				side: THREE.FrontSide,
 			}),
 		);
 
@@ -51,7 +51,7 @@ export default class SpeciesBillboard extends THREE.Mesh<
 
 		const borderMaterial = new THREE.MeshBasicMaterial({
 			color: 0xffffff,
-			side: THREE.DoubleSide,
+			side: THREE.FrontSide,
 		});
 		const outerWidth = width + BORDER_THICKNESS * 2;
 		const horizontalGeometry = new THREE.PlaneGeometry(

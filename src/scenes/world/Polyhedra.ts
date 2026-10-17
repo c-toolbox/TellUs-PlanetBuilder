@@ -4,12 +4,7 @@ import earcut from "earcut";
 import circle from "@/assets/circle.png";
 import { Tile } from "./TileManager";
 
-import {
-	VERTEX_DISTANCE,
-	EDGE_DISTANCE,
-	FACE_DISTANCE,
-	DOUBLE_SIDE,
-} from "./constants";
+import { VERTEX_DISTANCE, EDGE_DISTANCE, FACE_DISTANCE } from "./constants";
 import { TileMesh } from "./TileMesh";
 
 export class Polyhedra {
@@ -71,7 +66,7 @@ export class Polyhedra {
 			transparent: true,
 			premultipliedAlpha: true,
 			depthWrite: false, // keeps edges from z-fighting
-			side: DOUBLE_SIDE ? THREE.DoubleSide : THREE.FrontSide,
+			side: THREE.FrontSide,
 		});
 
 		const geometry = new THREE.PlaneGeometry(1, 1);
@@ -115,7 +110,7 @@ export class Polyhedra {
 		const material = new THREE.MeshBasicMaterial({
 			color: this.edgeColor,
 			depthWrite: true,
-			side: DOUBLE_SIDE ? THREE.DoubleSide : THREE.FrontSide,
+			side: THREE.FrontSide,
 		});
 
 		const quad = new THREE.PlaneGeometry(1, 1);
@@ -314,7 +309,7 @@ export class Polyhedra {
 		// Step 7: Create mesh
 		const material = new THREE.MeshBasicMaterial({
 			transparent: true,
-			side: DOUBLE_SIDE ? THREE.DoubleSide : THREE.FrontSide,
+			side: THREE.FrontSide,
 		});
 		const mesh = new TileMesh(geometry, material);
 		mesh.scale.multiplyScalar(FACE_DISTANCE);

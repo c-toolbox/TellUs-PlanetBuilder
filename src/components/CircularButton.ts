@@ -38,7 +38,7 @@ export default class CircularButton extends THREE.Mesh<
 			new THREE.CircleGeometry(radius, 48),
 			new THREE.MeshBasicMaterial({
 				color,
-				side: THREE.DoubleSide,
+				side: THREE.FrontSide,
 			}),
 		);
 
@@ -52,7 +52,7 @@ export default class CircularButton extends THREE.Mesh<
 			new THREE.RingGeometry(radius, radius * 1.15, 48),
 			new THREE.MeshBasicMaterial({
 				color: 0xffffff,
-				side: THREE.DoubleSide,
+				side: THREE.FrontSide,
 			}),
 		);
 		outline.position.z = 0.001;
@@ -100,7 +100,7 @@ export default class CircularButton extends THREE.Mesh<
 			new THREE.MeshBasicMaterial({
 				map: texture,
 				transparent: true,
-				side: THREE.DoubleSide,
+				side: THREE.FrontSide,
 			}),
 		);
 		this.icon.position.z = 0.002;

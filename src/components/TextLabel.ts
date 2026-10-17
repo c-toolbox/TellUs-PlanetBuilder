@@ -34,8 +34,7 @@ export default class TextLabel extends THREE.Mesh<
 			new THREE.ShapeGeometry(),
 			new THREE.MeshBasicMaterial({
 				color: 0xffffff,
-				side: THREE.DoubleSide,
-				depthWrite: false,
+				side: THREE.FrontSide,
 			}),
 		);
 

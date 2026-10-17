@@ -160,7 +160,6 @@ export default abstract class BaseScene extends THREE.Scene {
 			const geometry = new THREE.SphereGeometry(distance, 64, 64);
 			const material = new THREE.MeshBasicMaterial({
 				map: texture,
-				// side: THREE.DoubleSide,
 				side: THREE.BackSide,
 			});
 			material.color.set(tintColor);
