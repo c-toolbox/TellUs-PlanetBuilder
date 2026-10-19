@@ -8,6 +8,8 @@ import { GLOBE_FOV_DEGREES } from "@/constants";
 
 type ViewMode = "azimuthal" | "scene" | "sphere";
 
+const MAX_SPHERE_TOUCHES = 64;
+
 export class Renderer extends THREE.WebGLRenderer {
 	public currentScene: BaseScene;
 	public projectionScene: ProjectionScene;
@@ -20,7 +22,7 @@ export class Renderer extends THREE.WebGLRenderer {
 
 	private viewMode: ViewMode = "azimuthal";
 	private sphericalDisplayRaycaster = new THREE.Raycaster();
-	private activeSphereTouch?: { pointerId: number; touchId: number };
+	private activeSpherePointers = new Map<number, number>();
 	private nextSimulatedTouchId = -1;
 
 	constructor() {
@@ -53,12 +55,7 @@ export class Renderer extends THREE.WebGLRenderer {
 		);
 		this.configureOrbitControls(this.debugControls);
 
-		this.sphericalDisplayCamera = new THREE.PerspectiveCamera(
-			70,
-			1,
-			0.01,
-			100,
-		);
+		this.sphericalDisplayCamera = new THREE.PerspectiveCamera(70, 1, 0.01, 100);
 		this.sphericalDisplayCamera.up.set(0, 1, 0);
 		this.sphericalDisplayCamera.position.set(0, 0, 3);
 		this.sphericalDisplayCamera.lookAt(0, 0, 0);
@@ -88,6 +85,10 @@ export class Renderer extends THREE.WebGLRenderer {
 			if (e.key === "2") this.setViewMode("scene");
 			if (e.key === "3") this.setViewMode("sphere");
 		});
+		window.addEventListener("blur", () => this.cancelSphereTouches());
+		document.addEventListener("visibilitychange", () => {
+			if (document.hidden) this.cancelSphereTouches();
+		});
 		this.domElement.addEventListener(
 			"pointerdown",
 			(event) => this.handleSphericalDisplayPointerDown(event),
@@ -105,6 +106,11 @@ export class Renderer extends THREE.WebGLRenderer {
 		);
 		this.domElement.addEventListener(
 			"pointercancel",
+			(event) => this.handleSphericalDisplayPointerEnd(event),
+			true,
+		);
+		this.domElement.addEventListener(
+			"lostpointercapture",
 			(event) => this.handleSphericalDisplayPointerEnd(event),
 			true,
 		);
@@ -148,7 +154,7 @@ export class Renderer extends THREE.WebGLRenderer {
 	}
 
 	private setViewMode(viewMode: ViewMode) {
-		this.cancelActiveSphereTouch();
+		this.cancelSphereTouches();
 		this.viewMode = viewMode;
 		this.debugControls.enabled = viewMode === "scene";
 		this.sphericalDisplayControls.enabled = viewMode === "sphere";
@@ -182,8 +188,8 @@ export class Renderer extends THREE.WebGLRenderer {
 	}
 
 	private handleSphericalDisplayPointerDown(event: PointerEvent) {
-		if (this.viewMode !== "sphere") return;
-		if (this.activeSphereTouch) {
+		if (this.viewMode !== "sphere" || event.button !== 0) return;
+		if (this.activeSpherePointers.has(event.pointerId)) {
 			event.preventDefault();
 			event.stopImmediatePropagation();
 			return;
@@ -191,28 +197,33 @@ export class Renderer extends THREE.WebGLRenderer {
 
 		const position = this.getSphericalDisplayTouchPosition(event);
 		if (!position) return;
+		if (this.activeSpherePointers.size >= MAX_SPHERE_TOUCHES) return;
 
 		event.preventDefault();
 		event.stopImmediatePropagation();
-		this.domElement.setPointerCapture(event.pointerId);
 
+		// Keep simulated IDs separate from hardware TUIO session IDs.
 		const touchId = this.nextSimulatedTouchId--;
-		this.activeSphereTouch = { pointerId: event.pointerId, touchId };
-		const touchHandler = globalServices.touchHandler;
-		touchHandler.addTouch(touchId);
-		touchHandler.updateTouch(touchId, position.pitch, position.yaw);
+		this.activeSpherePointers.set(event.pointerId, touchId);
+		globalServices.touchHandler.addTouch(touchId);
+		this.domElement.setPointerCapture(event.pointerId);
+		globalServices.touchHandler.updateTouch(
+			touchId,
+			position.pitch,
+			position.yaw,
+		);
 	}
 
 	private handleSphericalDisplayPointerMove(event: PointerEvent) {
-		const touch = this.activeSphereTouch;
-		if (!touch || touch.pointerId !== event.pointerId) return;
+		const touchId = this.activeSpherePointers.get(event.pointerId);
+		if (touchId === undefined) return;
 
 		event.preventDefault();
 		event.stopImmediatePropagation();
 		const position = this.getSphericalDisplayTouchPosition(event);
 		if (position) {
 			globalServices.touchHandler.updateTouch(
-				touch.touchId,
+				touchId,
 				position.pitch,
 				position.yaw,
 			);
@@ -220,22 +231,28 @@ export class Renderer extends THREE.WebGLRenderer {
 	}
 
 	private handleSphericalDisplayPointerEnd(event: PointerEvent) {
-		const touch = this.activeSphereTouch;
-		if (!touch || touch.pointerId !== event.pointerId) return;
+		if (!this.activeSpherePointers.has(event.pointerId)) return;
 
 		event.preventDefault();
 		event.stopImmediatePropagation();
-		this.cancelActiveSphereTouch();
+		this.releaseSpherePointer(event.pointerId);
 	}
 
-	private cancelActiveSphereTouch() {
-		const touch = this.activeSphereTouch;
-		if (!touch) return;
+	private releaseSpherePointer(pointerId: number) {
+		const touchId = this.activeSpherePointers.get(pointerId);
+		if (touchId === undefined) return;
 
-		this.activeSphereTouch = undefined;
-		globalServices.touchHandler.removeTouch(touch.touchId);
-		if (this.domElement.hasPointerCapture(touch.pointerId)) {
-			this.domElement.releasePointerCapture(touch.pointerId);
+		// Forget the pointer before releasing capture, which can emit another event.
+		this.activeSpherePointers.delete(pointerId);
+		globalServices.touchHandler.removeTouch(touchId);
+		if (this.domElement.hasPointerCapture(pointerId)) {
+			this.domElement.releasePointerCapture(pointerId);
+		}
+	}
+
+	private cancelSphereTouches() {
+		for (const pointerId of this.activeSpherePointers.keys()) {
+			this.releaseSpherePointer(pointerId);
 		}
 	}
 
