@@ -351,11 +351,11 @@ export default class DistortionScene extends BaseScene {
 		// Display smoke
 		this.displayMat.uniforms.density.value = this.densityA.texture;
 		this.quad.material = this.displayMat;
-		renderer.setRenderTarget(null);
+		renderer.setRenderTarget(renderer.projectionOutputTarget);
 		renderer.render(this.quad, renderer.projectionScene.screenCamera);
 
 		// 🧪 DEBUG: visualize velocity
-		renderer.setRenderTarget(null);
+		renderer.setRenderTarget(renderer.projectionOutputTarget);
 		this.displayMat.uniforms.density.value = this.velocityA.texture;
 		renderer.render(this.quad, renderer.projectionScene.screenCamera);
 		return;

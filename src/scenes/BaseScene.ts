@@ -118,7 +118,7 @@ export default abstract class BaseScene extends THREE.Scene {
 		projectionScene.cubeCamera.update(renderer, this);
 
 		// Render Azimuthal Equidistant Projection (fisheye)
-		renderer.setRenderTarget(null);
+		renderer.setRenderTarget(renderer.projectionOutputTarget);
 		renderer.render(projectionScene, projectionScene.screenCamera);
 	}
 

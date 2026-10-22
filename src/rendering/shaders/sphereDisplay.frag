@@ -1,28 +1,20 @@
 precision highp float;
-uniform samplerCube envMap;
-uniform samplerCube transitionEnvMap;
-uniform float transitionProgress;
-uniform float transitionBorderWidth;
-uniform vec3 transitionOrigin;
-uniform bool transitionActive;
+uniform sampler2D projectionMap;
+uniform float globeFovDegrees;
 varying vec3 vDirection;
 
 void main() {
-	vec3 dir = normalize(vec3(vDirection.x, vDirection.z, vDirection.y));
-	vec4 color = textureCube(envMap, dir);
-
-	if (transitionActive) {
-		float angle = acos(clamp(dot(dir, normalize(transitionOrigin)), -1.0, 1.0));
-		float wipeAngle = transitionProgress * 3.141592653589793;
-		float halfBorder = transitionBorderWidth * 0.5;
-
-		if (abs(angle - wipeAngle) <= halfBorder) {
-			color = vec4(1.0);
-		} else if (angle < wipeAngle) {
-			color = textureCube(transitionEnvMap, dir);
-		}
+	vec3 dir = normalize(vDirection);
+	float pitch = acos(clamp(dir.y, -1.0, 1.0));
+	float maxPitch = 3.141592653589793 * (globeFovDegrees / 360.0);
+	if (pitch > maxPitch) {
+		gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+		return;
 	}
 
-	color.rgb = pow(color.rgb, vec3(1.0 / 1.9));
-	gl_FragColor = color;
+	// Inverse of azimuthal.frag, with the globe's +Y pole matching cube +Z.
+	vec2 radial = vec2(-dir.x, dir.z);
+	vec2 uv = 0.5 + 0.5 * (pitch / maxPitch)
+		* radial / max(length(radial), 0.000001);
+	gl_FragColor = texture2D(projectionMap, uv);
 }

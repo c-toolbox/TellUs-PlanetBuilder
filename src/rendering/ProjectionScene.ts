@@ -7,7 +7,10 @@ import sphereFragmentShader from "@/rendering/shaders/sphereDisplay.frag?raw";
 import { GLOBE_FOV_DEGREES } from "@/constants";
 import { Color } from "@/utils/colors";
 
-const CUBE_RENDER_RESOLUTION = 4096;
+// Pixels per cube face. Debug preview can be much cheaper than projector output.
+const AZIMUTHAL_CUBE_RESOLUTION = 1024;
+const SPHERE_CUBE_RESOLUTION = 1024;
+const SPHERE_PROJECTION_RESOLUTION = 2048;
 const PROJECTION_RESOLUTION = 2048;
 const PROJECTION_MSAA_SAMPLES = 4;
 
@@ -16,6 +19,7 @@ export class ProjectionScene extends THREE.Scene {
 	public transitionCubeCamera: THREE.CubeCamera;
 	public screenCamera: THREE.OrthographicCamera;
 	public aepTarget: THREE.WebGLRenderTarget;
+	public sphereProjectionTarget: THREE.WebGLRenderTarget;
 	public sphericalDisplayScene: THREE.Scene;
 	public sphericalDisplayMesh: THREE.Mesh<
 		THREE.SphereGeometry,
@@ -27,7 +31,7 @@ export class ProjectionScene extends THREE.Scene {
 		super();
 
 		const cubeRenderTarget = new THREE.WebGLCubeRenderTarget(
-			CUBE_RENDER_RESOLUTION,
+			AZIMUTHAL_CUBE_RESOLUTION,
 			{
 				generateMipmaps: true,
 				minFilter: THREE.LinearMipmapLinearFilter,
@@ -37,7 +41,7 @@ export class ProjectionScene extends THREE.Scene {
 		this.cubeCamera = new THREE.CubeCamera(0.01, 1000, cubeRenderTarget);
 
 		const transitionCubeRenderTarget = new THREE.WebGLCubeRenderTarget(
-			CUBE_RENDER_RESOLUTION,
+			AZIMUTHAL_CUBE_RESOLUTION,
 			{
 				generateMipmaps: true,
 				minFilter: THREE.LinearMipmapLinearFilter,
@@ -62,6 +66,15 @@ export class ProjectionScene extends THREE.Scene {
 			},
 		);
 		this.aepTarget.texture.colorSpace = THREE.SRGBColorSpace;
+
+		this.sphereProjectionTarget = new THREE.WebGLRenderTarget(
+			SPHERE_PROJECTION_RESOLUTION,
+			SPHERE_PROJECTION_RESOLUTION,
+			{ depthBuffer: false },
+		);
+		// The final projection shader already applies its display gamma.
+		// Store its output unchanged so the preview does not decode/encode it again.
+		this.sphereProjectionTarget.texture.colorSpace = THREE.NoColorSpace;
 
 		const sharedUniforms = {
 			envMap: { value: cubeRenderTarget.texture },
@@ -93,7 +106,10 @@ export class ProjectionScene extends THREE.Scene {
 		this.sphericalDisplayMesh = new THREE.Mesh(
 			new THREE.SphereGeometry(1, 128, 64),
 			new THREE.ShaderMaterial({
-				uniforms: sharedUniforms,
+				uniforms: {
+					projectionMap: { value: this.sphereProjectionTarget.texture },
+					globeFovDegrees: { value: GLOBE_FOV_DEGREES },
+				},
 				vertexShader: sphereVertexShader,
 				fragmentShader: sphereFragmentShader,
 				side: THREE.FrontSide,
@@ -122,6 +138,19 @@ export class ProjectionScene extends THREE.Scene {
 		const fillLight = new THREE.DirectionalLight(0xffffff, 0.5);
 		fillLight.position.set(-5, 2, -5);
 		this.sphericalDisplayScene.add(fillLight);
+	}
+
+	setPreviewMode(sphereMode: boolean) {
+		const cubeResolution = sphereMode
+			? SPHERE_CUBE_RESOLUTION
+			: AZIMUTHAL_CUBE_RESOLUTION;
+		for (const camera of [this.cubeCamera, this.transitionCubeCamera]) {
+			camera.renderTarget.setSize(cubeResolution, cubeResolution);
+		}
+		const projectionResolution = sphereMode
+			? SPHERE_PROJECTION_RESOLUTION
+			: PROJECTION_RESOLUTION;
+		this.aepTarget.setSize(projectionResolution, projectionResolution);
 	}
 
 	setTransition(active: boolean, progress = 0, origin?: THREE.Vector3) {

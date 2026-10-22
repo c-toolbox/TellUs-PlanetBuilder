@@ -75,6 +75,7 @@ export class Renderer extends THREE.WebGLRenderer {
 
 		// Projection scene (spherical projection)
 		this.projectionScene = new ProjectionScene();
+		this.setViewMode(this.viewMode);
 
 		// Resize handler
 		window.addEventListener("resize", () => this.resize());
@@ -158,6 +159,14 @@ export class Renderer extends THREE.WebGLRenderer {
 		this.viewMode = viewMode;
 		this.debugControls.enabled = viewMode === "scene";
 		this.sphericalDisplayControls.enabled = viewMode === "sphere";
+		this.projectionScene.setPreviewMode(viewMode === "sphere");
+	}
+
+	/** Destination for a scene's final azimuthal image, including its effects. */
+	get projectionOutputTarget(): THREE.WebGLRenderTarget | null {
+		return this.viewMode === "sphere"
+			? this.projectionScene.sphereProjectionTarget
+			: null;
 	}
 
 	private getSphericalDisplayTouchPosition(event: PointerEvent) {
@@ -182,6 +191,7 @@ export class Renderer extends THREE.WebGLRenderer {
 			sphereDirection.y,
 		);
 		const scaledPitch = Math.acos(THREE.MathUtils.clamp(direction.z, -1, 1));
+		if (scaledPitch > Math.PI * (GLOBE_FOV_DEGREES / 360)) return undefined;
 		const pitch = scaledPitch / (GLOBE_FOV_DEGREES / 360);
 		const yaw = Math.atan2(-direction.y, direction.x);
 		return { pitch, yaw };

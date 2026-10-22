@@ -36,20 +36,51 @@ export function curvePanel(panel: THREE.Object3D, {
 			return [name, Array.from({ length: attribute.itemSize }, (_, component) =>
 				attribute.getComponent(index, component))];
 		}));
-		const midpoint = (a: Vertex, b: Vertex): Vertex => Object.fromEntries(names.map((name) =>
-			[name, a[name].map((value, index) => (value + b[name][index]) / 2)]));
-		const emit = (a: Vertex, b: Vertex, c: Vertex, depth = 0): void => {
-			const xs = [a.position[0], b.position[0], c.position[0]];
-			if (Math.max(...xs) - Math.min(...xs) > maxSegmentWidth && depth < 12) {
-				const ab = midpoint(a, b), bc = midpoint(b, c), ca = midpoint(c, a);
-				emit(a, ab, ca, depth + 1);
-				emit(ab, b, bc, depth + 1);
-				emit(ca, bc, c, depth + 1);
-				emit(ab, bc, ca, depth + 1);
-				return;
-			}
+		const emit = (a: Vertex, b: Vertex, c: Vertex): void => {
 			for (const vertex of [a, b, c]) {
 				for (const name of names) output[name].push(...vertex[name]);
+			}
+		};
+		const clip = (vertices: Vertex[], x: number, keepRight: boolean): Vertex[] => {
+			if (vertices.length === 0) return [];
+			const result: Vertex[] = [];
+			let previous = vertices[vertices.length - 1];
+			let previousInside = keepRight ? previous.position[0] >= x : previous.position[0] <= x;
+			for (const current of vertices) {
+				const inside = keepRight ? current.position[0] >= x : current.position[0] <= x;
+				if (inside !== previousInside) {
+					const t = (x - previous.position[0]) / (current.position[0] - previous.position[0]);
+					if (t > 0 && t < 1) {
+						const intersection: Vertex = Object.fromEntries(names.map((name) => [
+							name, previous[name].map((value, index) => value + (current[name][index] - value) * t),
+						]));
+						intersection.position[0] = x;
+						result.push(intersection);
+					}
+				}
+				if (inside) result.push(current);
+				previous = current;
+				previousInside = inside;
+			}
+			return result;
+		};
+		const subdivide = (a: Vertex, b: Vertex, c: Vertex): void => {
+			const minX = Math.min(a.position[0], b.position[0], c.position[0]);
+			const maxX = Math.max(a.position[0], b.position[0], c.position[0]);
+			const firstStrip = Math.floor(minX / maxSegmentWidth);
+			const lastStrip = Math.ceil(maxX / maxSegmentWidth) - 1;
+			if (firstStrip === lastStrip || maxX - minX < 1e-9) {
+				emit(a, b, c);
+				return;
+			}
+			// Slice only across X, where the model bends. Shared strip boundaries
+			// keep adjoining triangles aligned without subdividing flat directions.
+			for (let strip = firstStrip; strip <= lastStrip; strip++) {
+				const polygon = clip(clip([a, b, c], strip * maxSegmentWidth, true),
+					(strip + 1) * maxSegmentWidth, false);
+				for (let i = 1; i + 1 < polygon.length; i++) {
+					emit(polygon[0], polygon[i], polygon[i + 1]);
+				}
 			}
 		};
 		const geometry = new THREE.BufferGeometry();
@@ -57,7 +88,7 @@ export function curvePanel(panel: THREE.Object3D, {
 		for (const group of groups) {
 			const start = output.position.length / 3;
 			for (let i = group.start; i < group.start + group.count; i += 3) {
-				emit(read(i), read(i + 1), read(i + 2));
+				subdivide(read(i), read(i + 1), read(i + 2));
 			}
 			geometry.addGroup(start, output.position.length / 3 - start, group.materialIndex);
 		}

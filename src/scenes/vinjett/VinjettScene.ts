@@ -585,7 +585,7 @@ export default class VinjettScene extends BaseScene {
 			projectionScene.setTransition(false);
 		}
 
-		renderer.setRenderTarget(null);
+		renderer.setRenderTarget(renderer.projectionOutputTarget);
 		renderer.render(projectionScene, projectionScene.screenCamera);
 	}
 

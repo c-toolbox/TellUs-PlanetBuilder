@@ -293,7 +293,7 @@ export default class PaintScene extends BaseScene {
 		renderer.render(this.feedbackQuad, projectionScene.screenCamera);
 
 		// 4️⃣ Display final
-		renderer.setRenderTarget(null);
+		renderer.setRenderTarget(renderer.projectionOutputTarget);
 		renderer.render(this.feedbackQuad, projectionScene.screenCamera);
 
 		// 5️⃣ Swap buffers
