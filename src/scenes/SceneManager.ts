@@ -10,6 +10,7 @@ import MusicScene from "./music/MusicScene";
 import InteractionScene from "./interaction/InteractionScene";
 import MeasuringScene from "./measuring/MeasuringScene";
 import FluidScene from "./fluid/FluidScene";
+import ForceGraphScene from "./graph/ForceGraphScene";
 
 /* Scenes */
 
@@ -23,6 +24,7 @@ export enum SceneKey {
 	Interaction = "Interaction",
 	Measuring = "Measuring",
 	Fluid = "Fluid",
+	ForceGraph = "Force graph",
 	ReactionDiffusion = "ReactionDiffusion",
 }
 
@@ -36,6 +38,7 @@ export const scenes = {
 	[SceneKey.Interaction]: new InteractionScene(),
 	[SceneKey.Measuring]: new MeasuringScene(),
 	[SceneKey.Fluid]: new FluidScene(),
+	[SceneKey.ForceGraph]: new ForceGraphScene(),
 	[SceneKey.ReactionDiffusion]: new ReactionDiffusionScene(),
 } satisfies Record<SceneKey, BaseScene>;
 
