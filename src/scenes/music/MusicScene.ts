@@ -1,128 +1,82 @@
 import * as THREE from "three";
-import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 import BaseScene from "@/scenes/BaseScene";
 import { SceneKey } from "@/scenes/SceneManager";
-import { ORIGIN } from "@/constants";
-import { TouchId } from "@/network/tuioProtocol";
 import { UiConfigEvent } from "@/network/uiProtocol";
-import pianoUrl from "@/assets/models/piano.fbx?url";
-import { curvePanel } from "@/utils/curvePanel";
 import { Renderer } from "@/rendering/Renderer";
-import { TouchInteraction } from "@/network/TouchInteraction";
-
-const PIANO_WIDTH = 2.4;
-const PIANO_DISTANCE = 2;
-const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+import { Piano } from "./Piano";
+import { SoundFontPlayer } from "./SoundFontPlayer";
 
 export default class MusicScene extends BaseScene {
-	private piano?: THREE.Group;
-	private keyNotes = new Map<THREE.Object3D, string>();
+	private readonly audio = new SoundFontPlayer();
+	private readonly piano: Piano;
 
 	constructor() {
 		super();
 		this.background = new THREE.Color(0x18202d);
-		this.add(new THREE.HemisphereLight(0xffffff, 0x465065, 2));
-		const light = new THREE.DirectionalLight(0xffffff, 2);
-		light.position.set(-1, 2, 0);
-		this.add(light);
+		this.addLights();
 
-		new FBXLoader().load(
-			pianoUrl,
-			(model) => this.addPiano(model),
-			undefined,
-			(error) => console.error("Failed to load piano model", error),
+		this.piano = new Piano({
+			registerInteraction: (interaction) =>
+				this.registerTouchInteraction(interaction),
+			createTween: (target) => this.createTween(target),
+		});
+		this.add(this.piano.object);
+		this.piano.on("noteOn", this.audio.noteOn);
+		this.piano.on("noteOff", this.audio.noteOff);
+		this.audio.on("change", () => {
+			if (this.audio.isActive) this.sendUiConfig();
+		});
+		this.audio.on("loadError", (error) =>
+			console.error("Failed to load music audio", error),
 		);
 	}
 
-	private addPiano(model: THREE.Group) {
-		// The FBX includes Blender's camera and lights; use the scene's lighting.
-		const helpers: THREE.Object3D[] = [];
-		const keys: { mesh: THREE.Mesh; x: number }[] = [];
-		model.updateMatrixWorld(true);
-		model.traverse((object) => {
-			if (object instanceof THREE.Mesh && object.name === "Plane") {
-				// The exported casing has inward-facing triangles. BackSide also
-				// flips its shading normals and raycasts against the outward side.
-				const fixCasingMaterial = (material: THREE.Material) => {
-					const corrected = material.clone();
-					corrected.side = THREE.BackSide;
-					return corrected;
-				};
-				object.material = Array.isArray(object.material)
-					? object.material.map(fixCasingMaterial)
-					: fixCasingMaterial(object.material);
-			}
-			if (object instanceof THREE.Camera || object instanceof THREE.Light) {
-				helpers.push(object);
-			}
-			// In this asset, Cube001–Cube025 are keys and Plane is the casing.
-			if (object instanceof THREE.Mesh && /^Cube\d{3}$/.test(object.name)) {
-				const center = new THREE.Box3()
-					.setFromObject(object)
-					.getCenter(new THREE.Vector3());
-				keys.push({ mesh: object, x: center.x });
-			}
-		});
-		helpers.forEach((object) => object.removeFromParent());
-		keys.sort((a, b) => a.x - b.x);
-		keys.forEach(({ mesh }, index) => {
-			this.keyNotes.set(
-				mesh,
-				`${NOTE_NAMES[index % 12]}${3 + Math.floor(index / 12)}`,
+	private addLights() {
+		this.add(new THREE.HemisphereLight(0xe5edff, 0x303344, 0.45));
+
+		const rimColors = [0xffd1ab, 0xb5ceff, 0xb8e4d5];
+
+		for (let i = 0; i < rimColors.length; i++) {
+			const angle = (i / rimColors.length) * Math.PI * 2;
+
+			// Outside the radius-2 piano: restrained color along its edges.
+			const rim = new THREE.PointLight(rimColors[i], 5, 5, 2);
+			rim.position.set(Math.cos(angle) * 2.8, 0.9, Math.sin(angle) * 2.8);
+
+			// Offset inside lights reveal changing key angles when pressed.
+			const insideAngle = angle + Math.PI / 3;
+			const fill = new THREE.PointLight(0xfff4e8, 2.5, 4, 2);
+			fill.position.set(
+				Math.cos(insideAngle) * 1.1,
+				0.55,
+				Math.sin(insideAngle) * 1.1,
 			);
-		});
-		if (keys.length !== 25) {
-			console.warn(`Expected 25 piano keys (C3-C5), found ${keys.length}`);
+
+			this.add(rim, fill);
 		}
+	}
 
-		// Center and normalize before bending in the piano group's coordinates.
-		const bounds = new THREE.Box3().setFromObject(model);
-		const size = bounds.getSize(new THREE.Vector3());
-		const centered = new THREE.Group();
-		centered.add(model);
-		model.position.sub(bounds.getCenter(new THREE.Vector3()));
-		centered.scale.setScalar(PIANO_WIDTH / size.x);
+	override onEnter(renderer: Renderer) {
+		super.onEnter(renderer);
+		this.audio.activate();
+	}
 
-		const piano = new THREE.Group();
-		piano.add(centered);
-		// Exported keys face +Y, with their front edges toward +Z.
-		// Rotate the playing surface toward local +Z and the front edges downward.
-		centered.rotation.x = Math.PI / 2;
-		curvePanel(piano, { radius: PIANO_DISTANCE });
-		piano.position.set(0, 0, -PIANO_DISTANCE);
-		piano.lookAt(ORIGIN);
-		this.add(piano);
-		piano.updateMatrixWorld(true);
-		this.piano = piano;
+	override onExit(renderer: Renderer) {
+		this.piano.reset();
+		this.audio.deactivate();
+		super.onExit(renderer);
+	}
 
-		keys.forEach(({ mesh }) => {
-			const interaction = this.registerTouchInteraction(
-				new TouchInteraction(mesh, { raycastRoot: piano }),
-			);
-			const onEnter = ({ touchId }: { touchId: TouchId }) => {
-				console.log(
-					"Pressed piano key:",
-					this.keyNotes.get(mesh),
-					mesh.name,
-					"touch:",
-					touchId,
-				);
-			};
-			const onRelease = ({ touchId }: { touchId: TouchId }) => {
-				if (interaction.activeTouchIds.size > 0) return;
-				console.log(
-					"Released piano key:",
-					this.keyNotes.get(mesh),
-					mesh.name,
-					"touch:",
-					touchId,
-				);
-			};
-
-			interaction.on("enter", onEnter);
-			interaction.on("leave", onRelease);
-			interaction.on("release", onRelease);
-		});
+	protected override initializeUi() {
+		super.initializeUi();
+		this.uiSocket.on(
+			"soundFont",
+			(name: string) => void this.audio.selectSoundFont(name),
+		);
+		this.uiSocket.on("instrument", (label: string) =>
+			this.audio.selectInstrument(label),
+		);
+		this.uiSocket.on("retryAudio", () => void this.audio.retry());
 	}
 
 	protected override get uiConfig(): UiConfigEvent {
@@ -138,6 +92,7 @@ export default class MusicScene extends BaseScene {
 					value: SceneKey.Music,
 					options: Object.values(SceneKey),
 				},
+				...this.audio.uiElements,
 			],
 		};
 	}
