@@ -1,6 +1,6 @@
 {
-	"applicationId": "tellus-demo",
-	"version": "1.0.0",
+	"applicationId": "",
+	"version": "",
 	"defaultMode": "window",
 	"port": 0,
 	"documentRoot": "/dist/web/",
@@ -19,17 +19,23 @@
 		"enabled": true,
 		"writeToLogFile": false
 	},
-	"nativeAllowList": ["app.exit", "app.broadcast", "extensions.dispatch", "extensions.getStats", "window.center"],
+	"nativeAllowList": [
+		"app.exit",
+		"app.broadcast",
+		"extensions.dispatch",
+		"extensions.getStats",
+		"window.center"
+	],
 	"modes": {
 		"window": {
-			"title": "Tellus Demo",
-			"width": 3840,
-			"height": 2400,
-			"minWidth": 1920,
-			"minHeight": 1080,
-			"fullScreen": true,
+			"title": "",
+			"width": 1280,
+			"height": 800,
+			"minWidth": 800,
+			"minHeight": 600,
+			"fullScreen": false,
 			"alwaysOnTop": false,
-			"icon": "/src/public/icon.png",
+			"icon": "/icon.png",
 			"enableInspector": false,
 			"borderless": false,
 			"maximize": false,
@@ -40,7 +46,7 @@
 		}
 	},
 	"cli": {
-		"binaryName": "tellus-demo",
+		"binaryName": "",
 		"resourcesPath": "/dist/",
 		"frontendLibrary": {
 			"patchFile": "/src/index.html",

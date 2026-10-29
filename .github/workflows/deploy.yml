@@ -2,16 +2,23 @@ name: Build and Release
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: write
+
+concurrency:
+  group: rolling-release
+  cancel-in-progress: false
 
 jobs:
   build:
     name: Build & Release
     runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
 
     steps:
       - name: Checkout repo
@@ -26,24 +33,37 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check types and template behavior
+        run: |
+          npm run typecheck
+
       - name: Build project
         run: npm run build
+
+      - name: Read generated application metadata
+        id: app
+        run: |
+          $metadata = Get-Content -LiteralPath dist/app-metadata.json -Raw | ConvertFrom-Json
+          "title=$($metadata.title)" >> $env:GITHUB_OUTPUT
+          "bundle=$($metadata.bundleDirectory)" >> $env:GITHUB_OUTPUT
+          "archive=$($metadata.archivePath)" >> $env:GITHUB_OUTPUT
 
       - name: Compile Inno Setup Installer
         uses: robin24/inno-setup-action@v1
         with:
-          filepath: installer.iss
+          filepath: dist/installer.iss
 
-      - name: Compress Build Folder with Installer
-        run: |
-          Compress-Archive -Path "dist\win\PlanetBuilder\*" -DestinationPath "dist\PlanetBuilder.zip" -Force
+      - name: Compress application and installer
+        env:
+          APP_BUNDLE: ${{ steps.app.outputs.bundle }}
+          APP_ARCHIVE: ${{ steps.app.outputs.archive }}
+        run: Compress-Archive -Path (Join-Path $env:APP_BUNDLE '*') -DestinationPath $env:APP_ARCHIVE -Force
 
       - name: Create or update rolling release
         uses: marvinpinto/action-automatic-releases@latest
         with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          automatic_release_tag: "latest"
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          automatic_release_tag: latest
           prerelease: false
-          title: "Planet Builder - Latest Build"
-          files: |
-            dist/PlanetBuilder.zip
+          title: "${{ steps.app.outputs.title }} - Latest Build"
+          files: ${{ steps.app.outputs.archive }}

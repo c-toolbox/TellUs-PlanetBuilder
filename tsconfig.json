@@ -4,20 +4,16 @@
 		"module": "ESNext",
 		"strict": true,
 		"forceConsistentCasingInFileNames": true,
-		"moduleResolution": "Node",
+		"moduleResolution": "Bundler",
 		"resolveJsonModule": true,
 		"isolatedModules": true,
 		"esModuleInterop": true,
 		"noEmit": true,
 		"skipLibCheck": true,
-		"removeComments": true,
-		"stripInternal": true,
-		"allowJs": true,
-		"strictPropertyInitialization": false,
 		"paths": {
 			"@/*": ["./src/*"]
 		}
 	},
-	"include": ["src", "scripts", "extensions", "typings"],
+	"include": ["src", "neutralino", "extensions", "typings", "vite.config.ts"],
 	"exclude": ["node_modules"]
 }

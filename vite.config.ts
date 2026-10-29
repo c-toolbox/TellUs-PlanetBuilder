@@ -1,60 +1,39 @@
 import { defineConfig } from "vite";
-
-import zip from "vite-plugin-zip-pack";
 import checker from "vite-plugin-checker";
 import tsconfigPaths from "vite-tsconfig-paths";
-import getGitVersion from "./scripts/git-version";
-import preImageOptimizer from "./scripts/pre-image-optimizer";
-import tuioExtension from "./scripts/tuio-extension";
-import neuBuild from "./scripts/neu-build";
-import neuInject from "./scripts/neu-inject";
-import bundleWinApp from "./scripts/win-bundle";
-import buildCleanup from "./scripts/build-cleanup";
+import neuInject from "./neutralino/neu-inject";
+import packageWindows from "./neutralino/package-windows";
+import { title, description } from "./neutralino/app-config";
 
-import { title, team, description, distribution_name } from "./scripts/constants";
-
-export default () => {
-	process.env.VITE_GAME_TITLE = title;
-	process.env.VITE_GAME_TEAM = team;
-	process.env.VITE_GAME_DESCRIPTION = description;
-
-	return defineConfig({
-		base: "./",
-		root: "src",
-		plugins: [
-			tsconfigPaths(),
-			getGitVersion(),
-			checker({
-				typescript: true,
-			}),
-			preImageOptimizer(),
-			neuInject(),
-			tuioExtension(),
-			neuBuild(),
-			bundleWinApp(),
-			zip({
-				inDir: `./dist/win`,
-				outDir: "./dist",
-				outFileName: `${distribution_name}.zip`,
-			}),
-			buildCleanup(),
-		],
-		build: {
-			outDir: "../dist/web",
-			chunkSizeWarningLimit: 4096,
-			assetsInlineLimit: 0,
-			target: "ES2022",
-			minify: "terser",
-			terserOptions: {
-				format: {
-					comments: false,
-				},
-			},
+export default defineConfig({
+	base: "./",
+	root: "src",
+	plugins: [
+		tsconfigPaths(),
+		checker({ typescript: true }),
+		{
+			name: "app-title",
+			transformIndexHtml: (html) => html
+				.replaceAll("%APP_TITLE%", () => escapeHtml(title))
+				.replaceAll("%APP_DESCRIPTION%", () => escapeHtml(description)),
 		},
-		server: {
-			host: "localhost",
-			port: 5173,
-			strictPort: true,
-		},
-	});
-};
+		neuInject(),
+		packageWindows(),
+	],
+	build: {
+		outDir: "../dist/web",
+		chunkSizeWarningLimit: 4096,
+		assetsInlineLimit: 0,
+		target: "ES2022",
+	},
+	server: {
+		host: "localhost",
+		port: 5173,
+		strictPort: true,
+	},
+});
+
+function escapeHtml(value: string) {
+	return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;")
+		.replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+}

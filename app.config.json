@@ -1,0 +1,16 @@
+{
+  "title": "Planet Builder",
+  "team": "Visualiseringscenter C",
+  "description": "TellUs Planet Builder",
+  "version": "0.1.0",
+  "neutralino": {
+    "allow": [],
+    "window": {
+      "width": 3840,
+      "height": 2400,
+      "minWidth": 1920,
+      "minHeight": 1080,
+      "fullScreen": true
+    }
+  }
+}

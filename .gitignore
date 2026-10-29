@@ -1,68 +1,28 @@
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-node_modules
-dist
-dist-ssr
-*.local
-
-# Editor directories and files
-.vscode/*
-!.vscode/launch.json
-!.vscode/settings.json
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-
-# Neutralino files
+# Dependencies and build output
+node_modules/
+dist/
 bin/
 extensions/*.exe
-extensions/.dev*/
-src/neutralino.js
-.tmp
-.storage
+*.log
+*.local
 
-# Uncompressed music
-*.wav
-
-# Misc files
-.cache/
-.firebase/
-*.zip
-src/version.json
+# Generated Neutralino files and local state
 neutralino.config.json
 __neutralino_globals.js
+.tmp/
+.storage/
 
-# Python
-# Virtual envs
-.venv/
-venv/
-env/
-proxy/.venv/
-**/.venv/
+# Editors and OS
+.vscode/*
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
 
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
+# Blender backup
+*.blend1
 
-# pytest
-.pytest_cache/
-
-# mypy
-.mypy_cache/
-
-# pipenv / packaging
-pip-wheel-metadata/
-*.egg-info/
+# Temp
+original/
+cropper.py
