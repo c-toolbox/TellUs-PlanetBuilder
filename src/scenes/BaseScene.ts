@@ -1,66 +1,34 @@
 import * as THREE from "three";
 import { Group, Tween } from "@tweenjs/tween.js";
-import { FontLoader } from "three/examples/jsm/loaders/FontLoader.js";
-import latoBlackFontUrl from "@/assets/fonts/Lato/Black.json?url";
-
-import { Renderer } from "../rendering/Renderer";
+import type { Renderer } from "@/rendering/Renderer";
 import { globalServices } from "@/network/GlobalServices";
-import { TouchId } from "@/network/tuioProtocol";
-import Player from "@/network/Player";
-import { ORIGIN } from "@/constants";
-import { SceneKey, sceneManager, scenes } from "./SceneManager";
-import { UiConfigEvent } from "@/network/uiProtocol";
-import { TouchInteraction } from "@/network/TouchInteraction";
-import { Color } from "@/utils/colors";
+import type { TouchId } from "@/network/tuioProtocol";
+import type { TouchInteraction } from "@/network/TouchInteraction";
+import type { UiConfigEvent } from "@/network/socket_ui/protocol";
 
 export default abstract class BaseScene extends THREE.Scene {
-	protected omniSocket = globalServices.omniSocket;
+	protected renderer: Renderer | null = null;
 	protected touchHandler = globalServices.touchHandler;
-	protected uiSocket = globalServices.uiSocket;
-	private clearColor: THREE.ColorRepresentation = Color.Black;
-
-	protected raycaster: THREE.Raycaster;
-	protected clickable: THREE.Object3D[];
-
-	protected playerGroup: THREE.Group;
-	protected players: Map<string, Player>;
+	protected sceneManager = globalServices.sceneManager;
 	private tweenGroup = new Group();
 	private touchInteractions = new Set<TouchInteraction>();
 	private touchInteractionsActive = false;
+	protected uiSocket = globalServices.uiSocket;
 
 	constructor() {
 		super();
-
-		// Players
-		this.playerGroup = new THREE.Group();
-		this.add(this.playerGroup);
-		this.players = new Map<string, Player>();
-
-		this.raycaster = new THREE.Raycaster();
-		this.clickable = [];
-
 		this.onTouch = this.onTouch.bind(this);
-		this.onClick = this.onClick.bind(this);
 		this.onRemove = this.onRemove.bind(this);
 	}
 
-	public applyRendererSettings(renderer: Renderer) {
-		renderer.setClearColor(this.clearColor);
-		this.setRendererSettings(renderer);
+	applyRendererSettings(renderer: Renderer) {
+		renderer.setClearColor(0x000000);
+		renderer.outputColorSpace = THREE.SRGBColorSpace;
+		renderer.toneMapping = THREE.NoToneMapping;
+		renderer.autoClear = true;
 	}
 
-	public setRendererSettings(renderer: Renderer) {}
-
-	protected setClearColor(color: THREE.ColorRepresentation) {
-		this.clearColor = color;
-	}
-
-	/* Touch input */
-
-	public makeClickable(group: THREE.Group) {
-		group.children.forEach((mesh) => this.clickable.push(mesh));
-	}
-
+	// Register once when creating an object. BaseScene activates it only in this scene.
 	protected registerTouchInteraction(interaction: TouchInteraction) {
 		this.touchInteractions.add(interaction);
 		if (this.touchInteractionsActive) {
@@ -69,20 +37,12 @@ export default abstract class BaseScene extends THREE.Scene {
 		return interaction;
 	}
 
-	protected unregisterTouchInteraction(interaction: TouchInteraction) {
-		this.touchInteractions.delete(interaction);
-		this.touchHandler.unregisterInteraction(interaction);
-	}
-
-	/* Scene management */
-
-	onEnter(renderer: Renderer) {
-		this.initializeUi();
-		this.sendUiConfig();
-
+	onSceneEnter(renderer: Renderer) {
+		this.renderer = renderer;
+		this.registerSocketUiListeners();
+		this.sendSocketUiConfig();
 		this.add(this.touchHandler.touchGroup);
 		this.touchHandler.on("touch", this.onTouch);
-		this.touchHandler.on("click", this.onClick);
 		this.touchHandler.on("remove", this.onRemove);
 		this.touchInteractionsActive = true;
 		this.touchInteractions.forEach((interaction) =>
@@ -90,54 +50,28 @@ export default abstract class BaseScene extends THREE.Scene {
 		);
 	}
 
-	onExit(renderer: Renderer) {
+	onSceneExit(renderer: Renderer) {
+		this.uiSocket.removeAllListeners();
 		this.tweenGroup.getAll().forEach((tween) => tween.stop());
 		this.tweenGroup.removeAll();
-
 		this.touchInteractionsActive = false;
 		this.touchInteractions.forEach((interaction) =>
 			this.touchHandler.unregisterInteraction(interaction),
 		);
 		this.touchHandler.off("touch", this.onTouch);
-		this.touchHandler.off("click", this.onClick);
 		this.touchHandler.off("remove", this.onRemove);
-
-		this.uiSocket.removeAllListeners();
+		this.renderer = null;
 	}
 
-	/* Rendering */
-
 	renderScene(renderer: Renderer) {
-		const projectionScene = renderer.projectionScene;
-
-		// Update cube camera orientation
-		projectionScene.cubeCamera.position.copy(renderer.centerCamera.position);
-		projectionScene.cubeCamera.quaternion.copy(
-			renderer.centerCamera.quaternion,
-		);
-		projectionScene.cubeCamera.update(renderer, this);
-
-		// Render Azimuthal Equidistant Projection (fisheye)
-		renderer.setRenderTarget(renderer.projectionOutputTarget);
-		renderer.render(projectionScene, projectionScene.screenCamera);
+		renderer.renderProjection(this);
 	}
 
 	updateTweens() {
 		this.tweenGroup.update();
-		this.tweenGroup
-			.getAll()
+		this.tweenGroup.getAll()
 			.filter((tween) => !tween.isPlaying())
 			.forEach((tween) => this.tweenGroup.remove(tween));
-	}
-
-	update(delta: number) {}
-
-	updateFixed(delta: number) {}
-
-	render(renderer: Renderer) {}
-
-	postRender(renderer: Renderer) {
-		this.touchHandler.setCameraQuaternion(renderer.centerCamera.quaternion);
 	}
 
 	protected createTween<T extends object>(target: T) {
@@ -146,91 +80,30 @@ export default abstract class BaseScene extends THREE.Scene {
 		return tween;
 	}
 
-	/* 3D helpers */
-
-	protected setBackground(
-		assetPath: string,
-		distance: number,
-		tintColor: THREE.ColorRepresentation = 0xffffff,
-	) {
-		const loader = new THREE.TextureLoader();
-		loader.load(assetPath, (texture) => {
-			texture.colorSpace = THREE.SRGBColorSpace;
-
-			const geometry = new THREE.SphereGeometry(distance, 64, 64);
-			const material = new THREE.MeshBasicMaterial({
-				map: texture,
-				side: THREE.BackSide,
-			});
-			material.color.set(tintColor);
-			const sphere = new THREE.Mesh(geometry, material);
-			sphere.scale.x *= -1;
-			this.add(sphere);
-		});
+	protected registerSocketUiListeners() {
+		// On SocketUI refreshing, which then sends a request to get the config
+		this.uiSocket.on("request", () => this.sendSocketUiConfig());
 	}
 
-	protected addText({
-		text,
-		color = 0xffffff,
-		size = 0.1,
-		position,
-	}: {
-		text: string;
-		color?: number;
-		size?: number;
-		position: THREE.Vector3;
-	}) {
-		const loader = new FontLoader();
-		loader.load(latoBlackFontUrl, (font) => {
-			const material = new THREE.MeshBasicMaterial({ color: color });
-
-			const shapes = font.generateShapes(text, size);
-			const geometry = new THREE.ShapeGeometry(shapes);
-
-			// Center text
-			geometry.computeBoundingBox();
-			const bounds = geometry.boundingBox!;
-			geometry.translate(-(bounds.max.x - bounds.min.x) / 2, 0, 0);
-
-			const mesh = new THREE.Mesh(geometry, material);
-			mesh.position.copy(position);
-			mesh.lookAt(ORIGIN);
-
-			this.add(mesh);
-		});
+	protected sendSocketUiConfig() {
+		this.uiSocket.send(this.socketUiConfig);
 	}
 
-	/* Global touch events, not aimed at specific objects */
+	protected abstract get socketUiConfig(): UiConfigEvent;
 
-	protected onTouch(touchId: TouchId, vector: THREE.Vector3) {}
+	// Frame updates use milliseconds; fixed updates use seconds.
+	update(delta: number) {}
+	updateFixed(delta: number) {}
 
-	protected onClick(touchId: TouchId, vector: THREE.Vector3) {}
+	postRender(renderer: Renderer) {
+		this.touchHandler.setCameraQuaternion(renderer.projectionCamera.quaternion);
+	}
 
+	protected onTouch(touchId: TouchId, direction: THREE.Vector3) {}
 	protected onRemove(touchId: TouchId) {}
 
-	/* Socket UI */
-
-	protected initializeUi() {
-		this.uiSocket.on("request", () => this.sendUiConfig());
-
-		this.uiSocket.on("scene", (value: SceneKey) => {
-			sceneManager.setScene(scenes[value]);
-		});
+	protected unregisterTouchInteraction(interaction: TouchInteraction) {
+		this.touchInteractions.delete(interaction);
+		this.touchHandler.unregisterInteraction(interaction);
 	}
-
-	protected sendUiConfig() {
-		this.uiSocket.send(this.uiConfig);
-	}
-
-	protected bindUiConfigKey<T extends string>(
-		config: Record<string, any>,
-		key: T,
-	) {
-		this.uiSocket.on(key, (value: any) => {
-			config[key] = value;
-			this.sendUiConfig();
-		});
-	}
-
-	protected abstract get uiConfig(): UiConfigEvent;
 }

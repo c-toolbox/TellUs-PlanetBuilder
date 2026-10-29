@@ -86,7 +86,7 @@ export default class MeasuringTape extends THREE.Group {
 			throw new Error("Invalid measuring tape directions or radius");
 		}
 		this.radius = radius;
-		this.material = new THREE.MeshBasicMaterial({ color, side: THREE.FrontSide });
+		this.material = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide });
 		this.ropeGeometry = this.createGeometry((ROPE_SEGMENTS + 1) * 2, radius * 1.02);
 		const ropeIndices: number[] = [];
 		for (let i = 0; i < ROPE_SEGMENTS; i++) {
@@ -111,7 +111,7 @@ export default class MeasuringTape extends THREE.Group {
 		// A shortest arc is at most half the circumference: one reusable label per major tick.
 		this.labels = Array.from({ length: Math.floor(MAX_TICKS / MAJOR_TICK_INTERVAL) }, (_, i) => {
 			const distance = (i + 1) * MAJOR_TICK_INTERVAL * TICK_INTERVAL_KM;
-			const label = new TextLabel(`${distance.toLocaleString("en-US")} km`, radius * LABEL_FONT_SIZE, radius * LABEL_MAX_WIDTH);
+			const label = new TextLabel(`${distance.toLocaleString("en-US")} km`, radius * LABEL_FONT_SIZE, "center", radius * LABEL_MAX_WIDTH);
 			label.material.color.set(color);
 			label.visible = false;
 			this.add(label);

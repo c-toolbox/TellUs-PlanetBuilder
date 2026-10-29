@@ -1,31 +1,71 @@
 * {
 	box-sizing: border-box;
-	/* user-select: none; */
 }
 
 html,
 body {
 	width: 100%;
 	height: 100%;
-	padding-top: var(--safe-area-inset-top);
-	padding-left: var(--safe-area-inset-left);
-	padding-right: var(--safe-area-inset-right);
-	padding-bottom: var(--safe-area-inset-bottom);
+	margin: 0;
 }
 
 body {
 	display: flex;
 	justify-content: center;
 	align-items: center;
-	margin: 0;
-	padding: 0;
 	background: black;
 	color: white;
 	font-family: sans-serif;
+	overflow: hidden;
 }
 
-/* Custom */
+canvas {
+	display: block;
+	touch-action: none;
+}
 
+.debug-controls {
+	display: grid;
+	gap: 1em;
+	position: fixed;
+	top: 1em;
+	left: 1em;
+
+	opacity: 0.4;
+	transition: 100ms;
+}
+
+.debug-controls:hover {
+	opacity: 1;
+}
+
+.control-group {
+	display: grid;
+	gap: 0.5em;
+}
+
+.control-options {
+	display: flex;
+	flex-direction: column;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+}
+
+.control-options button {
+	padding: 0.4rem 0.65rem;
+	border: 1px solid #888;
+	border-radius: 4px;
+	background: transparent;
+	font: inherit;
+	cursor: pointer;
+}
+
+.control-options button[aria-pressed="true"] {
+	background: #2563eb;
+	border-color: transparent;
+}
+
+/* Project HTML component */
 .element {
 	background: white;
 	padding: 32px;
@@ -42,13 +82,4 @@ body {
 	padding: 16px;
 	border: none;
 	border-radius: 16px;
-}
-
-.debug-controls {
-	position: fixed;
-	top: 0.5em;
-	left: 0.5em;
-
-	font-family: "Trebuchet MS";
-	color: #666;
 }

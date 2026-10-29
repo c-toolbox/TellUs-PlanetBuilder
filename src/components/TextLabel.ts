@@ -3,14 +3,14 @@ import {
 	Font,
 	FontLoader,
 } from "three/examples/jsm/loaders/FontLoader.js";
-import latoBlackFontUrl from "@/assets/fonts/Lato/Bold.json?url";
+import latoBoldFontUrl from "@/assets/fonts/Lato/Bold.json?url";
 
 let fontPromise: Promise<Font> | undefined;
 
 function loadFont() {
 	fontPromise ??= new Promise<Font>((resolve, reject) => {
 		new FontLoader().load(
-			latoBlackFontUrl,
+			latoBoldFontUrl,
 			resolve,
 			undefined,
 			reject,
@@ -24,12 +24,16 @@ export default class TextLabel extends THREE.Mesh<
 	THREE.MeshBasicMaterial
 > {
 	private readonly size: number;
-	private readonly maxWidth: number;
 	private text: string;
 	private font?: Font;
 	private disposed = false;
 
-	constructor(text: string, size: number, maxWidth: number) {
+	constructor(
+		text: string,
+		size: number,
+		private readonly alignment: "center" | "left" = "center",
+		private readonly maxWidth = Infinity,
+	) {
 		super(
 			new THREE.ShapeGeometry(),
 			new THREE.MeshBasicMaterial({
@@ -39,7 +43,6 @@ export default class TextLabel extends THREE.Mesh<
 		);
 
 		this.size = size;
-		this.maxWidth = maxWidth;
 		this.text = text;
 		this.raycast = () => {};
 		loadFont().then(
@@ -71,7 +74,7 @@ export default class TextLabel extends THREE.Mesh<
 		const width = bounds.max.x - bounds.min.x;
 		const height = bounds.max.y - bounds.min.y;
 		this.geometry.translate(
-			-(bounds.min.x + width / 2),
+			-(bounds.min.x + (this.alignment === "center" ? width / 2 : 0)),
 			-(bounds.min.y + height / 2),
 			0,
 		);

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 	<head>
 		<meta charset="UTF-8" />
@@ -16,10 +16,14 @@
 	<body>
 		<div id="container"></div>
 		<div class="debug-controls">
-			<div>Change camera</div>
-			<div>[1] Azimuthal</div>
-			<div>[2] Scene</div>
-			<div>[3] Sphere</div>
+			<div class="control-group">
+				<span id="scene-label">Scene</span>
+				<div id="scene-options" class="control-options" role="group" aria-labelledby="scene-label"></div>
+			</div>
+			<div class="control-group">
+				<span id="view-mode-label">View mode</span>
+				<div id="view-mode-options" class="control-options" role="group" aria-labelledby="view-mode-label"></div>
+			</div>
 		</div>
 	</body>
 </html>

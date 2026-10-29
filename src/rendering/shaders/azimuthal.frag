@@ -1,11 +1,11 @@
 precision highp float;
 uniform samplerCube envMap;
 uniform samplerCube transitionEnvMap;
-uniform float globeFovDegrees;
+uniform bool transitionEnabled;
 uniform float transitionProgress;
-uniform float transitionBorderWidth;
 uniform vec3 transitionOrigin;
-uniform bool transitionActive;
+uniform float transitionBorderWidth;
+uniform float globeFovDegrees;
 varying vec2 vUv;
 
 void main() {
@@ -16,32 +16,20 @@ void main() {
 		return;
 	}
 
-	// Scale the angle by the globe's FOV constraint
-	// If FOV is 320 degrees, max colatitude = π * (320/360)
-	float fovFactor = globeFovDegrees / 360.0;
-	float c = r * 3.141592653589793 * fovFactor;
+	// Contract the view to the globe's visible field of view.
+	float c = r * 3.141592653589793 * (globeFovDegrees / 360.0);
 	float theta = atan(p.y, p.x);
-	float sin_c = sin(c);
-	float cos_c = cos(c);
-	vec3 dir = vec3(
-		-sin_c * cos(theta),
-		 sin_c * sin(theta),
-		 cos_c
-	);
-
+	vec3 dir = vec3(-sin(c) * cos(theta), sin(c) * sin(theta), cos(c));
 	vec4 color = textureCube(envMap, dir);
-	if (transitionActive) {
+	if (transitionEnabled) {
 		float angle = acos(clamp(dot(normalize(dir), normalize(transitionOrigin)), -1.0, 1.0));
 		float wipeAngle = transitionProgress * 3.141592653589793;
-		float halfBorder = transitionBorderWidth * 0.5;
-
-		if (abs(angle - wipeAngle) <= halfBorder) {
+		if (abs(angle - wipeAngle) <= transitionBorderWidth * 0.5) {
 			color = vec4(1.0);
 		} else if (angle < wipeAngle) {
 			color = textureCube(transitionEnvMap, dir);
 		}
 	}
-
 	color.rgb = pow(color.rgb, vec3(1.0 / 1.9));
 	gl_FragColor = color;
 }

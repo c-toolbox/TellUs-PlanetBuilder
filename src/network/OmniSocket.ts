@@ -95,7 +95,7 @@ export enum ConnectionStatus {
 }
 
 export class OmniSocket extends EventEmitter {
-	private socket: WebSocket;
+	private socket: WebSocket | null = null;
 	private handlers: { [type in Response]: (data: any) => void };
 
 	constructor() {
@@ -134,7 +134,7 @@ export class OmniSocket extends EventEmitter {
 	}
 
 	send(data: object, isOmni = false) {
-		if (this.isConnectedToSocket) {
+		if (this.socket && this.isConnectedToSocket) {
 			this.socket.send(JSON.stringify(data));
 		} else {
 			console.warn("Cannot send. Socket is closed.");

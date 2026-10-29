@@ -1,24 +1,27 @@
-import { OmniSocket } from "@/network/OmniSocket";
-import { TouchHandler } from "@/network/TouchHandler";
-import { UiSocket } from "./UiSocket";
+import { TouchHandler } from "./TouchHandler";
+import { SocketUi } from "./socket_ui/SocketUi";
+import { SceneManager } from "@/scenes/SceneManager";
+import { scenes } from "@/scenes/scenes";
+import { Renderer } from "@/rendering/Renderer";
 
 class GlobalServices {
-	omniSocket: OmniSocket;
-	touchHandler: TouchHandler;
-	uiSocket: UiSocket;
+	readonly touchHandler = new TouchHandler();
+	readonly uiSocket = new SocketUi();
+	private rendererInstance?: Renderer;
+	private sceneManagerInstance?: SceneManager;
 
-	constructor() {
-		this.omniSocket = new OmniSocket();
-		this.touchHandler = new TouchHandler();
-		this.uiSocket = new UiSocket();
+	get renderer(): Renderer {
+		return this.rendererInstance ??= new Renderer();
+	}
+
+	get sceneManager(): SceneManager {
+		return this.sceneManagerInstance ??= new SceneManager(scenes, this.renderer);
 	}
 
 	connectAll() {
-		// this.omniSocket.connect();
 		this.touchHandler.connect();
 		this.uiSocket.connect();
 	}
 }
 
-// Export a singleton instance
 export const globalServices = new GlobalServices();

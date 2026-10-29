@@ -1,13 +1,13 @@
-// Ensure URL is available in the global scope before other imports
-if (typeof globalThis.URL === "undefined") {
-	globalThis.URL = URL;
-}
-
 import "@/utils/neu";
 import "@/utils/storage";
-
+import { setupHtmlDebugControls } from "@/utils/HtmlDebugControls";
 import { globalServices } from "@/network/GlobalServices";
-import { SceneKey, sceneManager, scenes } from "./scenes/SceneManager";
+import { SceneId } from "./scenes/scenes";
+
+const { renderer, sceneManager } = globalServices;
+
+setupHtmlDebugControls(renderer, sceneManager);
+
+sceneManager.setScene(SceneId.Planet);
 
 globalServices.connectAll();
-sceneManager.setScene(scenes[SceneKey.World]);

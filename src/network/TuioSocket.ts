@@ -1,6 +1,5 @@
 import { EventEmitter } from "events";
 import {
-	TuioEvent,
 	TuioAddEvent,
 	TuioRemoveEvent,
 	TuioUpdateEvent,

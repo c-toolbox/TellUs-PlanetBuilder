@@ -76,7 +76,7 @@ export default class SpeciesBillboard extends THREE.Mesh<
 			this.add(part);
 		});
 
-		this.textLabel = new TextLabel(label, 0.12, Math.max(width, 1.2));
+		this.textLabel = new TextLabel(label, 0.12, "center", Math.max(width, 1.2));
 		this.textLabel.position.set(
 			0,
 			-(height / 2 + BORDER_THICKNESS + 0.12),

@@ -1,15 +1,8 @@
 import { EventEmitter } from "events";
-import {
-	UiEvent,
-	UiConfigEvent,
-	UiUpdateEvent,
-	UiRequestEvent,
-} from "./uiProtocol";
+import { UiEvent } from "./protocol";
 
-const UI_URL = `ws://${location.hostname}:7000/ws`;
-
-export class UiSocket extends EventEmitter {
-	private socket: WebSocket;
+export class SocketUi extends EventEmitter {
+	private socket: WebSocket | null = null;
 	private reconnectAttempts: number = 0;
 	private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -18,7 +11,7 @@ export class UiSocket extends EventEmitter {
 	}
 
 	connect(): void {
-		this.socket = new WebSocket(UI_URL);
+		this.socket = new WebSocket(`ws://${location.hostname}:7000/ws`);
 
 		this.socket.onopen = (event) => {
 			console.debug("Socket UI opened");
@@ -41,7 +34,7 @@ export class UiSocket extends EventEmitter {
 
 	send(data: UiEvent) {
 		if (this.isConnectedToSocket) {
-			this.socket.send(JSON.stringify(data));
+			this.socket?.send(JSON.stringify(data));
 		}
 	}
 

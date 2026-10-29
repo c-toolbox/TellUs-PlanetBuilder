@@ -15,11 +15,12 @@ import {
 	GLOBE_FOV_DEGREES,
 } from "@/constants";
 
-import circleAsset from "@/assets/circle.png";
+import circleAsset from "@/assets/textures/circle.png";
 
 export class TouchHandler extends EventEmitter {
 	public touchGroup: THREE.Group;
 	private touchPoints: Map<TouchId, TouchPoint>;
+	private cameraLocalDirections = new Map<TouchId, THREE.Vector3>();
 	private touchOuterMaterial: THREE.MeshBasicMaterial;
 	private touchInnerMaterial: THREE.MeshBasicMaterial;
 	private cameraQuaternion: THREE.Quaternion;
@@ -32,6 +33,7 @@ export class TouchHandler extends EventEmitter {
 			pressed?: TouchInteraction;
 			startDirection: THREE.Vector3;
 			previousDirection: THREE.Vector3;
+			startedTimestamp: number;
 			dragging: boolean;
 		}
 	>();
@@ -101,6 +103,7 @@ export class TouchHandler extends EventEmitter {
 
 		this.touchGroup.add(mesh);
 		this.touchPoints.set(touchId, mesh);
+		this.cameraLocalDirections.set(touchId, new THREE.Vector3(0, 0, 1));
 	}
 
 	updateTouch(touchId: TouchId, pitch: number, yaw: number) {
@@ -120,7 +123,7 @@ export class TouchHandler extends EventEmitter {
 		);
 
 		// Store camera-local direction
-		object.cameraLocalDirection.copy(direction);
+		this.cameraLocalDirections.get(touchId)!.copy(direction);
 
 		// Apply camera quaternion to emit world-space direction
 		const worldDirection = direction
@@ -128,34 +131,6 @@ export class TouchHandler extends EventEmitter {
 			.applyQuaternion(this.cameraQuaternion);
 
 		const newWorldPos = worldDirection.clone().multiplyScalar(TOUCH_DISTANCE);
-		const now = Date.now();
-
-		if (object.hasPreviousPosition) {
-			const dt = (now - object.lastUpdateTimestamp) / 1000; // seconds
-
-			// Ensure dt is valid (> 0) and not too small to avoid division spikes
-			if (dt > 0.001) {
-				const displacement = newWorldPos.clone().sub(object.position);
-				const calculatedVelocity = displacement.divideScalar(dt);
-
-				// Clamp touch velocity to prevent hardware touch noise spikes
-				const MAX_TOUCH_VELOCITY = 1000;
-				if (calculatedVelocity.length() > MAX_TOUCH_VELOCITY) {
-					calculatedVelocity.setLength(MAX_TOUCH_VELOCITY);
-				}
-
-				object.velocity.copy(calculatedVelocity);
-				object.previousPosition.copy(object.position).normalize();
-			}
-		} else {
-			// First update after touch down: initialize positions, zero velocity
-			object.hasPreviousPosition = true;
-			object.position.copy(newWorldPos);
-			object.previousPosition.copy(newWorldPos).normalize();
-			object.velocity.set(0, 0, 0);
-		}
-
-		object.lastUpdateTimestamp = now;
 		object.position.copy(newWorldPos);
 		object.lookAt(ORIGIN);
 		this.updateInteractions(touchId, object, worldDirection);
@@ -190,6 +165,7 @@ export class TouchHandler extends EventEmitter {
 			state = {
 				startDirection: direction.clone(),
 				previousDirection: direction.clone(),
+				startedTimestamp: Date.now(),
 				dragging: false,
 			};
 			this.interactionStates.set(touchId, state);
@@ -368,8 +344,8 @@ export class TouchHandler extends EventEmitter {
 	}
 
 	private updateTouchPointsForCameraRotation() {
-		this.touchPoints.forEach((touchPoint) => {
-			const worldDirection = touchPoint.cameraLocalDirection
+		this.touchPoints.forEach((touchPoint, touchId) => {
+			const worldDirection = this.cameraLocalDirections.get(touchId)!
 				.clone()
 				.applyQuaternion(this.cameraQuaternion);
 
@@ -404,9 +380,12 @@ export class TouchHandler extends EventEmitter {
 				);
 			});
 			if (
-				object.shouldRegisterAsClick &&
 				pressedInteraction &&
-				pressedInteraction === interactionState.hovered
+				interactionState.pressed === pressedInteraction &&
+				interactionState.hovered === pressedInteraction &&
+				this.interactions.has(pressedInteraction) &&
+				pressedInteraction.isEnabled &&
+				Date.now() - interactionState.startedTimestamp < pressedInteraction.clickDuration
 			) {
 				this.emitInteraction(
 					"click",
@@ -420,19 +399,20 @@ export class TouchHandler extends EventEmitter {
 		}
 		this.interactionStates.delete(touchId);
 
-		if (object.shouldRegisterAsClick) {
-			const direction = object.position.clone().normalize();
-			this.emit("click", touchId, direction);
-		}
-
+		this.cameraLocalDirections.delete(touchId);
 		this.touchPoints.delete(touchId);
 		this.touchGroup.remove(object);
+		object.dispose();
 
 		this.emit("remove", touchId);
 	}
 
 	getTouchPoint(touchId: TouchId) {
 		return this.touchPoints.get(touchId);
+	}
+
+	getCameraLocalDirection(touchId: TouchId) {
+		return this.cameraLocalDirections.get(touchId)?.clone();
 	}
 
 	getTouchPoints() {
