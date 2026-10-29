@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import earcut from "earcut";
 
-import circle from "@/assets/circle.png";
+import circle from "@/assets/textures/circle.png";
 import { Tile } from "./TileManager";
 
 import { VERTEX_DISTANCE, EDGE_DISTANCE, FACE_DISTANCE } from "./constants";
@@ -13,7 +13,7 @@ export class Polyhedra {
 	private faces: number[][];
 
 	private vertexEdges: Map<number, number[]> = new Map();
-	private edgeMap: Map<string, number>;
+	private edgeMap: Map<string, number> = new Map<string, number>();
 
 	private edgeSize: number;
 	private edgeColor: string;
@@ -91,9 +91,6 @@ export class Polyhedra {
 	// Create a cylinder on every edge
 	// Create billboarded quads for edges (always face the origin)
 	initEdges() {
-		/* Prepare mapping of edges and vertices */
-		this.edgeMap = new Map<string, number>();
-
 		for (let i = 0; i < this.edges.length; i++) {
 			const [ia, ib] = this.edges[i];
 

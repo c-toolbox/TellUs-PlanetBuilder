@@ -1,12 +1,15 @@
+import { TileBrush } from "./TileBrush";
+import { TouchInteraction } from "@/network/TouchInteraction";
+import BackgroundSphere from "@/components/BackgroundSphere";
 import * as THREE from "three";
 import BaseScene from "@/scenes/BaseScene";
-import { SceneKey } from "@/scenes/SceneManager";
+import { SceneId, scenes } from "@/scenes/scenes";
 import { Renderer } from "@/rendering/Renderer";
 
 import { TileMesh } from "@/scenes/world/TileMesh";
 import { TouchId } from "@/network/tuioProtocol";
 import { Tile, tileManager, Tiles } from "@/scenes/world/TileManager";
-import { UiConfigEvent } from "@/network/uiProtocol";
+import { UiConfigEvent } from "@/network/socket_ui/protocol";
 import { Polyhedra } from "@/scenes/world/Polyhedra";
 import { ORIGIN } from "@/constants";
 import {
@@ -32,14 +35,18 @@ interface SaveState {
 import backgroundAsset from "@/assets/backgrounds/globe/truecolor.png";
 
 export default class WorldScene extends BaseScene {
-	private globe: Polyhedra;
-	private activePolyhedraModel: ModelName;
+	private globe: Polyhedra | null = null;
+	private activePolyhedraModel: ModelName | null = null;
 
 	private saveCount: number = 0;
 	private saveStates: SaveState[] = [];
 	private saveStateListeners = new Map<string, (...args: any[]) => void>();
 	private planetDirty: boolean = true;
-	private renderer: Renderer | null = null;
+	private readonly raycaster = new THREE.Raycaster();
+	private tileMeshes: TileMesh[] = [];
+	private tileInteraction?: TouchInteraction;
+	private readonly tileBrushes = new Map<TouchId, TileBrush>();
+	private readonly previousDirections = new Map<TouchId, THREE.Vector3>();
 	private targetCameraQuaternion: THREE.Quaternion = new THREE.Quaternion();
 	private cameraRotationSmoothing: number = 0.12;
 
@@ -86,7 +93,8 @@ export default class WorldScene extends BaseScene {
 		this.add(dir);
 	}
 
-	public setRendererSettings(renderer: Renderer): void {
+	public applyRendererSettings(renderer: Renderer): void {
+		super.applyRendererSettings(renderer);
 		renderer.outputColorSpace = THREE.SRGBColorSpace;
 		renderer.toneMapping = THREE.NoToneMapping;
 	}
@@ -105,7 +113,7 @@ export default class WorldScene extends BaseScene {
 		this.activePolyhedraModel = polyhedra.name;
 
 		// Remove existing globe
-		this.clickable = [];
+		this.tileMeshes = [];
 		if (this.globe) {
 			this.remove(this.globe.vertexGroup);
 			this.remove(this.globe.edgeGroup);
@@ -123,7 +131,11 @@ export default class WorldScene extends BaseScene {
 		this.add(this.globe.vertexGroup);
 		this.add(this.globe.edgeGroup);
 		this.add(this.globe.faceGroup);
-		this.makeClickable(this.globe.faceGroup);
+		this.tileMeshes = this.globe.tileMeshes;
+		if (this.tileInteraction) this.unregisterTouchInteraction(this.tileInteraction);
+		this.tileInteraction = this.registerTouchInteraction(new TouchInteraction(this.globe.faceGroup, {
+			enabled: () => !this.worldConfig.rotationMode,
+		})).on("click", ({ touchId, direction }) => this.handleRaycast(touchId, direction, "click"));
 
 		// Handle invisible tiles
 		if (this.worldConfig.tileTexture === "invisible tiles") {
@@ -134,20 +146,7 @@ export default class WorldScene extends BaseScene {
 	}
 
 	populatePlanetTiles() {
-		// const blue = new THREE.Color(0x0000ff);
-		// const red = new THREE.Color(0xff0000);
-		// this.globe.faceGroup.children.forEach((mesh) => {
-		// 	const tileMesh = mesh as TileMesh;
-		// 	const { temperature, height, tectonic } = tileManager.getClimate(
-		// 		tileMesh.center,
-		// 	);
-		// 	// const t = height *0.5+0.5;
-		// 	const t = temperature *0.5+0.5;
-		// 	// const t = Math.pow(Math.abs(temperature), 0.1);
-		// 	tileMesh.setColor(interpolateColor(blue, red, t));
-		// 	// tileMesh.setColor(Math.abs(tectonic) < 0.2 ? red : blue);
-		// });
-		// return;
+		if (!this.globe) return;
 
 		const tilePositions = this.globe.faceGroup.children.map(
 			(mesh) => mesh.position,
@@ -167,6 +166,7 @@ export default class WorldScene extends BaseScene {
 	}
 
 	clearPlanetTiles() {
+		if (!this.globe) return;
 		this.globe.tileMeshes.forEach((tileMesh, index) => {
 			tileMesh.setTile(Tile.None);
 		});
@@ -177,6 +177,7 @@ export default class WorldScene extends BaseScene {
 	}
 
 	updateEdgeVisibility() {
+		if (!this.globe) return;
 		this.globe.tileMeshes.forEach((tileMesh) => {
 			tileMesh.neighbors.forEach(({ mesh, edgeIndex }) => {
 				this.toggleEdge(
@@ -188,6 +189,7 @@ export default class WorldScene extends BaseScene {
 	}
 
 	toggleEdge(edgeIndex: number, sameEdge: boolean) {
+		if (!this.globe) return;
 		switch (this.worldConfig.tileEdge) {
 			case "hide all":
 				return this.globe.setEdgeVisible(edgeIndex, false);
@@ -199,12 +201,13 @@ export default class WorldScene extends BaseScene {
 	}
 
 	// On entering scene
-	override onEnter(renderer: Renderer) {
+	override onSceneEnter(renderer: Renderer) {
 		this.renderer = renderer;
-		this.targetCameraQuaternion.copy(renderer.centerCamera.quaternion);
-		super.onEnter(renderer);
+		this.targetCameraQuaternion.copy(renderer.projectionCamera.quaternion);
+		this.previousDirections.clear();
+		super.onSceneEnter(renderer);
 
-		this.setBackground(backgroundAsset, 2);
+		this.add(new BackgroundSphere(backgroundAsset, 2));
 
 		// Set tileManager variables
 		tileManager.worldConfig = this.worldConfig;
@@ -214,19 +217,32 @@ export default class WorldScene extends BaseScene {
 	}
 
 	// On exiting scene
-	override onExit(renderer: Renderer) {
-		super.onExit(renderer);
-		this.renderer = null;
+	override onSceneExit(renderer: Renderer) {
+		super.onSceneExit(renderer);
+		this.tileBrushes.forEach((brush) => brush.dispose());
+		this.tileBrushes.clear();
+		this.previousDirections.clear();
+		if (this.tileInteraction) this.unregisterTouchInteraction(this.tileInteraction);
+		this.tileInteraction = undefined;
 
 		this.clear();
+		this.globe = null;
+		this.activePolyhedraModel = null;
+		this.tileMeshes = [];
 	}
 
-	protected onTouch(touchId: TouchId, vector: THREE.Vector3) {
+	protected override onTouch(touchId: TouchId, vector: THREE.Vector3) {
+		if (this.worldConfig.rotationMode) {
+			this.handleCameraMovement(touchId);
+			return;
+		}
 		this.handleRaycast(touchId, vector, "touch");
 	}
 
-	protected onClick(touchId: TouchId, vector: THREE.Vector3) {
-		this.handleRaycast(touchId, vector, "click");
+	protected override onRemove(touchId: TouchId) {
+		this.tileBrushes.get(touchId)?.dispose();
+		this.tileBrushes.delete(touchId);
+		this.previousDirections.delete(touchId);
 	}
 
 	handleRaycast(
@@ -237,27 +253,27 @@ export default class WorldScene extends BaseScene {
 		this.raycaster.set(ORIGIN, vector);
 
 		const touchPoint = this.touchHandler.getTouchPoint(touchId);
-		if (!touchPoint) return;
-
-		if (this.worldConfig.rotationMode) {
-			this.handleCameraMovement();
-			return;
+		if (!touchPoint || this.worldConfig.rotationMode) return;
+		let brush = this.tileBrushes.get(touchId);
+		if (!brush) {
+			brush = new TileBrush(touchPoint);
+			this.tileBrushes.set(touchId, brush);
 		}
 
-		const intersects = this.raycaster.intersectObjects(this.clickable, true);
+		const intersects = this.raycaster.intersectObjects(this.tileMeshes, true);
 		if (intersects.length > 0) {
 			const tileMesh = intersects[0].object as TileMesh;
 			if (tileMesh) {
-				if (type == "touch" && touchPoint.tile == Tile.None) {
-					touchPoint.setTile(tileMesh.tile);
+				if (type == "touch" && brush.tile == Tile.None) {
+					brush.setTile(tileMesh.tile);
 				} else if (type == "click") {
-					touchPoint.setTile(tileManager.getNextTile(tileMesh.tile));
+					brush.setTile(tileManager.getNextTile(tileMesh.tile));
 				}
 
-				if (tileMesh.tile != touchPoint.tile) {
-					tileMesh.setTile(touchPoint.tile);
+				if (tileMesh.tile != brush.tile) {
+					tileMesh.setTile(brush.tile);
 					this.markDirty();
-					this.sendUiConfig();
+					this.sendSocketUiConfig();
 				}
 
 				if (this.worldConfig.tileEdge == "show borders") {
@@ -279,52 +295,22 @@ export default class WorldScene extends BaseScene {
 		}
 	}
 
-	private handleCameraMovement() {
-		if (!this.renderer) return;
-
-		const touches = this.touchHandler.getTouchPoints();
-		let axisSum = new THREE.Vector3();
-		let angleSum = 0;
-		let activeCount = 0;
-
-		touches.forEach((touchPoint) => {
-			if (!touchPoint.hasPreviousPosition) return;
-
-			const prev = touchPoint.previousPosition.clone().normalize();
-			const curr = touchPoint.position.clone().normalize();
-			const dot = THREE.MathUtils.clamp(prev.dot(curr), -1, 1);
-			const angle = Math.acos(dot);
-			if (angle < 1e-4) return;
-
-			const axis = prev.clone().cross(curr);
-			if (axis.lengthSq() < 1e-8) return;
-			axis.normalize().multiplyScalar(angle);
-
-			axisSum.add(axis);
-			angleSum += angle;
-			activeCount += 1;
-		});
-
-		if (activeCount === 0 || axisSum.lengthSq() < 1e-8) return;
-
-		const axis = axisSum.normalize();
-		const angle = angleSum / activeCount;
-		const rotation = new THREE.Quaternion().setFromAxisAngle(axis, angle);
-
-		// Invert rotation so sphere follows hand motion (camera rotates opposite to touch movement)
-		const invRotation = rotation.clone().invert();
-		this.targetCameraQuaternion.multiplyQuaternions(
-			invRotation,
-			this.targetCameraQuaternion,
-		);
+	private handleCameraMovement(touchId: TouchId) {
+		const current = this.touchHandler.getCameraLocalDirection(touchId);
+		if (!current || !this.renderer) return;
+		const previous = this.previousDirections.get(touchId);
+		if (previous) {
+			const rotation = new THREE.Quaternion().setFromUnitVectors(previous, current).invert();
+			this.targetCameraQuaternion.multiply(rotation).normalize();
+		}
+		this.previousDirections.set(touchId, current);
 	}
 
 	update(delta: number) {
-		this.players.forEach((player) => player.update());
 
 		// Smooth camera rotation towards target using quaternion slerp
 		if (this.renderer && this.worldConfig.rotationMode) {
-			this.renderer.centerCamera.quaternion.slerp(
+			this.renderer.projectionCamera.quaternion.slerp(
 				this.targetCameraQuaternion,
 				this.cameraRotationSmoothing,
 			);
@@ -333,7 +319,7 @@ export default class WorldScene extends BaseScene {
 		// const time = ((this as any).time ?? 0) + (delta / 1000) * 5;
 		// (this as any).time = time;
 
-		// this.clickable.slice(0,1).forEach((mesh) => {
+		// this.tileMeshes.slice(0,1).forEach((mesh) => {
 		// 	const tileMesh = mesh as TileMesh;
 		// 	const scale = 1 + Math.sin((this as any).time) * 0.5;
 		// 	tileMesh.position.copy(tileMesh.center.clone().multiplyScalar(scale));
@@ -343,12 +329,17 @@ export default class WorldScene extends BaseScene {
 
 	/* Socket UI */
 
-	initializeUi() {
-		super.initializeUi();
+	registerSocketUiListeners() {
+		super.registerSocketUiListeners();
+		this.uiSocket.on("scene", (id: SceneId) => {
+			this.sceneManager.setScene(id);
+		});
 
 		this.uiSocket.on("rotation_mode", (value: boolean) => {
 			this.worldConfig.rotationMode = value;
-			this.sendUiConfig();
+			this.previousDirections.clear();
+			if (this.renderer) this.targetCameraQuaternion.copy(this.renderer.projectionCamera.quaternion);
+			this.sendSocketUiConfig();
 		});
 
 		this.uiSocket.on("auto_generate", (value: boolean) => {
@@ -356,31 +347,32 @@ export default class WorldScene extends BaseScene {
 			if (value) {
 				this.createPlanet();
 			}
-			this.sendUiConfig();
+			this.sendSocketUiConfig();
 		});
 
 		this.uiSocket.on("new_planet", () => {
 			this.createPlanet();
-			this.sendUiConfig();
+			this.sendSocketUiConfig();
 		});
 
 		this.uiSocket.on("clear_planet", () => {
 			this.worldConfig.autoGenerate = false;
 			this.clearPlanetTiles();
-			this.sendUiConfig();
+			this.sendSocketUiConfig();
 		});
 
 		this.uiSocket.on("tile_edges", (value: TileEdge) => {
 			this.worldConfig.tileEdge = value;
 			this.updateEdgeVisibility();
 			this.markDirty();
-			this.sendUiConfig();
+			this.sendSocketUiConfig();
 		});
 
 		this.uiSocket.on("tile_texture", (value: TileTexture) => {
+			if (!this.globe) return;
 			this.worldConfig.tileTexture = value;
 			this.markDirty();
-			this.sendUiConfig();
+			this.sendSocketUiConfig();
 
 			// Update textures
 			this.globe.tileMeshes.forEach((tileMesh) =>
@@ -400,7 +392,7 @@ export default class WorldScene extends BaseScene {
 		this.uiSocket.on("model", (value: ModelName) => {
 			this.worldConfig.model = value;
 			this.redistributeBiomes();
-			this.sendUiConfig();
+			this.sendSocketUiConfig();
 			// this.createPlanet();
 		});
 
@@ -429,7 +421,7 @@ export default class WorldScene extends BaseScene {
 		this.uiSocket.on("distribution", (value: DistributionType) => {
 			this.worldConfig.distribution = value;
 			this.redistributeBiomes();
-			this.sendUiConfig();
+			this.sendSocketUiConfig();
 		});
 
 		this.uiSocket.on("biome_distribution", (values: number[]) => {
@@ -452,34 +444,31 @@ export default class WorldScene extends BaseScene {
 				this.populatePlanetTiles();
 			}
 
-			this.sendUiConfig();
+			this.sendSocketUiConfig();
 		});
 
 		this.uiSocket.on("edge_width", (value: number) => {
 			this.worldConfig.edgeWidth = value;
 			if (this.globe) this.globe.setEdgeSize(value);
 			this.markDirty();
-			this.sendUiConfig();
+			this.sendSocketUiConfig();
 		});
 
 		this.uiSocket.on("edge_color", (color: string) => {
 			this.worldConfig.edgeColor = color;
 			if (this.globe) this.globe.setEdgeColor(color);
 			this.markDirty();
-			this.sendUiConfig();
+			this.sendSocketUiConfig();
 		});
 
 		this.uiSocket.on("save_planet", () => {
 			if (this.planetDirty) {
 				this.savePlanet();
-				this.sendUiConfig();
+				this.sendSocketUiConfig();
 			}
 		});
 	}
 
-	sendUiConfig() {
-		this.uiSocket.send(this.uiConfig);
-	}
 
 	private clearSaveStateListeners() {
 		this.saveStateListeners.forEach((handler, id) => {
@@ -506,19 +495,19 @@ export default class WorldScene extends BaseScene {
 
 			const loadHandler = () => {
 				this.loadPlanet(state);
-				this.sendUiConfig();
+				this.sendSocketUiConfig();
 			};
 
 			const saveHandler = () => {
 				if (this.planetDirty) {
 					this.savePlanet(index);
-					this.sendUiConfig();
+					this.sendSocketUiConfig();
 				}
 			};
 
 			const deleteHandler = () => {
 				this.deletePlanet(index);
-				this.sendUiConfig();
+				this.sendSocketUiConfig();
 			};
 
 			this.uiSocket.on(loadId, loadHandler);
@@ -532,6 +521,7 @@ export default class WorldScene extends BaseScene {
 	}
 
 	private savePlanet(index?: number) {
+		if (!this.globe || !this.activePolyhedraModel) return;
 		// Copy worldConfig
 		const config = JSON.parse(
 			JSON.stringify(this.worldConfig),
@@ -578,6 +568,7 @@ export default class WorldScene extends BaseScene {
 
 		// Populate planet tiles
 		this.createPlanet();
+		if (!this.globe) return;
 		this.globe.tileMeshes.forEach((tileMesh, index) => {
 			tileMesh.setTile(state.tiles[index]);
 		});
@@ -594,7 +585,7 @@ export default class WorldScene extends BaseScene {
 		this.registerSaveStateListeners();
 	}
 
-	get uiConfig(): UiConfigEvent {
+	get socketUiConfig(): UiConfigEvent {
 		return {
 			type: "config",
 			title: "Planet builder",
@@ -604,8 +595,8 @@ export default class WorldScene extends BaseScene {
 					id: "scene",
 					hint_title: "Scene",
 					hint_text: "Switch to a different scene",
-					value: SceneKey.World,
-					options: Object.values(SceneKey),
+					value: SceneId.Planet,
+					options: scenes.map((scene) => scene.id),
 				},
 				{
 					type: "switch",
@@ -621,7 +612,7 @@ export default class WorldScene extends BaseScene {
 				},
 				{
 					type: "text",
-					hint_title: `Tiles (${this.clickable.length} total)`,
+					hint_title: `Tiles (${this.tileMeshes.length} total)`,
 					hint_text: this.tileCountString,
 				},
 
@@ -896,7 +887,7 @@ export default class WorldScene extends BaseScene {
 		}
 
 		this.redistributeBiomes();
-		this.sendUiConfig();
+		this.sendSocketUiConfig();
 	}
 
 	getTileCount(): Record<Tile, number> {
@@ -905,7 +896,7 @@ export default class WorldScene extends BaseScene {
 			counts[tile] = 0;
 		}
 
-		for (const mesh of this.clickable) {
+		for (const mesh of this.tileMeshes) {
 			const tileMesh = mesh as TileMesh;
 			counts[tileMesh.tile]++;
 		}
@@ -916,7 +907,7 @@ export default class WorldScene extends BaseScene {
 	get tileCountString(): string {
 		const counts = this.getTileCount();
 
-		const total = this.clickable.length;
+		const total = this.tileMeshes.length;
 
 		return Object.entries(counts)
 			.filter(([, count]) => count > 0)

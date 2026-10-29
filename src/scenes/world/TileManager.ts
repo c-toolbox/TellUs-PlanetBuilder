@@ -74,14 +74,14 @@ export const Tile = Object.fromEntries(
 ) as { [K in Tile]: K };
 
 class TileManager {
-	public worldConfig: WorldUiConfig;
+	public worldConfig: WorldUiConfig | null = null;
 	public textureSets: Record<TextureSetKey, Record<Tile, THREE.Texture>>;
 
-	private noise1: NoiseFunction3D;
-	private noise2: NoiseFunction3D;
-	private noise3: NoiseFunction3D;
-	private noise4: NoiseFunction3D;
-	private noise5: NoiseFunction3D;
+	private noise1: NoiseFunction3D = createNoise3D();
+	private noise2: NoiseFunction3D = createNoise3D();
+	private noise3: NoiseFunction3D = createNoise3D();
+	private noise4: NoiseFunction3D = createNoise3D();
+	private noise5: NoiseFunction3D = createNoise3D();
 
 	constructor() {
 		this.textureSets = {
@@ -145,6 +145,8 @@ class TileManager {
 	}
 
 	getClimate(position: THREE.Vector3) {
+		if (!this.worldConfig) throw new Error("Missing worldConfig");
+
 		const { x, y, z } = position;
 
 		const pitch = getPitchFromVector(position) / Math.PI;
@@ -188,8 +190,7 @@ class TileManager {
 
 			case Tile.Desert:
 				return (
-					10 *
-					(this.gaussian(temp, 1.0, 0.6) + this.gaussian(height, 1, 0.5))
+					10 * (this.gaussian(temp, 1.0, 0.6) + this.gaussian(height, 1, 0.5))
 				);
 
 			case Tile.Savanna:
@@ -198,7 +199,9 @@ class TileManager {
 				);
 
 			case Tile.Taiga:
-				return 4 * this.gaussian(temp, -1, 0.4) + 0.5 * this.gaussian(height, 0, 0.5);
+				return (
+					4 * this.gaussian(temp, -1, 0.4) + 0.5 * this.gaussian(height, 0, 0.5)
+				);
 
 			case Tile.Forest:
 				return (
@@ -211,6 +214,8 @@ class TileManager {
 	}
 
 	populateTiles(positions: THREE.Vector3[], biomes: BiomeCount): Tile[] {
+		if (!this.worldConfig) throw new Error("Missing worldConfig");
+
 		type Candidate = {
 			posIndex: number;
 			tile: Tile;
@@ -283,6 +288,8 @@ class TileManager {
 	private tileCycle = Object.keys(Tiles) as Tile[];
 
 	getNextTile(tile: Tile) {
+		if (!this.worldConfig) return tile;
+
 		const startIndex = this.tileCycle.indexOf(tile);
 
 		for (let i = 1; i <= this.tileCycle.length; i++) {

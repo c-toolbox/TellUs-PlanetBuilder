@@ -5,7 +5,7 @@ import { FACE_DISTANCE } from "./constants";
 export class TileMesh extends THREE.Mesh {
 	public material: THREE.MeshBasicMaterial;
 	public tile: Tile;
-	public center: THREE.Vector3;
+	public center: THREE.Vector3 | null = null;
 
 	public neighbors: { mesh: TileMesh; edgeIndex: number }[] = [];
 
@@ -21,7 +21,7 @@ export class TileMesh extends THREE.Mesh {
 	setTile(tile: Tile) {
 		this.tile = tile;
 
-		if (tileManager.worldConfig.tileTexture == "colored tiles") {
+		if (tileManager.worldConfig?.tileTexture == "colored tiles") {
 			this.material.map = tileManager.getTexture(Tile.None);
 			this.material.color.set(Tiles[tile].color);
 		} else {
