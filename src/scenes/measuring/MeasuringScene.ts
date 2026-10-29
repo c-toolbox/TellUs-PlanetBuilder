@@ -1,10 +1,11 @@
+import BackgroundSphere from "@/components/BackgroundSphere";
 import * as THREE from "three";
 import backgroundAsset from "@/assets/backgrounds/globe/truecolor.png";
 import MeasuringTape from "@/components/MeasuringTape";
-import { UiConfigEvent } from "@/network/uiProtocol";
+import { UiConfigEvent } from "@/network/socket_ui/protocol";
 import { Renderer } from "@/rendering/Renderer";
 import BaseScene from "@/scenes/BaseScene";
-import { SceneKey } from "@/scenes/SceneManager";
+import { SceneId, scenes } from "@/scenes/scenes";
 import { Color } from "@/utils/colors";
 
 export default class MeasuringScene extends BaseScene {
@@ -12,7 +13,8 @@ export default class MeasuringScene extends BaseScene {
 
 	constructor() {
 		super();
-		this.setBackground(backgroundAsset, 2);
+		this.add(new BackgroundSphere(backgroundAsset, 2));
+
 		this.measuringTapes = [Color.Red600, Color.Blue600, Color.Green600].map(
 			(color, index) => {
 				const angle = (index / 3) * Math.PI * 2;
@@ -38,12 +40,20 @@ export default class MeasuringScene extends BaseScene {
 		);
 	}
 
-	override onExit(renderer: Renderer) {
-		super.onExit(renderer);
+	override onSceneExit(renderer: Renderer) {
+		super.onSceneExit(renderer);
 		this.measuringTapes.forEach((tape) => tape.resetInteraction());
 	}
 
-	protected get uiConfig(): UiConfigEvent {
+	protected override registerSocketUiListeners() {
+		super.registerSocketUiListeners();
+
+		this.uiSocket.on("scene", (id: SceneId) => {
+			this.sceneManager.setScene(id);
+		});
+	}
+
+	protected get socketUiConfig(): UiConfigEvent {
 		return {
 			type: "config",
 			title: "Measuring",
@@ -53,8 +63,8 @@ export default class MeasuringScene extends BaseScene {
 					id: "scene",
 					hint_title: "Scene",
 					hint_text: "Switch to a different scene",
-					value: SceneKey.Measuring,
-					options: Object.values(SceneKey),
+					value: SceneId.Measuring,
+					options: scenes.map((scene) => scene.id),
 				},
 			],
 		};
