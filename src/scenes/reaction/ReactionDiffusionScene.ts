@@ -1,9 +1,9 @@
 import * as THREE from "three";
 import BaseScene from "../BaseScene";
-import { UiConfigEvent } from "@/network/uiProtocol";
+import { UiConfigEvent } from "@/network/socket_ui/protocol";
 import { Renderer } from "@/rendering/Renderer";
 import { TouchId } from "@/network/tuioProtocol";
-import { SceneKey } from "../SceneManager";
+import { SceneId, scenes } from "@/scenes/scenes";
 import { ReactionTouches } from "./ReactionTouches";
 import {
 	ReactionSettings,
@@ -42,7 +42,7 @@ export default class ReactionDiffusionScene extends BaseScene {
 		this.background = new THREE.Color(0x020408);
 	}
 
-	override onEnter(renderer: Renderer) {
+	override onSceneEnter(renderer: Renderer) {
 		this.accumulator = 0;
 		this.unavailable =
 			!renderer.extensions.has("EXT_color_buffer_float") &&
@@ -56,13 +56,13 @@ export default class ReactionDiffusionScene extends BaseScene {
 				"Reaction diffusion requires renderable half-float textures.",
 			);
 		}
-		super.onEnter(renderer);
+		super.onSceneEnter(renderer);
 		// The chemical brush itself marks each contact.
 		this.remove(this.touchHandler.touchGroup);
 	}
 
-	override onExit(renderer: Renderer) {
-		super.onExit(renderer);
+	override onSceneExit(renderer: Renderer) {
+		super.onSceneExit(renderer);
 		this.touches.clear();
 		this.accumulator = 0;
 		if (this.simulation) {
@@ -98,8 +98,11 @@ export default class ReactionDiffusionScene extends BaseScene {
 		this.touches.release(touchId);
 	}
 
-	protected override initializeUi() {
-		super.initializeUi();
+	protected override registerSocketUiListeners() {
+		super.registerSocketUiListeners();
+		this.uiSocket.on("scene", (id: SceneId) => {
+			this.sceneManager.setScene(id);
+		});
 		const slider = (
 			key: Exclude<keyof ReactionSettings, "erase">,
 			min: number,
@@ -111,7 +114,7 @@ export default class ReactionDiffusionScene extends BaseScene {
 				if (["feed", "kill", "diffusionU", "diffusionV"].includes(key))
 					this.preset = "Custom";
 				this.simulation?.setAppearance(this.settings);
-				this.sendUiConfig();
+				this.sendSocketUiConfig();
 			});
 		};
 		slider("feed", 0.005, 0.08);
@@ -126,7 +129,7 @@ export default class ReactionDiffusionScene extends BaseScene {
 		this.uiSocket.on("preset", (value: string) => {
 			if (value === "Custom") {
 				this.preset = value;
-				this.sendUiConfig();
+				this.sendSocketUiConfig();
 				return;
 			}
 			if (!Object.prototype.hasOwnProperty.call(PRESETS, value)) return;
@@ -136,19 +139,19 @@ export default class ReactionDiffusionScene extends BaseScene {
 				diffusionV: 0.09,
 			});
 			this.resetSimulation(true);
-			this.sendUiConfig();
+			this.sendSocketUiConfig();
 		});
 		this.uiSocket.on("erase", (value: boolean) => {
 			if (typeof value !== "boolean") return;
 			this.settings.erase = value;
-			this.sendUiConfig();
+			this.sendSocketUiConfig();
 		});
 		this.uiSocket.on("paused", (value: boolean) => {
 			if (typeof value !== "boolean") return;
 			this.paused = value;
 			this.touches.clear();
 			this.accumulator = 0;
-			this.sendUiConfig();
+			this.sendSocketUiConfig();
 		});
 		this.uiSocket.on("reset", () => this.resetSimulation(true));
 		this.uiSocket.on("clear", () => this.resetSimulation(false));
@@ -160,7 +163,7 @@ export default class ReactionDiffusionScene extends BaseScene {
 		this.simulation?.reset(seed);
 	}
 
-	protected override get uiConfig(): UiConfigEvent {
+	protected override get socketUiConfig(): UiConfigEvent {
 		return {
 			type: "config",
 			title: "Reaction diffusion",
@@ -170,8 +173,8 @@ export default class ReactionDiffusionScene extends BaseScene {
 					id: "scene",
 					hint_title: "Scene",
 					hint_text: "Switch to a different scene",
-					value: SceneKey.ReactionDiffusion,
-					options: Object.values(SceneKey),
+					value: SceneId.ReactionDiffusion,
+					options: scenes.map((scene) => scene.id),
 				},
 				{
 					type: "text",

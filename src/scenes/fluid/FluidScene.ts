@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import BaseScene from "@/scenes/BaseScene";
-import { SceneKey } from "@/scenes/SceneManager";
-import { UiConfigEvent } from "@/network/uiProtocol";
+import { SceneId, scenes } from "@/scenes/scenes";
+import { UiConfigEvent } from "@/network/socket_ui/protocol";
 import { Renderer } from "@/rendering/Renderer";
 import { TouchId } from "@/network/tuioProtocol";
 import { FluidTouches } from "./FluidTouches";
@@ -28,7 +28,7 @@ export default class FluidScene extends BaseScene {
 		this.background = new THREE.Color(0x020408);
 	}
 
-	override onEnter(renderer: Renderer) {
+	override onSceneEnter(renderer: Renderer) {
 		this.accumulator = 0;
 		this.unavailable = !renderer.extensions.has("EXT_color_buffer_float") &&
 			!renderer.extensions.has("EXT_color_buffer_half_float");
@@ -39,13 +39,13 @@ export default class FluidScene extends BaseScene {
 		} else {
 			console.warn("Fluid simulation unavailable: renderable half-float textures are required.");
 		}
-		super.onEnter(renderer);
+		super.onSceneEnter(renderer);
 		// Dye marks the fingers directly; the shared touch discs would cover it.
 		this.remove(this.touchHandler.touchGroup);
 	}
 
-	override onExit(renderer: Renderer) {
-		super.onExit(renderer);
+	override onSceneExit(renderer: Renderer) {
+		super.onSceneExit(renderer);
 		this.touches.clear();
 		this.accumulator = 0;
 		if (this.fluid) {
@@ -80,19 +80,22 @@ export default class FluidScene extends BaseScene {
 		this.touches.release(touchId);
 	}
 
-	protected override initializeUi() {
-		super.initializeUi();
+	protected override registerSocketUiListeners() {
+		super.registerSocketUiListeners();
+		this.uiSocket.on("scene", (id: SceneId) => {
+			this.sceneManager.setScene(id);
+		});
 		this.uiSocket.on("output", (value: unknown) => {
 			if (typeof value !== "string" || !Object.prototype.hasOwnProperty.call(FLUID_OUTPUTS, value)) return;
 			this.output = value as FluidOutput;
 			this.fluid?.setOutput(this.output);
-			this.sendUiConfig();
+			this.sendSocketUiConfig();
 		});
 		const slider = (key: "touchRadius" | "touchForce" | "swirl" | "dyeDecay", min: number, max: number) => {
 			this.uiSocket.on(key, (value: number) => {
 				if (typeof value !== "number" || !Number.isFinite(value)) return;
 				this.settings[key] = THREE.MathUtils.clamp(value, min, max);
-				this.sendUiConfig();
+				this.sendSocketUiConfig();
 			});
 		};
 		slider("touchRadius", 0.04, 0.35);
@@ -102,14 +105,14 @@ export default class FluidScene extends BaseScene {
 		this.uiSocket.on("ambient", (value: boolean) => {
 			if (typeof value !== "boolean") return;
 			this.settings.ambient = value;
-			this.sendUiConfig();
+			this.sendSocketUiConfig();
 		});
 		this.uiSocket.on("paused", (value: boolean) => {
 			if (typeof value !== "boolean") return;
 			this.paused = value;
 			this.touches.clear();
 			this.accumulator = 0;
-			this.sendUiConfig();
+			this.sendSocketUiConfig();
 		});
 		this.uiSocket.on("reset", () => this.resetFluid(true));
 		this.uiSocket.on("clear", () => this.resetFluid(false));
@@ -121,7 +124,7 @@ export default class FluidScene extends BaseScene {
 		this.fluid?.reset(seed);
 	}
 
-	protected override get uiConfig(): UiConfigEvent {
+	protected override get socketUiConfig(): UiConfigEvent {
 		return {
 			type: "config",
 			title: "Fluid",
@@ -131,8 +134,8 @@ export default class FluidScene extends BaseScene {
 					id: "scene",
 					hint_title: "Scene",
 					hint_text: "Switch to a different scene",
-					value: SceneKey.Fluid,
-					options: Object.values(SceneKey),
+					value: SceneId.Fluid,
+					options: scenes.map((scene) => scene.id),
 				},
 				{
 					type: "dropdown",

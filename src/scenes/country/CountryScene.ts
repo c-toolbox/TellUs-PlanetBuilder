@@ -1,15 +1,16 @@
 import * as THREE from "three";
 import earcut from "earcut";
 import BaseScene from "@/scenes/BaseScene";
-import { SceneKey } from "@/scenes/SceneManager";
+import { SceneId, scenes } from "@/scenes/scenes";
 
 import { TouchId } from "@/network/tuioProtocol";
-import { UiConfigEvent } from "@/network/uiProtocol";
+import { UiConfigEvent } from "@/network/socket_ui/protocol";
 import { ORIGIN } from "@/constants";
 
 import worldGeodata from "@/assets/world.json";
 
 export default class CountryScene extends BaseScene {
+	private readonly raycaster = new THREE.Raycaster();
 	private countryMeshes: {
 		mesh: THREE.Mesh;
 		feature: any;
@@ -93,7 +94,7 @@ export default class CountryScene extends BaseScene {
 		const points: THREE.Vector3[] = [];
 
 		coordinates[0].forEach(([lon, lat]) => {
-			points.push(this.latLonToVector3(lat, lon, 1.001)); // slight offset to avoid z-fighting
+			points.push(this.latLonToVector3(lat, lon, 0.99)); // slight offset to avoid z-fighting
 		});
 
 		const geometry = new THREE.BufferGeometry().setFromPoints(points);
@@ -173,15 +174,15 @@ export default class CountryScene extends BaseScene {
 
 	/* Socket UI */
 
-	initializeUi() {
-		super.initializeUi();
+	registerSocketUiListeners() {
+		super.registerSocketUiListeners();
+		this.uiSocket.on("scene", (id: SceneId) => {
+			this.sceneManager.setScene(id);
+		});
 	}
 
-	sendUiConfig() {
-		this.uiSocket.send(this.uiConfig);
-	}
 
-	get uiConfig(): UiConfigEvent {
+	get socketUiConfig(): UiConfigEvent {
 		return {
 			type: "config",
 			title: "Country",
@@ -191,8 +192,8 @@ export default class CountryScene extends BaseScene {
 					id: "scene",
 					hint_title: "Scene",
 					hint_text: "Switch to a different scene",
-					value: SceneKey.Country,
-					options: Object.values(SceneKey),
+					value: SceneId.Country,
+					options: scenes.map((scene) => scene.id),
 				},
 			],
 		};

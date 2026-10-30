@@ -1,11 +1,11 @@
 import * as THREE from "three";
 import BaseScene from "@/scenes/BaseScene";
 import { Renderer } from "@/rendering/Renderer";
-import { SceneKey } from "@/scenes/SceneManager";
+import { SceneId, scenes } from "@/scenes/scenes";
 
 import { TouchId } from "@/network/tuioProtocol";
 import { getRainbowColor, getRandomColor } from "@/utils/functions";
-import { UiConfigEvent } from "@/network/uiProtocol";
+import { UiConfigEvent } from "@/network/socket_ui/protocol";
 import vertexShader from "@/rendering/shaders/basic.vert?raw";
 
 const fragmentShader = `
@@ -63,18 +63,20 @@ export interface PaintUiConfig {
 
 export default class PaintScene extends BaseScene {
 	// Drawing
-	private touchStates: Map<number, TouchState>;
-	private touchSphereGeo: THREE.SphereGeometry;
-	private touchSphereMat: THREE.MeshBasicMaterial;
-	private lineGeo: THREE.CylinderGeometry;
+	private touchStates: Map<number, TouchState> | null = null;
+	private touchSphereGeo: THREE.SphereGeometry | null = null;
+	private touchSphereMat: THREE.MeshBasicMaterial | null = null;
+	private lineGeo: THREE.CylinderGeometry | null = null;
 	private lineMeshes: THREE.Mesh[] = [];
 	private touchColors: { [touchId: number]: number } = {};
 
 	// Shader
-	private feedbackA: THREE.WebGLRenderTarget;
-	private feedbackB: THREE.WebGLRenderTarget;
-	private feedbackMaterial: THREE.ShaderMaterial;
-	private feedbackQuad: THREE.Mesh;
+	private feedbackA: THREE.WebGLRenderTarget | null = null;
+	private feedbackB: THREE.WebGLRenderTarget | null = null;
+	private feedbackMaterial: THREE.ShaderMaterial | null = null;
+	private feedbackQuad: THREE.Mesh | null = null;
+	private readonly feedbackCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+	private readonly projectionTarget = new THREE.WebGLRenderTarget(2048, 2048, { samples: 4 });
 	private useA = true;
 	private needsClear = false;
 
@@ -87,6 +89,7 @@ export default class PaintScene extends BaseScene {
 	constructor() {
 		super();
 
+		this.projectionTarget.texture.colorSpace = THREE.SRGBColorSpace;
 		this.init();
 	}
 
@@ -98,7 +101,8 @@ export default class PaintScene extends BaseScene {
 		this.removeTouchSphere(touchId);
 	}
 
-	public setRendererSettings(renderer: Renderer): void {
+	public applyRendererSettings(renderer: Renderer): void {
+		super.applyRendererSettings(renderer);
 		renderer.setClearColor(new THREE.Color(0, 0, 0));
 		renderer.clearColor();
 		renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -153,12 +157,13 @@ export default class PaintScene extends BaseScene {
 	}
 
 	updateTouchSphere(id: number, vector: THREE.Vector3) {
+		if (!this.touchStates || !this.touchSphereGeo || !this.touchSphereMat) return;
 		if (!(id in this.touchColors)) {
 			this.touchColors[id] = this.getColor();
 		}
 		this.touchSphereMat.color.setHex(this.touchColors[id]);
 
-		let state = this.touchStates.get(id);
+		let state = this.touchStates?.get(id);
 		if (!state) {
 			const sphereNow = new THREE.Mesh(
 				this.touchSphereGeo,
@@ -184,8 +189,10 @@ export default class PaintScene extends BaseScene {
 			state.spherePrev.position.copy(state.lastPosition);
 
 			const line = this.createLine(state.lastPosition, newPosition);
-			this.add(line);
-			this.lineMeshes.push(line);
+			if (line) {
+				this.add(line);
+				this.lineMeshes.push(line);
+			}
 		}
 
 		// Update last position
@@ -193,11 +200,11 @@ export default class PaintScene extends BaseScene {
 	}
 
 	removeTouchSphere(id: number) {
-		const state = this.touchStates.get(id);
+		const state = this.touchStates?.get(id);
 		if (state) {
 			this.remove(state.sphereNow);
 			this.remove(state.spherePrev);
-			this.touchStates.delete(id);
+			this.touchStates?.delete(id);
 		}
 	}
 
@@ -207,7 +214,8 @@ export default class PaintScene extends BaseScene {
 		this.lineMeshes.length = 0;
 	}
 
-	createLine(start: THREE.Vector3, end: THREE.Vector3): THREE.Mesh {
+	createLine(start: THREE.Vector3, end: THREE.Vector3): THREE.Mesh | null {
+		if (!this.lineGeo || !this.touchSphereMat) return null;
 		const line = new THREE.Mesh(this.lineGeo, this.touchSphereMat.clone());
 		const direction = end.clone().sub(start);
 		const length = direction.length();
@@ -226,8 +234,8 @@ export default class PaintScene extends BaseScene {
 		this.paintConfig.penWidth = width;
 
 		// Dispose old geometries
-		this.touchSphereGeo.dispose();
-		this.lineGeo.dispose();
+		this.touchSphereGeo?.dispose();
+		this.lineGeo?.dispose();
 
 		// Create new ones
 		this.touchSphereGeo = new THREE.SphereGeometry(width, 12, 10);
@@ -249,17 +257,19 @@ export default class PaintScene extends BaseScene {
 
 	/* Rendering */
 
-	override onEnter(renderer: Renderer) {
-		super.onEnter(renderer);
+	override onSceneEnter(renderer: Renderer) {
+		super.onSceneEnter(renderer);
 
 		this.remove(this.touchHandler.touchGroup);
 	}
 
-	override onExit(renderer: Renderer) {
-		super.onExit(renderer);
+	override onSceneExit(renderer: Renderer) {
+		super.onSceneExit(renderer);
 
 		// Remove feedback textures, listeners, etc.
 		this.clearLines();
+		this.touchStates?.clear();
+		this.touchColors = {};
 		this.clear();
 	}
 
@@ -269,32 +279,22 @@ export default class PaintScene extends BaseScene {
 	}
 
 	override renderScene(renderer: Renderer) {
-		const projectionScene = renderer.projectionScene;
-
-		// 1️⃣ Capture cube map
-		projectionScene.cubeCamera.position.copy(renderer.centerCamera.position);
-		projectionScene.cubeCamera.quaternion.copy(
-			renderer.centerCamera.quaternion,
-		);
-		projectionScene.cubeCamera.update(renderer, this);
-
-		// 2️⃣ Render AEP into target
-		renderer.setRenderTarget(projectionScene.aepTarget);
-		renderer.render(projectionScene, projectionScene.screenCamera);
+		if (!this.feedbackA || !this.feedbackB || !this.feedbackMaterial || !this.feedbackQuad) return;
+		renderer.renderProjection(this, this.projectionTarget);
 
 		// 3️⃣ Feedback blur pass
 		const readBuffer = this.useA ? this.feedbackA : this.feedbackB;
 		const writeBuffer = this.useA ? this.feedbackB : this.feedbackA;
 		this.feedbackMaterial.uniforms.textureNew.value =
-			projectionScene.aepTarget.texture;
+			this.projectionTarget.texture;
 		this.feedbackMaterial.uniforms.textureOld.value = readBuffer.texture;
 
 		renderer.setRenderTarget(writeBuffer);
-		renderer.render(this.feedbackQuad, projectionScene.screenCamera);
+		renderer.render(this.feedbackQuad, this.feedbackCamera);
 
 		// 4️⃣ Display final
 		renderer.setRenderTarget(renderer.projectionOutputTarget);
-		renderer.render(this.feedbackQuad, projectionScene.screenCamera);
+		renderer.render(this.feedbackQuad, this.feedbackCamera);
 
 		// 5️⃣ Swap buffers
 		this.useA = !this.useA;
@@ -318,26 +318,30 @@ export default class PaintScene extends BaseScene {
 
 	/* Socket UI */
 
-	initializeUi() {
-		super.initializeUi();
+	registerSocketUiListeners() {
+		super.registerSocketUiListeners();
+		this.uiSocket.on("scene", (id: SceneId) => {
+			this.sceneManager.setScene(id);
+		});
 
 		this.uiSocket.on("pen_width", (value: number) => {
 			this.updatePenWidth(value);
-			this.sendUiConfig();
+			this.sendSocketUiConfig();
 		});
 
 		this.uiSocket.on("blur", (value: boolean) => {
+			if (!this.feedbackMaterial) return;
 			this.paintConfig.blur = value;
 			this.feedbackMaterial.fragmentShader = value
 				? blurFragmentShader
 				: fragmentShader;
 			this.feedbackMaterial.needsUpdate = true;
-			this.sendUiConfig();
+			this.sendSocketUiConfig();
 		});
 
 		this.uiSocket.on("color_mode", (value: ColorMode) => {
 			this.paintConfig.colorMode = value;
-			this.sendUiConfig();
+			this.sendSocketUiConfig();
 		});
 
 		this.uiSocket.on("clear", () => {
@@ -345,11 +349,8 @@ export default class PaintScene extends BaseScene {
 		});
 	}
 
-	sendUiConfig() {
-		this.uiSocket.send(this.uiConfig);
-	}
 
-	get uiConfig(): UiConfigEvent {
+	get socketUiConfig(): UiConfigEvent {
 		return {
 			type: "config",
 			title: "Paint",
@@ -359,8 +360,8 @@ export default class PaintScene extends BaseScene {
 					id: "scene",
 					hint_title: "Scene",
 					hint_text: "Switch to a different scene",
-					value: SceneKey.Paint,
-					options: Object.values(SceneKey),
+					value: SceneId.Paint,
+					options: scenes.map((scene) => scene.id),
 				},
 
 				{

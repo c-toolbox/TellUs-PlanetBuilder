@@ -1,13 +1,17 @@
+import type { TouchId } from "@/network/tuioProtocol";
+import type { Renderer } from "@/rendering/Renderer";
+import { TOUCH_DISTANCE } from "@/constants";
+import BackgroundSphere from "@/components/BackgroundSphere";
 import * as THREE from "three";
 import BaseScene from "@/scenes/BaseScene";
-import { SceneKey } from "@/scenes/SceneManager";
+import { SceneId, scenes } from "@/scenes/scenes";
 
 import { TouchPoint } from "@/network/TouchPoint";
-import { UiConfigEvent } from "@/network/uiProtocol";
+import { UiConfigEvent } from "@/network/socket_ui/protocol";
 import { Color, GoogleColor } from "@/utils/colors";
 
 import { Fish } from "./Fish";
-import { Boat } from "./Boat";
+import { Boat, type BoatTouch } from "./Boat";
 import { FISH_BOIDS_CONFIG } from "./constants";
 import backgroundAsset from "@/assets/square.png";
 
@@ -47,6 +51,7 @@ export default class BoidsScene extends BaseScene {
 
 	protected boatGroup: THREE.Group;
 	private boats: Boat[];
+	private readonly touchMotions = new Map<TouchId, BoatTouch & { timestamp: number }>();
 
 	private boidsConfig: BoidsUiConfig = {
 		fishCount: 300,
@@ -61,8 +66,8 @@ export default class BoidsScene extends BaseScene {
 	constructor() {
 		super();
 
-		this.setClearColor(Color.Blue950);
-		this.setBackground(backgroundAsset, 1.5, Color.Blue900);
+		this.background = new THREE.Color(Color.Blue950);
+		this.add(new BackgroundSphere(backgroundAsset, 1.5, Color.Blue900));
 
 		this.fishGroup = new THREE.Group();
 		this.add(this.fishGroup);
@@ -83,7 +88,7 @@ export default class BoidsScene extends BaseScene {
 		/* Temporary */
 
 		window.addEventListener("keydown", (e) => {
-			if (e.key === " " || e.key === "Enter") {
+			if (this.renderer && (e.key === " " || e.key === "Enter")) {
 				this.fishes.forEach((fish) => fish.boost());
 				this.boats.forEach((boat) => boat.boost());
 			}
@@ -100,7 +105,7 @@ export default class BoidsScene extends BaseScene {
 		this.fishes.forEach((fish) => fish.applyBoids(this.fishes, touchPoints));
 		this.fishes.forEach((fish) => fish.update());
 
-		this.boats.forEach((boat) => boat.applyBoids(this.boats, touchPoints));
+		this.boats.forEach((boat) => boat.applyBoids(this.boats, Array.from(this.touchMotions.values())));
 		this.boats.forEach((boat) => boat.update());
 	}
 
@@ -200,8 +205,11 @@ export default class BoidsScene extends BaseScene {
 
 	/* Socket UI */
 
-	initializeUi() {
-		super.initializeUi();
+	registerSocketUiListeners() {
+		super.registerSocketUiListeners();
+		this.uiSocket.on("scene", (id: SceneId) => {
+			this.sceneManager.setScene(id);
+		});
 
 		const configKeys: BoidsConfigKey[] = [
 			"fishCount",
@@ -213,14 +221,17 @@ export default class BoidsScene extends BaseScene {
 			"panicSpeed",
 		];
 
-		configKeys.forEach((key) => this.bindUiConfigKey(this.boidsConfig, key));
+		const bindUiConfigKey = <K extends BoidsConfigKey>(key: K) => {
+			this.uiSocket.on(key, (value: BoidsUiConfig[K]) => {
+				this.boidsConfig[key] = value;
+				this.sendSocketUiConfig();
+			});
+		};
+		configKeys.forEach((key) => bindUiConfigKey(key));
 	}
 
-	sendUiConfig() {
-		this.uiSocket.send(this.uiConfig);
-	}
 
-	get uiConfig(): UiConfigEvent {
+	get socketUiConfig(): UiConfigEvent {
 		return {
 			type: "config",
 			title: "Boids",
@@ -230,8 +241,8 @@ export default class BoidsScene extends BaseScene {
 					id: "scene",
 					hint_title: "Scene",
 					hint_text: "Switch to a different scene",
-					value: SceneKey.Boids,
-					options: Object.values(SceneKey),
+					value: SceneId.Fish,
+					options: scenes.map((scene) => scene.id),
 				},
 
 				{
@@ -318,5 +329,28 @@ export default class BoidsScene extends BaseScene {
 				},
 			],
 		};
+	}
+
+	protected override onTouch(id: TouchId, direction: THREE.Vector3) {
+		const position = direction.clone().multiplyScalar(TOUCH_DISTANCE);
+		const now = performance.now();
+		const previous = this.touchMotions.get(id);
+		if (previous) {
+			const dt = (now - previous.timestamp) / 1000;
+			if (dt > 0.001) previous.velocity.copy(position).sub(previous.position).divideScalar(dt).clampLength(0, 1000);
+			previous.position.copy(position);
+			previous.timestamp = now;
+		} else {
+			this.touchMotions.set(id, { position, velocity: new THREE.Vector3(), timestamp: now });
+		}
+	}
+
+	protected override onRemove(id: TouchId) {
+		this.touchMotions.delete(id);
+	}
+
+	override onSceneExit(renderer: Renderer) {
+		super.onSceneExit(renderer);
+		this.touchMotions.clear();
 	}
 }

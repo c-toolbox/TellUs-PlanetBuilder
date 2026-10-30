@@ -1,12 +1,12 @@
 import * as THREE from "three";
 import { Easing, Tween } from "@tweenjs/tween.js";
 import BaseScene from "@/scenes/BaseScene";
-import { SceneKey } from "@/scenes/SceneManager";
+import { SceneId, scenes } from "@/scenes/scenes";
 import { Renderer } from "@/rendering/Renderer";
 
-import { UiConfigEvent } from "@/network/uiProtocol";
+import { UiConfigEvent } from "@/network/socket_ui/protocol";
 import { ORIGIN } from "@/constants";
-import CircularButton from "@/components/CircularButton";
+import CircleButton from "@/components/CircleButton";
 import SpeciesBillboard from "@/components/SpeciesBillboard";
 import pinIcon from "@/assets/icons/pin.png";
 import homeIcon from "@/assets/icons/home.png";
@@ -62,12 +62,12 @@ export default class VinjettScene extends BaseScene {
 		THREE.BoxGeometry,
 		THREE.MeshBasicMaterial[]
 	>;
-	private circularButtons: CircularButton[] = [];
+	private circleButtons: CircleButton[] = [];
 	private pinTexture = new THREE.TextureLoader().load(pinIcon);
 	private homeTexture = new THREE.TextureLoader().load(homeIcon);
 	private questionTexture = new THREE.TextureLoader().load(questionIcon);
 	private discoveredSpecies = new Set<SpeciesKey>();
-	private speciesButtons = new Map<CircularButton, SpeciesKey>();
+	private speciesButtons = new Map<CircleButton, SpeciesKey>();
 	private speciesTextures = new Map<SpeciesKey, THREE.Texture>();
 	private speciesImageCache = new Map<SpeciesKey, SpeciesImageCacheEntry>();
 	private speciesBillboards = new Map<SpeciesKey, ActiveBillboard>();
@@ -78,17 +78,17 @@ export default class VinjettScene extends BaseScene {
 	private transitionTarget?: LocationKey;
 	private transitionOrigin = new THREE.Vector3(0, 0, 1);
 	private pendingBackground?: THREE.MeshBasicMaterial[];
-	private outgoingButtons: CircularButton[] = [];
+	private outgoingButtons: CircleButton[] = [];
 	private outgoingScales = new Map<THREE.Object3D, number>();
 
 	constructor() {
 		super();
 
-		this.setBackground(this.vinjettConfig.location);
-		this.addCircularButtons();
+		this.setLocationBackground(this.vinjettConfig.location);
+		this.addCircleButtons();
 	}
 
-	override onExit(renderer: Renderer) {
+	override onSceneExit(renderer: Renderer) {
 		if (this.pendingBackground) {
 			this.applyBackground(this.pendingBackground);
 		}
@@ -96,23 +96,24 @@ export default class VinjettScene extends BaseScene {
 		this.speciesBillboards.forEach((activeBillboard) => {
 			this.removeSpeciesBillboard(activeBillboard);
 		});
-		this.disposeCircularButtons(this.outgoingButtons);
+		this.disposeCircleButtons(this.outgoingButtons);
 		this.outgoingButtons = [];
 		this.outgoingScales.clear();
 		this.transitionTarget = undefined;
 		this.pendingBackground = undefined;
 		this.transitionPhase = "idle";
 		this.transitionElapsed = 0;
-		this.circularButtons.forEach((button) => {
+		this.circleButtons.forEach((button) => {
+			button.resetInteraction();
 			button.visible = true;
 			button.scale.setScalar(1);
 		});
-		super.onExit(renderer);
+		super.onSceneExit(renderer);
 	}
 
-	private addCircularButtons() {
-		this.disposeCircularButtons(this.circularButtons);
-		this.circularButtons = [];
+	private addCircleButtons() {
+		this.disposeCircleButtons(this.circleButtons);
+		this.circleButtons = [];
 		this.speciesButtons.clear();
 
 		if (this.vinjettConfig.location === "Home") {
@@ -122,7 +123,7 @@ export default class VinjettScene extends BaseScene {
 
 				const { pitch, yaw } = location.homeButtonRotation;
 				const position = this.pitchYawToVector3(pitch, yaw);
-				this.addCircularButton(
+				this.addCircleButton(
 					position,
 					location.color,
 					this.pinTexture,
@@ -136,7 +137,7 @@ export default class VinjettScene extends BaseScene {
 		const location = locations[this.vinjettConfig.location];
 		const { pitch, yaw } = location.homeButtonRotation;
 		const position = this.pitchYawToVector3(pitch, yaw).negate();
-		this.addCircularButton(
+		this.addCircleButton(
 			position,
 			0x808080,
 			this.homeTexture,
@@ -146,7 +147,7 @@ export default class VinjettScene extends BaseScene {
 
 		for (const placement of location.species) {
 			const position = this.pitchYawToVector3(placement.pitch, placement.yaw);
-			const button = this.addCircularButton(
+			const button = this.addCircleButton(
 				position,
 				location.color,
 				this.getSpeciesButtonTexture(placement.species),
@@ -158,7 +159,7 @@ export default class VinjettScene extends BaseScene {
 		}
 	}
 
-	private disposeCircularButtons(buttons: CircularButton[]) {
+	private disposeCircleButtons(buttons: CircleButton[]) {
 		buttons.forEach((button) => {
 			this.unregisterTouchInteraction(button.touchInteraction);
 			this.remove(button);
@@ -308,14 +309,14 @@ export default class VinjettScene extends BaseScene {
 		this.speciesBillboards.delete(activeBillboard.speciesKey);
 	}
 
-	private addCircularButton(
+	private addCircleButton(
 		position: THREE.Vector3,
 		color: THREE.ColorRepresentation,
 		texture: THREE.Texture,
 		label: string,
 		onClick: () => void,
 	) {
-		const button = new CircularButton({
+		const button = new CircleButton({
 			position,
 			color,
 			texture,
@@ -327,7 +328,7 @@ export default class VinjettScene extends BaseScene {
 			this.transitionPhase === "idle";
 		this.registerTouchInteraction(button.touchInteraction);
 
-		this.circularButtons.push(button);
+		this.circleButtons.push(button);
 		this.add(button);
 		return button;
 	}
@@ -358,7 +359,7 @@ export default class VinjettScene extends BaseScene {
 		this.transitionPhase = "wipe";
 		this.transitionElapsed = 0;
 		this.loadingSpecies.clear();
-		this.outgoingButtons = this.circularButtons;
+		this.outgoingButtons = this.circleButtons;
 		this.outgoingScales.clear();
 		this.outgoingButtons.forEach((button) => {
 			this.outgoingScales.set(button, button.scale.x);
@@ -373,11 +374,11 @@ export default class VinjettScene extends BaseScene {
 			);
 		});
 
-		this.circularButtons = [];
+		this.circleButtons = [];
 		this.speciesButtons.clear();
 		this.vinjettConfig.location = locationKey;
-		this.addCircularButtons();
-		this.circularButtons.forEach((button) => button.scale.setScalar(0));
+		this.addCircleButtons();
+		this.circleButtons.forEach((button) => button.scale.setScalar(0));
 
 		background.ready.then(
 			() => {},
@@ -403,7 +404,7 @@ export default class VinjettScene extends BaseScene {
 		return this.vinjettConfig.location === "Home" ? origin : origin.negate();
 	}
 
-	protected override setBackground(locationKey: LocationKey) {
+	private setLocationBackground(locationKey: LocationKey) {
 		this.applyBackground(this.getBackground(locationKey).materials);
 	}
 
@@ -466,13 +467,13 @@ export default class VinjettScene extends BaseScene {
 		this.applyBackground(this.pendingBackground);
 		this.transitionTarget = undefined;
 		this.pendingBackground = undefined;
-		this.disposeCircularButtons(this.outgoingButtons);
+		this.disposeCircleButtons(this.outgoingButtons);
 		this.outgoingButtons = [];
 		this.speciesBillboards.forEach((activeBillboard) => {
 			this.removeSpeciesBillboard(activeBillboard);
 		});
 		this.outgoingScales.clear();
-		this.sendUiConfig();
+		this.sendSocketUiConfig();
 		this.transitionPhase = "reveal";
 	}
 
@@ -519,7 +520,7 @@ export default class VinjettScene extends BaseScene {
 			);
 		});
 
-		this.circularButtons.forEach((button) => {
+		this.circleButtons.forEach((button) => {
 			const arrival = this.getWipeArrival(button.position);
 			const progress = THREE.MathUtils.clamp(
 				(transitionElapsed - arrival) / APPEAR_DURATION,
@@ -544,7 +545,7 @@ export default class VinjettScene extends BaseScene {
 				this.transitionPhase === "reveal" &&
 				this.transitionElapsed >= WIPE_DURATION + APPEAR_DURATION
 			) {
-				this.circularButtons.forEach((button) => button.scale.setScalar(1));
+				this.circleButtons.forEach((button) => button.scale.setScalar(1));
 				this.transitionPhase = "idle";
 				this.transitionElapsed = 0;
 			}
@@ -552,44 +553,26 @@ export default class VinjettScene extends BaseScene {
 	}
 
 	override renderScene(renderer: Renderer) {
-		const projectionScene = renderer.projectionScene;
-		const cameraPosition = renderer.centerCamera.position;
-		const cameraQuaternion = renderer.centerCamera.quaternion;
-
-		projectionScene.cubeCamera.position.copy(cameraPosition);
-		projectionScene.cubeCamera.quaternion.copy(cameraQuaternion);
-		projectionScene.cubeCamera.update(renderer, this);
-
-		if (
-			this.transitionPhase === "wipe" &&
-			this.backgroundCube &&
-			this.pendingBackground
-		) {
-			const currentBackground = this.backgroundCube.material;
-			this.backgroundCube.material = this.pendingBackground;
-
-			projectionScene.transitionCubeCamera.position.copy(cameraPosition);
-			projectionScene.transitionCubeCamera.quaternion.copy(cameraQuaternion);
-			projectionScene.transitionCubeCamera.update(renderer, this);
-			this.backgroundCube.material = currentBackground;
-
-			const localOrigin = this.transitionOrigin
-				.clone()
-				.applyQuaternion(cameraQuaternion.clone().invert());
-			projectionScene.setTransition(
-				true,
-				Math.min(this.easedTransitionElapsed / WIPE_DURATION, 1),
-				localOrigin,
-			);
-		} else {
-			projectionScene.setTransition(false);
+		if (this.transitionPhase !== "wipe" || !this.backgroundCube || !this.pendingBackground) {
+			renderer.renderProjection(this);
+			return;
 		}
-
-		renderer.setRenderTarget(renderer.projectionOutputTarget);
-		renderer.render(projectionScene, projectionScene.screenCamera);
+		const { projection, projectionCamera } = renderer;
+		projection.captureScene(renderer, this, projectionCamera);
+		const currentBackground = this.backgroundCube.material;
+		try {
+			this.backgroundCube.material = this.pendingBackground;
+			projection.captureTransitionScene(renderer, this, projectionCamera);
+		} finally {
+			this.backgroundCube.material = currentBackground;
+		}
+		projection.renderOutput(renderer, renderer.projectionOutputTarget, {
+			progress: Math.min(this.easedTransitionElapsed / WIPE_DURATION, 1),
+			origin: this.transitionOrigin.clone().applyQuaternion(projectionCamera.quaternion.clone().invert()),
+		});
 	}
 
-	// setRendererSettings(renderer: Renderer) {
+	// applyRendererSettings(renderer: Renderer) {
 	// 	renderer.outputColorSpace = THREE.SRGBColorSpace;
 	// }
 
@@ -612,8 +595,11 @@ export default class VinjettScene extends BaseScene {
 
 	/* Socket UI */
 
-	initializeUi() {
-		super.initializeUi();
+	registerSocketUiListeners() {
+		super.registerSocketUiListeners();
+		this.uiSocket.on("scene", (id: SceneId) => {
+			this.sceneManager.setScene(id);
+		});
 
 		this.uiSocket.on("location", (value: LocationKey) => {
 			this.setLocation(value);
@@ -625,21 +611,18 @@ export default class VinjettScene extends BaseScene {
 				billboard.setLabel(species[speciesKey][value]);
 			});
 			if (this.transitionPhase === "idle") {
-				this.addCircularButtons();
+				this.addCircleButtons();
 			} else {
 				this.refreshSpeciesButtons();
 			}
-			this.sendUiConfig();
+			this.sendSocketUiConfig();
 		});
 
 		this.uiSocket.on("reset_progress", () => this.resetDiscoveredSpecies());
 	}
 
-	sendUiConfig() {
-		this.uiSocket.send(this.uiConfig);
-	}
 
-	get uiConfig(): UiConfigEvent {
+	get socketUiConfig(): UiConfigEvent {
 		return {
 			type: "config",
 			title: "Vinjett",
@@ -649,8 +632,8 @@ export default class VinjettScene extends BaseScene {
 					id: "scene",
 					hint_title: "Scene",
 					hint_text: "Switch to a different scene",
-					value: SceneKey.Vinjett,
-					options: Object.values(SceneKey),
+					value: SceneId.Wildlife,
+					options: scenes.map((scene) => scene.id),
 				},
 
 				{

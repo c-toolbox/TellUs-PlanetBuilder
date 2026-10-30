@@ -1,9 +1,11 @@
+import TextLabel from "@/components/TextLabel";
+import { ORIGIN } from "@/constants";
 import * as THREE from "three";
 import { Easing, Tween } from "@tweenjs/tween.js";
 import BaseScene from "@/scenes/BaseScene";
-import { SceneKey } from "@/scenes/SceneManager";
+import { SceneId, scenes } from "@/scenes/scenes";
 
-import { UiConfigEvent } from "@/network/uiProtocol";
+import { UiConfigEvent } from "@/network/socket_ui/protocol";
 import { TouchInteraction } from "@/network/TouchInteraction";
 import { Color } from "@/utils/colors";
 import SphericalSlider from "@/components/SphericalSlider";
@@ -17,7 +19,7 @@ export default class InteractionScene extends BaseScene {
 
 	constructor() {
 		super();
-		this.setClearColor(Color.Stone800);
+		this.background = new THREE.Color(Color.Stone800);
 		const sphereClasses = [
 			HoverSphere,
 			HoldToggleSphere,
@@ -64,8 +66,8 @@ export default class InteractionScene extends BaseScene {
 		}
 	}
 
-	override onExit(renderer: Renderer) {
-		super.onExit(renderer);
+	override onSceneExit(renderer: Renderer) {
+		super.onSceneExit(renderer);
 		this.slider.resetInteraction();
 	}
 
@@ -78,7 +80,7 @@ export default class InteractionScene extends BaseScene {
 		console.log(value);
 	}
 
-	protected get uiConfig(): UiConfigEvent {
+	protected get socketUiConfig(): UiConfigEvent {
 		return {
 			type: "config",
 			title: "Interaction ",
@@ -88,11 +90,28 @@ export default class InteractionScene extends BaseScene {
 					id: "scene",
 					hint_title: "Scene",
 					hint_text: "Switch to a different scene",
-					value: SceneKey.Interaction,
-					options: Object.values(SceneKey),
+					value: SceneId.Interaction,
+					options: scenes.map((scene) => scene.id),
 				},
 			],
 		};
+	}
+
+	protected override registerSocketUiListeners() {
+		super.registerSocketUiListeners();
+		this.uiSocket.on("scene", (id: SceneId) => {
+			this.sceneManager.setScene(id);
+		});
+	}
+
+	private addText({ text, color, size, position }: {
+		text: string; color: number; size: number; position: THREE.Vector3;
+	}) {
+		const label = new TextLabel(text, size);
+		label.material.color.set(color);
+		label.position.copy(position);
+		label.lookAt(ORIGIN);
+		this.add(label);
 	}
 }
 

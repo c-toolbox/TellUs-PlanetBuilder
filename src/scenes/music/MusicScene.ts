@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import BaseScene from "@/scenes/BaseScene";
-import { SceneKey } from "@/scenes/SceneManager";
-import { UiConfigEvent } from "@/network/uiProtocol";
+import { SceneId, scenes } from "@/scenes/scenes";
+import { UiConfigEvent } from "@/network/socket_ui/protocol";
 import { Renderer } from "@/rendering/Renderer";
 import { Piano } from "./Piano";
 import { SoundFontPlayer } from "./SoundFontPlayer";
@@ -24,7 +24,7 @@ export default class MusicScene extends BaseScene {
 		this.piano.on("noteOn", this.audio.noteOn);
 		this.piano.on("noteOff", this.audio.noteOff);
 		this.audio.on("change", () => {
-			if (this.audio.isActive) this.sendUiConfig();
+			if (this.audio.isActive) this.sendSocketUiConfig();
 		});
 		this.audio.on("loadError", (error) =>
 			console.error("Failed to load music audio", error),
@@ -56,19 +56,22 @@ export default class MusicScene extends BaseScene {
 		}
 	}
 
-	override onEnter(renderer: Renderer) {
-		super.onEnter(renderer);
+	override onSceneEnter(renderer: Renderer) {
+		super.onSceneEnter(renderer);
 		this.audio.activate();
 	}
 
-	override onExit(renderer: Renderer) {
+	override onSceneExit(renderer: Renderer) {
 		this.piano.reset();
 		this.audio.deactivate();
-		super.onExit(renderer);
+		super.onSceneExit(renderer);
 	}
 
-	protected override initializeUi() {
-		super.initializeUi();
+	protected override registerSocketUiListeners() {
+		super.registerSocketUiListeners();
+		this.uiSocket.on("scene", (id: SceneId) => {
+			this.sceneManager.setScene(id);
+		});
 		this.uiSocket.on(
 			"soundFont",
 			(name: string) => void this.audio.selectSoundFont(name),
@@ -79,7 +82,7 @@ export default class MusicScene extends BaseScene {
 		this.uiSocket.on("retryAudio", () => void this.audio.retry());
 	}
 
-	protected override get uiConfig(): UiConfigEvent {
+	protected override get socketUiConfig(): UiConfigEvent {
 		return {
 			type: "config",
 			title: "Music",
@@ -89,8 +92,8 @@ export default class MusicScene extends BaseScene {
 					id: "scene",
 					hint_title: "Scene",
 					hint_text: "Switch to a different scene",
-					value: SceneKey.Music,
-					options: Object.values(SceneKey),
+					value: SceneId.Music,
+					options: scenes.map((scene) => scene.id),
 				},
 				...this.audio.uiElements,
 			],

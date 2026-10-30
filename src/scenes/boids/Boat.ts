@@ -1,6 +1,9 @@
 import * as THREE from "three";
 import { createNoise3D } from "simplex-noise";
-import { TouchPoint } from "@/network/TouchPoint";
+export interface BoatTouch {
+	position: THREE.Vector3;
+	velocity: THREE.Vector3;
+}
 import { ORIGIN, UP } from "@/constants";
 import { BOAT_BOIDS_CONFIG, FISH_SIZE } from "./constants";
 
@@ -91,7 +94,7 @@ export class Boat extends THREE.Mesh {
 		this.lookAt(ORIGIN);
 	}
 
-	applyBoids(boats: Boat[], touchPoints: TouchPoint[]) {
+	applyBoids(boats: Boat[], touchPoints: BoatTouch[]) {
 		const {
 			sightRadius,
 			neighborRadius,

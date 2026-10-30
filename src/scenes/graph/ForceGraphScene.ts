@@ -1,7 +1,8 @@
+import type { TouchPoint } from "@/network/TouchPoint";
 import * as THREE from "three";
 import BaseScene from "@/scenes/BaseScene";
-import { SceneKey } from "@/scenes/SceneManager";
-import { UiConfigEvent } from "@/network/uiProtocol";
+import { SceneId, scenes } from "@/scenes/scenes";
+import { UiConfigEvent } from "@/network/socket_ui/protocol";
 import { TouchId } from "@/network/tuioProtocol";
 import { Renderer } from "@/rendering/Renderer";
 import geodesic20 from "@/scenes/world/models/geodesic20.json";
@@ -27,7 +28,7 @@ export default class ForceGraphScene extends BaseScene {
 	private preset: Preset = "geodesic20";
 	private paused = false;
 	private accumulator = 0;
-	private inputSince = 0;
+	private ignoredTouchPoints = new Set<TouchPoint>();
 	private topology = "";
 
 	constructor() {
@@ -36,18 +37,19 @@ export default class ForceGraphScene extends BaseScene {
 		this.graph.load(PRESETS[this.preset]);
 	}
 
-	override onEnter(renderer: Renderer) {
-		this.inputSince = Date.now();
+	override onSceneEnter(renderer: Renderer) {
+		this.ignoredTouchPoints = new Set(this.touchHandler.getTouchPoints());
 		this.accumulator = 0;
 		this.view = new GraphView(this.graph);
 		this.add(this.view);
-		super.onEnter(renderer);
+		super.onSceneEnter(renderer);
 		// Keep small dots and empty-space gestures visible beneath the fingers.
 		this.remove(this.touchHandler.touchGroup);
 	}
 
-	override onExit(renderer: Renderer) {
-		super.onExit(renderer);
+	override onSceneExit(renderer: Renderer) {
+		super.onSceneExit(renderer);
+		this.ignoredTouchPoints.clear();
 		this.touches.clear(false);
 		this.accumulator = 0;
 		if (this.view) {
@@ -71,14 +73,14 @@ export default class ForceGraphScene extends BaseScene {
 		const topology = `${this.graph.nodes.size}:${this.graph.edges.size}`;
 		if (topology !== this.topology) {
 			this.topology = topology;
-			this.sendUiConfig();
+			this.sendSocketUiConfig();
 		}
 	}
 
 	protected override onTouch(id: TouchId, direction: THREE.Vector3) {
 		// Contacts already down when switching scenes must be lifted first.
 		const point = this.touchHandler.getTouchPoint(id);
-		if (point && point.createdTimestamp < this.inputSince) return;
+		if (point && this.ignoredTouchPoints.has(point)) return;
 		this.touches.update(id, direction);
 	}
 
@@ -91,11 +93,14 @@ export default class ForceGraphScene extends BaseScene {
 		this.graph.load(PRESETS[this.preset]);
 		this.accumulator = 0;
 		this.view?.sync();
-		this.sendUiConfig();
+		this.sendSocketUiConfig();
 	}
 
-	protected override initializeUi() {
-		super.initializeUi();
+	protected override registerSocketUiListeners() {
+		super.registerSocketUiListeners();
+		this.uiSocket.on("scene", (id: SceneId) => {
+			this.sceneManager.setScene(id);
+		});
 		this.uiSocket.on("preset", (value: unknown) => {
 			if (
 				typeof value !== "string" ||
@@ -109,7 +114,7 @@ export default class ForceGraphScene extends BaseScene {
 			this.uiSocket.on(key, (value: unknown) => {
 				if (typeof value !== "number" || !Number.isFinite(value)) return;
 				this.graph.settings[key] = THREE.MathUtils.clamp(value, min, max);
-				this.sendUiConfig();
+				this.sendSocketUiConfig();
 			});
 		};
 		slider("repulsion", 0, 0.3);
@@ -120,12 +125,12 @@ export default class ForceGraphScene extends BaseScene {
 			if (typeof value !== "boolean") return;
 			this.paused = value;
 			this.accumulator = 0;
-			this.sendUiConfig();
+			this.sendSocketUiConfig();
 		});
 		this.uiSocket.on("reset", () => this.resetGraph());
 	}
 
-	protected override get uiConfig(): UiConfigEvent {
+	protected override get socketUiConfig(): UiConfigEvent {
 		const settings = this.graph.settings;
 		return {
 			type: "config",
@@ -135,8 +140,8 @@ export default class ForceGraphScene extends BaseScene {
 					type: "dropdown",
 					id: "scene",
 					hint_title: "Scene",
-					value: SceneKey.ForceGraph,
-					options: Object.values(SceneKey),
+					value: SceneId["Force graph"],
+					options: scenes.map((scene) => scene.id),
 				},
 				{
 					type: "dropdown",

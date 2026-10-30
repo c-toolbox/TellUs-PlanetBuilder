@@ -2,7 +2,7 @@ import { EventEmitter } from "events";
 import type { MIDIPatchFull } from "spessasynth_core";
 import { WorkletSynthesizer } from "spessasynth_lib";
 import workletUrl from "spessasynth_lib/dist/spessasynth_processor.min.js?url";
-import type { UiElement } from "@/network/uiProtocol";
+import type { UiElement } from "@/network/socket_ui/protocol";
 import { AUDIO_SETTINGS, SOUND_FONTS, SoundFontConfig } from "./soundFonts";
 
 interface SoundFontPlayerEvents {
