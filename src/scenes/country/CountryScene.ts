@@ -7,7 +7,7 @@ import { TouchId } from "@/network/tuioProtocol";
 import { UiConfigEvent } from "@/network/socket_ui/protocol";
 import { ORIGIN } from "@/constants";
 
-import worldGeodata from "@/assets/world.json";
+import countriesGeodata from "./countries.json";
 
 export default class CountryScene extends BaseScene {
 	private readonly raycaster = new THREE.Raycaster();
@@ -58,7 +58,7 @@ export default class CountryScene extends BaseScene {
 	/* Coordinates */
 
 	drawCountries() {
-		worldGeodata.features.forEach((countryData) => {
+		countriesGeodata.features.forEach((countryData) => {
 			const { type, coordinates } = countryData.geometry;
 			const outlineColor = 0x000000;
 			const color = Math.random() * 0xffffff;

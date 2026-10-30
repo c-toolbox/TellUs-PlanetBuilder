@@ -8,9 +8,9 @@ import { UiConfigEvent } from "@/network/socket_ui/protocol";
 import { ORIGIN } from "@/constants";
 import CircleButton from "@/components/CircleButton";
 import SpeciesBillboard from "@/components/SpeciesBillboard";
-import pinIcon from "@/assets/icons/pin.png";
-import homeIcon from "@/assets/icons/home.png";
-import questionIcon from "@/assets/icons/question.png";
+import pinIcon from "@/assets/textures/icons/pin.png";
+import homeIcon from "@/assets/textures/icons/home.png";
+import questionIcon from "@/assets/textures/icons/question.png";
 import {
 	LocationKey,
 	LocationKeys,

@@ -3,23 +3,23 @@ import { createNoise3D, NoiseFunction3D } from "simplex-noise";
 import { getPitchFromVector, shuffleArray } from "@/utils/functions";
 import { BiomeCount, WorldUiConfig } from "@/scenes/world/WorldSceneConfig";
 
-import assetSquare from "@/assets/square.png";
+import assetSquare from "@/assets/textures/square.png";
 
-import assetSavanna from "@/assets/colors/savanna.png";
-import assetDesert from "@/assets/colors/desert.png";
-import assetForest from "@/assets/colors/forest.png";
-import assetMountain from "@/assets/colors/mountain.png";
-import assetOcean from "@/assets/colors/ocean.png";
-import assetTaiga from "@/assets/colors/taiga.png";
-import assetSnow from "@/assets/colors/snow.png";
+import assetSavanna from "@/scenes/world/textures/icons/savanna.png";
+import assetDesert from "@/scenes/world/textures/icons/desert.png";
+import assetForest from "@/scenes/world/textures/icons/forest.png";
+import assetMountain from "@/scenes/world/textures/icons/mountain.png";
+import assetOcean from "@/scenes/world/textures/icons/ocean.png";
+import assetTaiga from "@/scenes/world/textures/icons/taiga.png";
+import assetSnow from "@/scenes/world/textures/icons/snow.png";
 
-import assetAiSavanna from "@/assets/ai/savanna.jpg";
-import assetAiDesert from "@/assets/ai/desert.jpg";
-import assetAiForest from "@/assets/ai/forest.jpg";
-import assetAiMountain from "@/assets/ai/mountain.jpg";
-import assetAiOcean from "@/assets/ai/ocean.jpg";
-import assetAiTaiga from "@/assets/ai/taiga.jpg";
-import assetAiSnow from "@/assets/ai/snow.png";
+import assetAiSavanna from "@/scenes/world/textures/ai/savanna.jpg";
+import assetAiDesert from "@/scenes/world/textures/ai/desert.jpg";
+import assetAiForest from "@/scenes/world/textures/ai/forest.jpg";
+import assetAiMountain from "@/scenes/world/textures/ai/mountain.jpg";
+import assetAiOcean from "@/scenes/world/textures/ai/ocean.jpg";
+import assetAiTaiga from "@/scenes/world/textures/ai/taiga.jpg";
+import assetAiSnow from "@/scenes/world/textures/ai/snow.png";
 import { Color } from "@/utils/colors";
 
 export type TextureSetKey = "icon" | "ai";

@@ -1,10 +1,10 @@
 const thumbnailImages = import.meta.glob<string>(
-	"../../assets/species/thumbnail/*.(jpg|jpeg|png|webp)",
+	"./textures/species/thumbnail/*.(jpg|jpeg|png|webp)",
 	{ eager: true, import: "default" },
 );
 
 const trimmedImages = import.meta.glob<string>(
-	"../../assets/species/trimmed/*.(jpg|jpeg|png|webp)",
+	"./textures/species/trimmed/*.(jpg|jpeg|png|webp)",
 	{ eager: true, import: "default" },
 );
 

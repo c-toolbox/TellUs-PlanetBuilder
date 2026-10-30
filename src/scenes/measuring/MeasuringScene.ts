@@ -1,6 +1,6 @@
 import BackgroundSphere from "@/components/BackgroundSphere";
 import * as THREE from "three";
-import backgroundAsset from "@/assets/backgrounds/globe/truecolor.png";
+import backgroundAsset from "@/assets/textures/globe/truecolor.png";
 import MeasuringTape from "@/components/MeasuringTape";
 import { UiConfigEvent } from "@/network/socket_ui/protocol";
 import { Renderer } from "@/rendering/Renderer";

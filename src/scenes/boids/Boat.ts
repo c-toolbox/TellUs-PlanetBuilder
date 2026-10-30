@@ -7,7 +7,7 @@ export interface BoatTouch {
 import { ORIGIN, UP } from "@/constants";
 import { BOAT_BOIDS_CONFIG, FISH_SIZE } from "./constants";
 
-import boatAsset from "@/assets/boat.png";
+import boatAsset from "@/scenes/boids/textures/boat.png";
 
 const noise = createNoise3D();
 

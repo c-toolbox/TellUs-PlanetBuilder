@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { PLAYER_DISTANCE, PLAYER_SIZE } from "@/constants";
 
-import fishAsset from "@/assets/fish.png";
+import fishAsset from "@/scenes/boids/textures/fish.png";
 import { Color } from "@/utils/colors";
 
 const PLAYER_COLORS = [

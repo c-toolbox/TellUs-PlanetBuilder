@@ -4,7 +4,7 @@ import { TouchPoint } from "@/network/TouchPoint";
 import { ORIGIN } from "@/constants";
 import { FISH_BOIDS_CONFIG, FISH_SIZE } from "./constants";
 
-import fishAsset from "@/assets/fish.png";
+import fishAsset from "@/scenes/boids/textures/fish.png";
 import type { BoidsUiConfig } from "./BoidsScene";
 
 const noise = createNoise3D();

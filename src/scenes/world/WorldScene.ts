@@ -32,7 +32,7 @@ interface SaveState {
 	tiles: Tile[];
 }
 
-import backgroundAsset from "@/assets/backgrounds/globe/truecolor.png";
+import backgroundAsset from "@/assets/textures/globe/truecolor.png";
 
 export default class WorldScene extends BaseScene {
 	private globe: Polyhedra | null = null;

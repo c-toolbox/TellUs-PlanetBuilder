@@ -13,7 +13,7 @@ import { Color, GoogleColor } from "@/utils/colors";
 import { Fish } from "./Fish";
 import { Boat, type BoatTouch } from "./Boat";
 import { FISH_BOIDS_CONFIG } from "./constants";
-import backgroundAsset from "@/assets/square.png";
+import backgroundAsset from "@/assets/textures/square.png";
 
 const FISH_COLORS = [
 	GoogleColor["Red 600"],
