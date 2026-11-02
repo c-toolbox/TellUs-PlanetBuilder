@@ -9,15 +9,38 @@ import { SphericalPaint } from "./SphericalPaint";
 
 interface TouchState {
 	sphereNow: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>;
-	spherePrev: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>;
 	lastPosition: THREE.Vector3;
+	inputPosition: THREE.Vector3;
+	brushPosition: THREE.Vector3;
+	controlPosition: THREE.Vector3;
+	controlWidth: number;
+	timestamp: number;
+	brushTimestamp: number;
+	speed: number;
+	movements: { distance: number; delta: number }[];
 }
+
+const PAINT_RADIUS = 5;
+// Small world-space distances on the painting sphere, independent of frame rate.
+const BRUSH_POINT_SPACING = 0.01;
+const BRUSH_CURVE_STEP = 0.05;
+
+// Average recent movements, then smooth over time. Speeds are world units/sec.
+const BRUSH_SPEED_SCALE = 5;
+const BRUSH_SPEED_SMOOTHING = 0.1;
+const BRUSH_SPEED_SAMPLES = 5;
+// The inverse width curve maps this speed to the selected pen width.
+const BRUSH_INITIAL_SPEED = BRUSH_SPEED_SCALE / 2;
 
 const ColorModes = ["rainbow", "random", "white"] as const;
 type ColorMode = (typeof ColorModes)[number];
 
 export interface PaintUiConfig {
 	penWidth: number;
+	dynamicWidth: boolean;
+	dynamicWidthRange: number;
+	lazyRadius: number;
+	friction: number;
 	blur: boolean;
 	colorMode: ColorMode;
 }
@@ -35,6 +58,10 @@ export default class PaintScene extends BaseScene {
 
 	private paintConfig: PaintUiConfig = {
 		penWidth: 0.1,
+		dynamicWidth: false,
+		dynamicWidthRange: 0.5,
+		lazyRadius: 0.02,
+		friction: 0,
 		blur: false,
 		colorMode: "rainbow",
 	};
@@ -51,68 +78,169 @@ export default class PaintScene extends BaseScene {
 		if (!this.touchSphereGeo || !this.lineGeo) return;
 		const lengthSquared = vector.lengthSq();
 		if (!Number.isFinite(lengthSquared) || lengthSquared < 1e-12) return;
-		const newPosition = vector.clone().normalize().multiplyScalar(5);
-		let state = this.touchStates.get(id);
-		if (state && state.lastPosition.distanceToSquared(newPosition) < 1e-12) return;
+		const newPosition = vector.clone().normalize().multiplyScalar(PAINT_RADIUS);
+		const now = performance.now();
+		const state = this.touchStates.get(id);
+		if (state) {
+			// Width follows the raw pointer, independently of the stabilized path.
+			const distance = state.inputPosition.distanceTo(newPosition);
+			if (distance < 1e-6) {
+				this.updateBrush(state, now);
+				return;
+			}
+			// Include time spent stationary in the next movement's speed estimate.
+			const dt = Math.max((now - state.timestamp) / 1000, 0.001);
+			state.timestamp = now;
+			state.movements.push({ distance, delta: dt });
+			if (state.movements.length > BRUSH_SPEED_SAMPLES) state.movements.shift();
+			// Keep the baseline width until we have enough actual movements.
+			if (state.movements.length === BRUSH_SPEED_SAMPLES) {
+				const distanceSum = state.movements.reduce((sum, movement) => sum + movement.distance, 0);
+				const deltaSum = state.movements.reduce((sum, movement) => sum + movement.delta, 0);
+				const averageSpeed = Math.min(distanceSum / deltaSum, 1000);
+				state.speed = THREE.MathUtils.damp(
+					state.speed, averageSpeed, 1 / BRUSH_SPEED_SMOOTHING, dt,
+				);
+			}
+			state.inputPosition.copy(newPosition);
+			this.updateBrush(state, now);
+			return;
+		}
 		this.strokesChanged = true;
 		const order = ++this.drawOrder;
-		if (!state) {
-			const material = new THREE.MeshBasicMaterial({
-				color: this.getColor(),
-				depthTest: false,
-				depthWrite: false,
-				blending: THREE.NoBlending,
-				toneMapped: false,
-			});
-			const sphereNow = new THREE.Mesh(this.touchSphereGeo, material);
-			const spherePrev = new THREE.Mesh(this.touchSphereGeo, material);
-			sphereNow.scale.setScalar(this.paintConfig.penWidth);
-			spherePrev.scale.setScalar(this.paintConfig.penWidth);
-			spherePrev.position.copy(newPosition);
-			this.strokes.add(sphereNow, spherePrev);
-			state = { sphereNow, spherePrev, lastPosition: newPosition.clone() };
-			this.touchStates.set(id, state);
-		} else {
-			state.spherePrev.position.copy(state.lastPosition);
-			const length = state.lastPosition.distanceTo(newPosition);
-			if (length > 1e-6) {
-				const line = new THREE.Mesh(this.lineGeo, state.sphereNow.material);
-				line.position.copy(state.lastPosition).add(newPosition).multiplyScalar(0.5);
-				line.lookAt(newPosition);
-				line.scale.set(this.paintConfig.penWidth, this.paintConfig.penWidth, length);
-				line.renderOrder = order;
-				this.strokes.add(line);
-				this.frameMeshes.push(line);
-			}
+		const material = new THREE.MeshBasicMaterial({
+			color: this.getColor(),
+			depthTest: false,
+			depthWrite: false,
+			blending: THREE.NoBlending,
+			toneMapped: false,
+		});
+		const sphereNow = new THREE.Mesh(this.touchSphereGeo, material);
+		sphereNow.scale.setScalar(this.paintConfig.penWidth);
+		sphereNow.position.copy(newPosition);
+		sphereNow.renderOrder = order;
+		this.strokes.add(sphereNow);
+		this.touchStates.set(id, {
+			sphereNow,
+			lastPosition: newPosition.clone(),
+			inputPosition: newPosition.clone(),
+			brushPosition: newPosition.clone(),
+			controlPosition: newPosition.clone(),
+			controlWidth: this.paintConfig.penWidth,
+			timestamp: now,
+			brushTimestamp: now,
+			speed: BRUSH_INITIAL_SPEED,
+			movements: [],
+		});
+	}
+
+	private updateBrush(state: TouchState, now: number) {
+		const dt = Math.max((now - state.brushTimestamp) / 1000, 0);
+		state.brushTimestamp = now;
+		const { lazyRadius, friction } = this.paintConfig;
+		// Follow only the excess distance outside the lazy radius. Friction is
+		// the fraction retained at 60 Hz, adjusted for elapsed time so different
+		// input and display rates have the same feel. 0 follows; 1 holds still.
+		const pullDistance = state.brushPosition.distanceTo(state.inputPosition);
+		if (pullDistance <= lazyRadius) return;
+		const follow = friction === 0 ? 1 : 1 - Math.pow(friction, dt * 60);
+		if (follow <= 0) return;
+		state.brushPosition.lerp(state.inputPosition, (1 - lazyRadius / pullDistance) * follow)
+			.normalize().multiplyScalar(PAINT_RADIUS);
+		const spacing = Math.min(BRUSH_POINT_SPACING, this.paintConfig.penWidth * 0.25);
+		if (state.controlPosition.distanceTo(state.brushPosition) < spacing) return;
+		const width = this.getBrushWidth(state.speed);
+		const midpoint = state.controlPosition.clone().add(state.brushPosition)
+			.normalize().multiplyScalar(PAINT_RADIUS);
+		this.drawCurve(state, midpoint, (state.controlWidth + width) / 2);
+		state.controlPosition.copy(state.brushPosition);
+		state.controlWidth = width;
+	}
+
+	private drawCurve(state: TouchState, endPosition: THREE.Vector3, endWidth: number) {
+		// Consecutive curves meet at sample midpoints, sharing a tangent. Apply
+		// the same quadratic interpolation to width to avoid little size steps.
+		const startWidth = state.sphereNow.scale.x;
+		const curve = new THREE.QuadraticBezierCurve3(
+			state.lastPosition.clone(), state.controlPosition, endPosition,
+		);
+		const length = state.lastPosition.distanceTo(state.controlPosition) +
+			state.controlPosition.distanceTo(endPosition);
+		const step = Math.min(BRUSH_CURVE_STEP, this.paintConfig.penWidth * 0.5);
+		const segments = THREE.MathUtils.clamp(Math.ceil(length / step), 1, 64);
+		const point = new THREE.Vector3();
+		for (let i = 1; i <= segments; i++) {
+			const t = i / segments;
+			const u = 1 - t;
+			curve.getPoint(t, point).normalize().multiplyScalar(PAINT_RADIUS);
+			const width = u * u * startWidth + 2 * u * t * state.controlWidth + t * t * endWidth;
+			this.drawSegment(state, point, width);
 		}
+	}
+
+	private drawSegment(state: TouchState, newPosition: THREE.Vector3, width: number) {
+		if (!this.lineGeo) return;
+		const length = state.lastPosition.distanceTo(newPosition);
+		if (length < 1e-6) return;
+		const order = ++this.drawOrder;
+		const previousWidth = state.sphereNow.scale.x;
+		// Keep every rounded joint until capture, even when several curve
+		// segments arrive between frames. Later segments must not resize it.
+		const spherePrev = state.sphereNow.clone();
+		spherePrev.visible = true;
+		spherePrev.renderOrder = order;
+		this.strokes.add(spherePrev);
+		this.frameMeshes.push(spherePrev);
+		const tapered = previousWidth !== width;
+		const geometry = tapered
+			? new THREE.CylinderGeometry(width, previousWidth, 1, 64, 1)
+			: this.lineGeo;
+		// After rotation, radiusTop is at local +Z, facing the new point.
+		if (tapered) geometry.rotateX(Math.PI / 2);
+		const line = new THREE.Mesh(geometry, state.sphereNow.material);
+		line.position.copy(state.lastPosition).add(newPosition).multiplyScalar(0.5);
+		line.lookAt(newPosition);
+		const radiusScale = tapered ? 1 : width;
+		line.scale.set(radiusScale, radiusScale, length);
+		line.renderOrder = order;
+		this.strokes.add(line);
+		this.frameMeshes.push(line);
 		state.sphereNow.position.copy(newPosition);
+		state.sphereNow.scale.setScalar(width);
 		state.sphereNow.visible = true;
-		state.spherePrev.visible = true;
 		state.sphereNow.renderOrder = order;
-		state.spherePrev.renderOrder = order;
 		state.lastPosition.copy(newPosition);
+		this.strokesChanged = true;
 	}
 
 	removeTouchSphere(id: TouchId) {
 		const state = this.touchStates.get(id);
 		if (!state) return;
+		// Finish the buffered curve without snapping across any remaining
+		// friction lag. Retain the last accepted width to avoid endpoint blobs.
+		const endPosition = this.paintConfig.friction > 0 ? state.brushPosition : state.inputPosition;
+		if (state.lastPosition.distanceToSquared(endPosition) > 1e-12) {
+			this.drawCurve(state, endPosition, state.controlWidth);
+		}
 		// Retain quick taps until the next update has copied them into the painting.
-		this.frameMeshes.push(state.sphereNow, state.spherePrev);
+		this.frameMeshes.push(state.sphereNow);
 		this.retiredMaterials.push(state.sphereNow.material);
 		this.touchStates.delete(id);
 	}
 
 	private clearFrameStrokes() {
-		for (const mesh of this.frameMeshes) this.strokes.remove(mesh);
+		for (const mesh of this.frameMeshes) {
+			this.strokes.remove(mesh);
+			if (mesh.geometry !== this.touchSphereGeo && mesh.geometry !== this.lineGeo) {
+				mesh.geometry.dispose();
+			}
+		}
 		this.frameMeshes.length = 0;
 		for (const material of this.retiredMaterials) material.dispose();
 		this.retiredMaterials.length = 0;
-		// The previous endpoint is needed for one frame only; a held touch paints
-		// its current position while the rest of the accumulated stroke can blur.
+		// A held touch paints its current position only when blur is enabled.
 		for (const state of this.touchStates.values()) {
-			state.spherePrev.position.copy(state.sphereNow.position);
 			state.sphereNow.visible = false;
-			state.spherePrev.visible = false;
 		}
 	}
 
@@ -129,12 +257,20 @@ export default class PaintScene extends BaseScene {
 		if (!Number.isFinite(width)) return;
 		this.paintConfig.penWidth = THREE.MathUtils.clamp(width, 0.01, 1);
 		for (const state of this.touchStates.values()) {
-			state.sphereNow.scale.setScalar(this.paintConfig.penWidth);
-			state.spherePrev.scale.setScalar(this.paintConfig.penWidth);
+			state.sphereNow.scale.setScalar(this.getBrushWidth(state.speed));
+			state.controlWidth = state.sphereNow.scale.x;
 			state.sphereNow.visible = true;
-			state.spherePrev.visible = true;
 		}
 		this.strokesChanged = this.touchStates.size > 0 || this.strokesChanged;
+	}
+
+	private getBrushWidth(speed: number) {
+		if (!this.paintConfig.dynamicWidth) return this.paintConfig.penWidth;
+		// Normalize the inverse curve to [-1, 1], keeping the initial speed at
+		// baseline width for every range. A range of 0.5 preserves 50–150%.
+		const response = THREE.MathUtils.clamp(3 / (1 + speed / BRUSH_SPEED_SCALE) - 2, -1, 1);
+		const scale = 1 + this.paintConfig.dynamicWidthRange * response;
+		return this.paintConfig.penWidth * scale;
 	}
 
 	getColor() {
@@ -173,13 +309,17 @@ export default class PaintScene extends BaseScene {
 	}
 
 	override update(delta: number) {
+		// Let friction settle toward a held pointer, even without new input.
+		if (this.paintConfig.friction > 0 && this.paintConfig.friction < 1) {
+			const now = performance.now();
+			for (const state of this.touchStates.values()) this.updateBrush(state, now);
+		}
 		// Update once before any view renders, including the direct 3D scene view.
 		// Re-stamping an unchanged contact would gradually turn fractional edge
-		// coverage opaque. Only blur needs continuous input from a held touch.
+		// coverage opaque. Once the brush settles, only blur needs more stamping.
 		if (this.paintConfig.blur) {
 			for (const state of this.touchStates.values()) {
 				state.sphereNow.visible = true;
-				state.spherePrev.visible = true;
 			}
 		}
 		if (this.strokesChanged || this.paintConfig.blur) {
@@ -201,6 +341,30 @@ export default class PaintScene extends BaseScene {
 			this.updatePenWidth(value);
 			this.sendSocketUiConfig();
 		});
+
+		this.uiSocket.on("dynamic_width", (value: boolean) => {
+			if (typeof value !== "boolean") return;
+			this.paintConfig.dynamicWidth = value;
+			this.updatePenWidth(this.paintConfig.penWidth);
+			this.sendSocketUiConfig();
+		});
+
+		const slider = (id: string, key: "dynamicWidthRange" | "lazyRadius" | "friction", max: number) => {
+			this.uiSocket.on(id, (value: number) => {
+				if (!Number.isFinite(value)) return;
+				this.paintConfig[key] = THREE.MathUtils.clamp(value, 0, max);
+				if (key === "dynamicWidthRange") {
+					this.updatePenWidth(this.paintConfig.penWidth);
+				} else {
+					const now = performance.now();
+					for (const state of this.touchStates.values()) this.updateBrush(state, now);
+				}
+				this.sendSocketUiConfig();
+			});
+		};
+		slider("dynamic_width_range", "dynamicWidthRange", 1);
+		slider("lazy_radius", "lazyRadius", 0.5);
+		slider("friction", "friction", 1);
 
 		this.uiSocket.on("blur", (value: boolean) => {
 			if (typeof value !== "boolean") return;
@@ -246,6 +410,43 @@ export default class PaintScene extends BaseScene {
 					value: this.paintConfig.penWidth,
 					min: 0.01,
 					max: 1.0,
+					step: 0.01,
+				},
+				{
+					type: "switch",
+					id: "dynamic_width",
+					hint_title: "Dynamic pen size",
+					hint_text: "Faster strokes are thinner; adjust the amount with width variation",
+					value: this.paintConfig.dynamicWidth,
+				},
+				{
+					type: "slider",
+					id: "dynamic_width_range",
+					hint_title: "Width variation",
+					hint_text: "Variation around the pen size: 0 is constant, 0.5 allows ±50%, 1 allows ±100%",
+					value: this.paintConfig.dynamicWidthRange,
+					min: 0,
+					max: 1,
+					step: 0.01,
+				},
+				{
+					type: "slider",
+					id: "lazy_radius",
+					hint_title: "Lazy radius",
+					hint_text: "How far the pointer moves before pulling the brush; 0 removes the dead zone",
+					value: this.paintConfig.lazyRadius,
+					min: 0,
+					max: 0.5,
+					step: 0.005,
+				},
+				{
+					type: "slider",
+					id: "friction",
+					hint_title: "Friction",
+					hint_text: "Extra brush lag: 0 follows freely, 1 holds the brush still",
+					value: this.paintConfig.friction,
+					min: 0,
+					max: 1,
 					step: 0.01,
 				},
 				{
