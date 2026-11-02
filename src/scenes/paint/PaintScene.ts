@@ -2,55 +2,16 @@ import * as THREE from "three";
 import BaseScene from "@/scenes/BaseScene";
 import { Renderer } from "@/rendering/Renderer";
 import { SceneId, scenes } from "@/scenes/scenes";
-
 import { TouchId } from "@/network/tuioProtocol";
 import { getRainbowColor, getRandomColor } from "@/utils/functions";
 import { UiConfigEvent } from "@/network/socket_ui/protocol";
-import vertexShader from "@/rendering/shaders/basic.vert?raw";
-
-const fragmentShader = `
-precision highp float;
-uniform sampler2D textureNew;
-uniform sampler2D textureOld;
-uniform float blur;
-varying vec2 vUv;
-
-void main() {
-	vec4 oldColor = texture2D(textureOld, vUv);
-	vec4 newColor = texture2D(textureNew, vUv);
-
-	vec4 composed = 1.0 * max(oldColor, newColor);
-	gl_FragColor = composed;
-}
-`;
-
-const blurFragmentShader = `
-precision highp float;
-uniform sampler2D textureNew;
-uniform sampler2D textureOld;
-uniform float blur;
-varying vec2 vUv;
-
-void main() {
-	vec4 oldColor =
-		0.25 * texture2D(textureOld, vUv + vec2( blur,  blur)) +
-		0.25 * texture2D(textureOld, vUv + vec2(-blur,  blur)) +
-		0.25 * texture2D(textureOld, vUv + vec2( blur, -blur)) +
-		0.25 * texture2D(textureOld, vUv + vec2(-blur, -blur));
-	vec4 newColor = texture2D(textureNew, vUv);
-
-	vec4 composed = 0.998 * max(oldColor, newColor);
-	gl_FragColor = composed;
-}
-`;
+import { SphericalPaint } from "./SphericalPaint";
 
 interface TouchState {
-	sphereNow: THREE.Mesh;
-	spherePrev: THREE.Mesh;
-	lastPosition: THREE.Vector3 | null;
+	sphereNow: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>;
+	spherePrev: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>;
+	lastPosition: THREE.Vector3;
 }
-
-/* Socket UI config */
 
 const ColorModes = ["rainbow", "random", "white"] as const;
 type ColorMode = (typeof ColorModes)[number];
@@ -62,23 +23,15 @@ export interface PaintUiConfig {
 }
 
 export default class PaintScene extends BaseScene {
-	// Drawing
-	private touchStates: Map<number, TouchState> | null = null;
-	private touchSphereGeo: THREE.SphereGeometry | null = null;
-	private touchSphereMat: THREE.MeshBasicMaterial | null = null;
-	private lineGeo: THREE.CylinderGeometry | null = null;
-	private lineMeshes: THREE.Mesh[] = [];
-	private touchColors: { [touchId: number]: number } = {};
-
-	// Shader
-	private feedbackA: THREE.WebGLRenderTarget | null = null;
-	private feedbackB: THREE.WebGLRenderTarget | null = null;
-	private feedbackMaterial: THREE.ShaderMaterial | null = null;
-	private feedbackQuad: THREE.Mesh | null = null;
-	private readonly feedbackCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-	private readonly projectionTarget = new THREE.WebGLRenderTarget(2048, 2048, { samples: 4 });
-	private useA = true;
-	private needsClear = false;
+	private painting?: SphericalPaint;
+	private readonly strokes = new THREE.Scene();
+	private readonly touchStates = new Map<TouchId, TouchState>();
+	private touchSphereGeo?: THREE.SphereGeometry;
+	private lineGeo?: THREE.CylinderGeometry;
+	private frameMeshes: THREE.Mesh[] = [];
+	private retiredMaterials: THREE.MeshBasicMaterial[] = [];
+	private drawOrder = 0;
+	private strokesChanged = false;
 
 	private paintConfig: PaintUiConfig = {
 		penWidth: 0.1,
@@ -86,162 +39,102 @@ export default class PaintScene extends BaseScene {
 		colorMode: "rainbow",
 	};
 
-	constructor() {
-		super();
-
-		this.projectionTarget.texture.colorSpace = THREE.SRGBColorSpace;
-		this.init();
-	}
-
-	protected onTouch(touchId: TouchId, vector: THREE.Vector3) {
+	protected override onTouch(touchId: TouchId, vector: THREE.Vector3) {
 		this.updateTouchSphere(touchId, vector);
 	}
 
-	protected onRemove(touchId: TouchId) {
+	protected override onRemove(touchId: TouchId) {
 		this.removeTouchSphere(touchId);
 	}
 
-	public applyRendererSettings(renderer: Renderer): void {
-		super.applyRendererSettings(renderer);
-		renderer.setClearColor(new THREE.Color(0, 0, 0));
-		renderer.clearColor();
-		renderer.outputColorSpace = THREE.SRGBColorSpace;
-		renderer.toneMapping = THREE.NoToneMapping;
-		renderer.autoClear = true;
-	}
-
-	init() {
-		const penWidth = this.paintConfig.penWidth;
-
-		this.touchStates = new Map<number, TouchState>();
-		this.touchSphereGeo = new THREE.SphereGeometry(penWidth, 12, 10);
-		this.touchSphereMat = new THREE.MeshBasicMaterial({
-			color: 0xffffff,
-			depthTest: false,
-			depthWrite: false,
-		});
-		this.lineGeo = new THREE.CylinderGeometry(penWidth, penWidth, 1, 8, 1);
-		this.lineGeo.rotateX(Math.PI / 2); // Make cylinder align with Z axis
-		const lineMeshes: THREE.Mesh[] = [];
-
-		/* Rendering */
-
-		const res = 1024;
-
-		this.feedbackA = new THREE.WebGLRenderTarget(res, res, {
-			format: THREE.RGBAFormat,
-			type: THREE.UnsignedByteType,
-		});
-		this.feedbackB = new THREE.WebGLRenderTarget(res, res, {
-			format: THREE.RGBAFormat,
-			type: THREE.UnsignedByteType,
-		});
-
-		this.feedbackMaterial = new THREE.ShaderMaterial({
-			uniforms: {
-				textureNew: { value: null },
-				textureOld: { value: this.feedbackA.texture },
-				blur: { value: 0.0015 },
-			},
-			vertexShader: vertexShader,
-			fragmentShader: fragmentShader,
-			depthTest: false,
-			depthWrite: false,
-			transparent: true,
-		});
-
-		this.feedbackQuad = new THREE.Mesh(
-			new THREE.PlaneGeometry(2, 2),
-			this.feedbackMaterial,
-		);
-	}
-
-	updateTouchSphere(id: number, vector: THREE.Vector3) {
-		if (!this.touchStates || !this.touchSphereGeo || !this.touchSphereMat) return;
-		if (!(id in this.touchColors)) {
-			this.touchColors[id] = this.getColor();
-		}
-		this.touchSphereMat.color.setHex(this.touchColors[id]);
-
-		let state = this.touchStates?.get(id);
+	updateTouchSphere(id: TouchId, vector: THREE.Vector3) {
+		if (!this.touchSphereGeo || !this.lineGeo) return;
+		const lengthSquared = vector.lengthSq();
+		if (!Number.isFinite(lengthSquared) || lengthSquared < 1e-12) return;
+		const newPosition = vector.clone().normalize().multiplyScalar(5);
+		let state = this.touchStates.get(id);
+		if (state && state.lastPosition.distanceToSquared(newPosition) < 1e-12) return;
+		this.strokesChanged = true;
+		const order = ++this.drawOrder;
 		if (!state) {
-			const sphereNow = new THREE.Mesh(
-				this.touchSphereGeo,
-				this.touchSphereMat.clone(),
-			);
-			this.add(sphereNow);
-			const spherePrev = new THREE.Mesh(
-				this.touchSphereGeo,
-				this.touchSphereMat.clone(),
-			);
-			this.add(spherePrev);
-
-			state = { sphereNow, spherePrev, lastPosition: null };
+			const material = new THREE.MeshBasicMaterial({
+				color: this.getColor(),
+				depthTest: false,
+				depthWrite: false,
+				blending: THREE.NoBlending,
+				toneMapped: false,
+			});
+			const sphereNow = new THREE.Mesh(this.touchSphereGeo, material);
+			const spherePrev = new THREE.Mesh(this.touchSphereGeo, material);
+			sphereNow.scale.setScalar(this.paintConfig.penWidth);
+			spherePrev.scale.setScalar(this.paintConfig.penWidth);
+			spherePrev.position.copy(newPosition);
+			this.strokes.add(sphereNow, spherePrev);
+			state = { sphereNow, spherePrev, lastPosition: newPosition.clone() };
 			this.touchStates.set(id, state);
-		}
-
-		// Convert pitch/yaw to direction and get new position
-		const newPosition = vector.clone().multiplyScalar(5);
-		state.sphereNow.position.copy(newPosition);
-
-		// If we have a previous position, create a line between them
-		if (state.lastPosition) {
+		} else {
 			state.spherePrev.position.copy(state.lastPosition);
-
-			const line = this.createLine(state.lastPosition, newPosition);
-			if (line) {
-				this.add(line);
-				this.lineMeshes.push(line);
+			const length = state.lastPosition.distanceTo(newPosition);
+			if (length > 1e-6) {
+				const line = new THREE.Mesh(this.lineGeo, state.sphereNow.material);
+				line.position.copy(state.lastPosition).add(newPosition).multiplyScalar(0.5);
+				line.lookAt(newPosition);
+				line.scale.set(this.paintConfig.penWidth, this.paintConfig.penWidth, length);
+				line.renderOrder = order;
+				this.strokes.add(line);
+				this.frameMeshes.push(line);
 			}
 		}
-
-		// Update last position
-		state.lastPosition = newPosition.clone();
+		state.sphereNow.position.copy(newPosition);
+		state.sphereNow.visible = true;
+		state.spherePrev.visible = true;
+		state.sphereNow.renderOrder = order;
+		state.spherePrev.renderOrder = order;
+		state.lastPosition.copy(newPosition);
 	}
 
-	removeTouchSphere(id: number) {
-		const state = this.touchStates?.get(id);
-		if (state) {
-			this.remove(state.sphereNow);
-			this.remove(state.spherePrev);
-			this.touchStates?.delete(id);
+	removeTouchSphere(id: TouchId) {
+		const state = this.touchStates.get(id);
+		if (!state) return;
+		// Retain quick taps until the next update has copied them into the painting.
+		this.frameMeshes.push(state.sphereNow, state.spherePrev);
+		this.retiredMaterials.push(state.sphereNow.material);
+		this.touchStates.delete(id);
+	}
+
+	private clearFrameStrokes() {
+		for (const mesh of this.frameMeshes) this.strokes.remove(mesh);
+		this.frameMeshes.length = 0;
+		for (const material of this.retiredMaterials) material.dispose();
+		this.retiredMaterials.length = 0;
+		// The previous endpoint is needed for one frame only; a held touch paints
+		// its current position while the rest of the accumulated stroke can blur.
+		for (const state of this.touchStates.values()) {
+			state.spherePrev.position.copy(state.sphereNow.position);
+			state.sphereNow.visible = false;
+			state.spherePrev.visible = false;
 		}
 	}
 
-	clearLines() {
-		// Clear all lines
-		this.lineMeshes.forEach((line) => this.remove(line));
-		this.lineMeshes.length = 0;
-	}
-
-	createLine(start: THREE.Vector3, end: THREE.Vector3): THREE.Mesh | null {
-		if (!this.lineGeo || !this.touchSphereMat) return null;
-		const line = new THREE.Mesh(this.lineGeo, this.touchSphereMat.clone());
-		const direction = end.clone().sub(start);
-		const length = direction.length();
-
-		// Position at midpoint
-		line.position.copy(start).add(end).multiplyScalar(0.5);
-
-		// Orient to point from start to end
-		line.lookAt(end);
-		line.scale.set(1, 1, length);
-
-		return line;
+	private clearBrushes() {
+		this.clearFrameStrokes();
+		for (const state of this.touchStates.values()) state.sphereNow.material.dispose();
+		this.touchStates.clear();
+		this.strokes.clear();
+		this.drawOrder = 0;
+		this.strokesChanged = false;
 	}
 
 	updatePenWidth(width: number) {
-		this.paintConfig.penWidth = width;
-
-		// Dispose old geometries
-		this.touchSphereGeo?.dispose();
-		this.lineGeo?.dispose();
-
-		// Create new ones
-		this.touchSphereGeo = new THREE.SphereGeometry(width, 12, 10);
-
-		this.lineGeo = new THREE.CylinderGeometry(width, width, 1, 8, 1);
-		this.lineGeo.rotateX(Math.PI / 2);
+		if (!Number.isFinite(width)) return;
+		this.paintConfig.penWidth = THREE.MathUtils.clamp(width, 0.01, 1);
+		for (const state of this.touchStates.values()) {
+			state.sphereNow.scale.setScalar(this.paintConfig.penWidth);
+			state.spherePrev.scale.setScalar(this.paintConfig.penWidth);
+			state.sphereNow.visible = true;
+			state.spherePrev.visible = true;
+		}
+		this.strokesChanged = this.touchStates.size > 0 || this.strokesChanged;
 	}
 
 	getColor() {
@@ -255,65 +148,45 @@ export default class PaintScene extends BaseScene {
 		}
 	}
 
-	/* Rendering */
-
 	override onSceneEnter(renderer: Renderer) {
+		this.touchSphereGeo = new THREE.SphereGeometry(1, 64, 48);
+		this.lineGeo = new THREE.CylinderGeometry(1, 1, 1, 64, 1);
+		this.lineGeo.rotateX(Math.PI / 2);
+		this.painting = new SphericalPaint(renderer);
+		this.add(this.painting.surface);
 		super.onSceneEnter(renderer);
-
 		this.remove(this.touchHandler.touchGroup);
 	}
 
 	override onSceneExit(renderer: Renderer) {
 		super.onSceneExit(renderer);
-
-		// Remove feedback textures, listeners, etc.
-		this.clearLines();
-		this.touchStates?.clear();
-		this.touchColors = {};
-		this.clear();
-	}
-
-	postRender(renderer: Renderer) {
-		super.postRender(renderer);
-		this.clearLines();
-	}
-
-	override renderScene(renderer: Renderer) {
-		if (!this.feedbackA || !this.feedbackB || !this.feedbackMaterial || !this.feedbackQuad) return;
-		renderer.renderProjection(this, this.projectionTarget);
-
-		// 3️⃣ Feedback blur pass
-		const readBuffer = this.useA ? this.feedbackA : this.feedbackB;
-		const writeBuffer = this.useA ? this.feedbackB : this.feedbackA;
-		this.feedbackMaterial.uniforms.textureNew.value =
-			this.projectionTarget.texture;
-		this.feedbackMaterial.uniforms.textureOld.value = readBuffer.texture;
-
-		renderer.setRenderTarget(writeBuffer);
-		renderer.render(this.feedbackQuad, this.feedbackCamera);
-
-		// 4️⃣ Display final
-		renderer.setRenderTarget(renderer.projectionOutputTarget);
-		renderer.render(this.feedbackQuad, this.feedbackCamera);
-
-		// 5️⃣ Swap buffers
-		this.useA = !this.useA;
-
-		// Clear is needed
-		if (this.needsClear) {
-			const prev = renderer.getRenderTarget();
-
-			renderer.setRenderTarget(this.feedbackA);
-			renderer.clear(true, true, true);
-
-			renderer.setRenderTarget(this.feedbackB);
-			renderer.clear(true, true, true);
-
-			renderer.setRenderTarget(prev);
-
-			this.useA = true;
-			this.needsClear = false;
+		this.clearBrushes();
+		this.touchSphereGeo?.dispose();
+		this.touchSphereGeo = undefined;
+		this.lineGeo?.dispose();
+		this.lineGeo = undefined;
+		if (this.painting) {
+			this.remove(this.painting.surface);
+			this.painting.dispose();
+			this.painting = undefined;
 		}
+	}
+
+	override update(delta: number) {
+		// Update once before any view renders, including the direct 3D scene view.
+		// Re-stamping an unchanged contact would gradually turn fractional edge
+		// coverage opaque. Only blur needs continuous input from a held touch.
+		if (this.paintConfig.blur) {
+			for (const state of this.touchStates.values()) {
+				state.sphereNow.visible = true;
+				state.spherePrev.visible = true;
+			}
+		}
+		if (this.strokesChanged || this.paintConfig.blur) {
+			this.painting?.step(this.strokes, this.paintConfig.blur, delta / 1000);
+		}
+		this.strokesChanged = false;
+		this.clearFrameStrokes();
 	}
 
 	/* Socket UI */
@@ -330,25 +203,22 @@ export default class PaintScene extends BaseScene {
 		});
 
 		this.uiSocket.on("blur", (value: boolean) => {
-			if (!this.feedbackMaterial) return;
+			if (typeof value !== "boolean") return;
 			this.paintConfig.blur = value;
-			this.feedbackMaterial.fragmentShader = value
-				? blurFragmentShader
-				: fragmentShader;
-			this.feedbackMaterial.needsUpdate = true;
 			this.sendSocketUiConfig();
 		});
 
 		this.uiSocket.on("color_mode", (value: ColorMode) => {
+			if (!ColorModes.includes(value)) return;
 			this.paintConfig.colorMode = value;
 			this.sendSocketUiConfig();
 		});
 
 		this.uiSocket.on("clear", () => {
-			this.needsClear = true;
+			this.clearBrushes();
+			this.painting?.clear();
 		});
 	}
-
 
 	get socketUiConfig(): UiConfigEvent {
 		return {
@@ -382,7 +252,7 @@ export default class PaintScene extends BaseScene {
 					type: "switch",
 					id: "blur",
 					hint_title: "Enable blur",
-					hint_text: "Make the painting fade away",
+					hint_text: "Blur the painting and let it fade away",
 					value: this.paintConfig.blur,
 				},
 				{
