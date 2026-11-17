@@ -38,7 +38,13 @@ jobs:
           npm run typecheck
 
       - name: Build project
-        run: npm run build
+        env:
+          VITE_OMNI_TOKEN: ${{ secrets.OMNI_TOKEN }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:VITE_OMNI_TOKEN)) {
+            throw "Add the OMNI_TOKEN repository secret before building a release."
+          }
+          npm run build
 
       - name: Read generated application metadata
         id: app

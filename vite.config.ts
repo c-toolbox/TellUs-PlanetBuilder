@@ -8,6 +8,7 @@ import { title, description } from "./neutralino/app-config";
 export default defineConfig({
 	base: "./",
 	root: "src",
+	envDir: "..",
 	plugins: [
 		tsconfigPaths(),
 		checker({ typescript: true }),

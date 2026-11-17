@@ -1,5 +1,6 @@
 import { TouchHandler } from "./TouchHandler";
 import { SocketUi } from "./socket_ui/SocketUi";
+import { OmniSocket } from "./OmniSocket";
 import { SceneManager } from "@/scenes/SceneManager";
 import { scenes } from "@/scenes/scenes";
 import { Renderer } from "@/rendering/Renderer";
@@ -7,6 +8,7 @@ import { Renderer } from "@/rendering/Renderer";
 class GlobalServices {
 	readonly touchHandler = new TouchHandler();
 	readonly uiSocket = new SocketUi();
+	readonly omniSocket = new OmniSocket();
 	private rendererInstance?: Renderer;
 	private sceneManagerInstance?: SceneManager;
 
@@ -21,6 +23,7 @@ class GlobalServices {
 	connectAll() {
 		this.touchHandler.connect();
 		this.uiSocket.connect();
+		this.omniSocket.connect();
 	}
 }
 

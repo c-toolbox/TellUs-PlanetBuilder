@@ -6,6 +6,10 @@ extensions/*.exe
 *.log
 *.local
 
+# Local environment and credentials
+.env
+.env.*
+
 # Generated Neutralino files and local state
 neutralino.config.json
 __neutralino_globals.js

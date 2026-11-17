@@ -85,7 +85,7 @@ export interface Movement {
 
 export type ValidRequests = OmniToken | SetInput;
 
-const HOST_TOKEN = "5067f1bb-7205-40f8-bee1-1347ffa21a26";
+const HOST_TOKEN = import.meta.env.VITE_OMNI_TOKEN?.trim() ?? "";
 const URL = "wss://omni.itn.liu.se/ws/";
 
 export enum ConnectionStatus {
@@ -114,6 +114,11 @@ export class OmniSocket extends EventEmitter {
 	}
 
 	connect(): void {
+		if (!HOST_TOKEN) {
+			console.warn("OmniSocket disabled: set VITE_OMNI_TOKEN in .env.local and restart the app.");
+			return;
+		}
+
 		this.socket = new WebSocket(URL);
 
 		this.socket.onopen = () => {
@@ -133,12 +138,11 @@ export class OmniSocket extends EventEmitter {
 		};
 	}
 
-	send(data: object, isOmni = false) {
+	send(data: object) {
 		if (this.socket && this.isConnectedToSocket) {
 			this.socket.send(JSON.stringify(data));
 		} else {
 			console.warn("Cannot send. Socket is closed.");
-			console.debug(data);
 		}
 	}
 
@@ -159,7 +163,7 @@ export class OmniSocket extends EventEmitter {
 
 	onOmniConnect(data: OmniConnect) {
 		console.debug("onOmniConnect", data);
-		this.send({ token: HOST_TOKEN }, true);
+		this.send({ token: HOST_TOKEN });
 	}
 
 	onOmniDisconnect(data: OmniDisconnect) {
