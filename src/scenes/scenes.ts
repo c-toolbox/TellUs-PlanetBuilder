@@ -7,7 +7,7 @@ import MusicScene from "./music/MusicScene";
 import InteractionScene from "./interaction/InteractionScene";
 import MeasuringScene from "./measuring/MeasuringScene";
 import FluidScene from "./fluid/FluidScene";
-import ForceGraphScene from "./graph/ForceGraphScene";
+import PhysicsScene from "./physics/PhysicsScene";
 import ReactionDiffusionScene from "./reaction/ReactionDiffusionScene";
 
 // IDs are stable; titles are the labels in the local menu.
@@ -21,7 +21,7 @@ export const scenes = [
 	{ id: "Interaction", title: "Interaction", create: () => new InteractionScene() },
 	{ id: "Measuring", title: "Measuring", create: () => new MeasuringScene() },
 	{ id: "Fluid", title: "Fluid", create: () => new FluidScene() },
-	{ id: "Force graph", title: "Force graph", create: () => new ForceGraphScene() },
+	{ id: "Physics", title: "Physics", create: () => new PhysicsScene() },
 	{ id: "ReactionDiffusion", title: "Reaction diffusion", create: () => new ReactionDiffusionScene() },
 ] as const;
 
