@@ -66,7 +66,7 @@ export function interpolateColor(
 	return colorA.clone().lerp(colorB, t);
 }
 
-const colorCycle = [
+export const colorCycle = [
 	Color.Red500,
 	Color.Orange500,
 	Color.Amber500,

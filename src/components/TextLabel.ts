@@ -35,7 +35,7 @@ export default class TextLabel extends THREE.Mesh<
 		private readonly maxWidth = Infinity,
 	) {
 		super(
-			new THREE.ShapeGeometry(),
+			new THREE.ShapeGeometry([]),
 			new THREE.MeshBasicMaterial({
 				color: 0xffffff,
 				side: THREE.FrontSide,
