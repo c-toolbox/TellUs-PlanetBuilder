@@ -1,244 +1,135 @@
 import { EventEmitter } from "events";
+import {
+	OMNI_URL, OmniEvent, Response, isOmniResponse, parseOmniMessage,
+	type OmniSocketEvents, type OmniToken, type OmniUser,
+} from "./omniProtocol";
 
-/* Protocol types */
+export * from "./omniProtocol";
 
-export enum Request {
-	OmniToken = "token",
-
-	SetInput = "set_input",
-}
-
-export enum Response {
-	OmniConnect = "server_connect",
-	OmniDisconnect = "server_disconnect",
-	OmniAuthorized = "server_authorized",
-	OmniJoin = "server_join",
-	OmniLeave = "server_leave",
-	OmniError = "server_error",
-
-	Movement = "movement",
-}
-
-/* Omni*/
-
-// Sending token
-export interface OmniToken {
-	token: string;
-}
-
-// Upon connecting successfully
-export interface OmniConnect {
-	type: Response.OmniConnect;
-	message: string;
-}
-
-// Upon forced disconnect, such as guests being kicked after host disconnects
-export interface OmniDisconnect {
-	type: Response.OmniDisconnect;
-	message: string;
-}
-
-// Upon authorizing successfully
-export interface OmniAuthorized {
-	type: Response.OmniAuthorized;
-	message: string;
-}
-
-// Upon new application connecting.
-export interface OmniJoin {
-	type: Response.OmniJoin;
-	role: "host" | "client" | "guest";
-	user: string;
-}
-
-// Upon application disconnecting.
-export interface OmniLeave {
-	type: Response.OmniLeave;
-	role: "host" | "client" | "guest";
-	user: string;
-}
-
-// Errors including non-json message sent or invalid token.
-export interface OmniError {
-	type: Response.OmniError;
-	message: string;
-}
-
-/* Temporary */
-
-type InputTypes = "code" | "blank" | "poll" | "typing" | "joystick" | "drawing";
-
-export interface SetInput {
-	user?: string;
-	type: Request.SetInput;
-	input: InputTypes;
-}
-
-export interface Movement {
-	user: string;
-	type: Response.Movement;
-	x: number;
-	y: number;
-}
-
-/* All requests */
-
-export type ValidRequests = OmniToken | SetInput;
-
-const HOST_TOKEN = import.meta.env.VITE_OMNI_TOKEN?.trim() ?? "";
-const URL = "wss://omni.itn.liu.se/ws/";
-
-export enum ConnectionStatus {
-	Disconnected = "Disconnected",
-	Connecting = "Connecting",
-	Connected = "Connected",
-}
-
-export class OmniSocket extends EventEmitter {
+/** Shared Omni connection. Scenes interpret and own all application messages and state. */
+export class OmniSocket extends EventEmitter<OmniSocketEvents> {
 	private socket: WebSocket | null = null;
-	private handlers: { [type in Response]: (data: any) => void };
+	private readonly registeredUsers = new Map<string, OmniUser>();
+	private authorized = false;
 
-	constructor() {
+	constructor(
+		private readonly hostToken = import.meta.env?.VITE_OMNI_TOKEN?.trim() ?? "",
+		private readonly url = OMNI_URL,
+	) {
 		super();
-
-		this.handlers = {
-			[Response.OmniConnect]: this.onOmniConnect,
-			[Response.OmniDisconnect]: this.onOmniDisconnect,
-			[Response.OmniAuthorized]: this.onOmniAuthorized,
-			[Response.OmniJoin]: this.onOmniJoin,
-			[Response.OmniLeave]: this.onOmniLeave,
-			[Response.OmniError]: this.onOmniError,
-
-			[Response.Movement]: this.onMovement,
-		};
 	}
 
+	get users(): ReadonlyMap<string, OmniUser> { return this.registeredUsers; }
+	get isAuthorized(): boolean { return this.authorized; }
+	get isConnectedToSocket(): boolean { return this.socket?.readyState === WebSocket.OPEN; }
+
 	connect(): void {
-		if (!HOST_TOKEN) {
+		if (this.socket && this.socket.readyState !== WebSocket.CLOSED) return;
+		if (!this.hostToken) {
 			console.warn("OmniSocket disabled: set VITE_OMNI_TOKEN in .env.local and restart the app.");
 			return;
 		}
 
-		this.socket = new WebSocket(URL);
-
-		this.socket.onopen = () => {
-			console.debug("Socket Omni opened");
+		console.debug("Omni connecting:", this.url);
+		const socket = new WebSocket(this.url);
+		this.socket = socket;
+		socket.onopen = () => console.debug("Omni socket opened.");
+		socket.onclose = () => {
+			console.debug("Omni socket closed.");
+			if (this.socket !== socket) return;
+			this.socket = null;
+			this.clearSession();
 		};
-
-		this.socket.onclose = () => {
-			console.debug("Socket Omni closed");
-		};
-
-		this.socket.onerror = (event: Event) => {
-			console.debug("Socket Omni error" + event);
-		};
-
-		this.socket.onmessage = (event: MessageEvent) => {
-			this.receive(JSON.parse(event.data));
+		socket.onerror = () => console.warn("Omni WebSocket connection failed.");
+		socket.onmessage = (event: MessageEvent) => {
+			if (this.socket !== socket || typeof event.data !== "string") return;
+			let data: unknown;
+			try { data = JSON.parse(event.data); }
+			catch { console.warn("Ignoring invalid Omni JSON."); return; }
+			this.receive(data);
 		};
 	}
 
-	send(data: object) {
-		if (this.socket && this.isConnectedToSocket) {
-			this.socket.send(JSON.stringify(data));
-		} else {
-			console.warn("Cannot send. Socket is closed.");
+	disconnect(): void {
+		const socket = this.socket;
+		this.socket = null;
+		if (socket) console.debug("Omni disconnecting.");
+		socket?.close();
+		this.clearSession();
+	}
+
+	/** Scenes may send any JSON object, including Omni's optional target user ID. */
+	send(data: object): void {
+		if (this.isConnectedToSocket) this.socket!.send(JSON.stringify(data));
+		else console.warn("Cannot send. Omni socket is closed.");
+	}
+
+	/** Non-Omni payloads are forwarded unchanged for the active scene to validate. */
+	receive(input: unknown): boolean {
+		if (!isOmniResponse(input)) {
+			this.emit(OmniEvent.Message, input);
+			return true;
 		}
-	}
+		const data = parseOmniMessage(input);
+		if (!data) return false;
 
-	receive(data: any) {
-		if (data.type) {
-			const handler = this.handlers[data.type as Response];
-			if (handler) {
-				handler.call(this, data);
+		switch (data.type) {
+			case Response.OmniConnect: {
+				console.debug("Omni server connected:", data.message);
+				const credentials: OmniToken = { token: this.hostToken };
+				this.send(credentials);
 				this.emit(data.type, data);
-				return;
+				break;
 			}
+			case Response.OmniAuthorized:
+				console.debug("Omni authorized:", data.message);
+				this.authorized = true;
+				this.emit(data.type, data);
+				break;
+			case Response.OmniDisconnect:
+				console.debug("Omni server disconnected:", data.message);
+				this.disconnect();
+				this.emit(data.type, data);
+				break;
+			case Response.OmniCode:
+				console.debug("Omni session code:", data.code);
+				this.emit(data.type, data);
+				break;
+			case Response.OmniJoin: {
+				console.debug("Omni user joined:", { user: data.user, role: data.role, name: data.name });
+				if (data.role !== "host" && !this.registeredUsers.has(data.user)) {
+					const user: OmniUser = Object.freeze({
+						id: data.user, role: data.role, name: data.name ?? "Unnamed participant",
+					});
+					this.registeredUsers.set(user.id, user);
+					this.emit(OmniEvent.UserJoined, user);
+				}
+				this.emit(data.type, data);
+				break;
+			}
+			case Response.OmniLeave: {
+				const user = this.registeredUsers.get(data.user);
+				console.debug("Omni user left:", { user: data.user, role: data.role, name: user?.name });
+				if (user) {
+					this.registeredUsers.delete(user.id);
+					this.emit(OmniEvent.UserLeft, user);
+				}
+				this.emit(data.type, data);
+				break;
+			}
+			case Response.OmniError:
+				console.warn("Omni:", data.message);
+				this.emit(data.type, data);
+				break;
 		}
-
-		console.warn(data);
+		return true;
 	}
 
-	/* Response handlers */
-
-	onOmniConnect(data: OmniConnect) {
-		console.debug("onOmniConnect", data);
-		this.send({ token: HOST_TOKEN });
-	}
-
-	onOmniDisconnect(data: OmniDisconnect) {
-		console.debug("onOmniDisconnect", data);
-	}
-
-	onOmniAuthorized(data: OmniAuthorized) {
-		console.debug("onOmniAuthorized", data);
-	}
-
-	onOmniJoin(data: OmniJoin) {
-		console.debug("onOmniJoin", data);
-	}
-
-	onOmniLeave(data: OmniLeave) {
-		console.debug("onOmniLeave", data);
-	}
-
-	onOmniError(data: OmniError) {
-		console.debug("onOmniError", data.message);
-	}
-
-	onMovement(data: Movement) {}
-
-	/* Requests */
-
-	sendRequest(data: ValidRequests) {
-		this.send(data);
-	}
-
-	sendSetInput(input: InputTypes) {
-		let data: SetInput = {
-			type: Request.SetInput,
-			input,
-		};
-		this.sendRequest(data);
-	}
-
-	/* Misc */
-
-	get isConnectedToSocket() {
-		return this.socket && this.socket.readyState == WebSocket.OPEN;
+	private clearSession(): void {
+		this.authorized = false;
+		const users = [...this.registeredUsers.values()];
+		this.registeredUsers.clear();
+		if (users.length) console.debug("Omni session cleared:", { users: users.length });
+		for (const user of users) this.emit(OmniEvent.UserLeft, user);
 	}
 }
-
-/*
-this.omni = new OmniSocket();
-(window as any).omni = this.omni;
-
-this.omni.on("server_connect", (data: OmniConnect) => {});
-this.omni.on("server_disconnect", (data: OmniDisconnect) => {});
-this.omni.on("server_authorized", (data: OmniAuthorized) => {});
-this.omni.on("server_join", (data: OmniJoin) => {
-	if (data.role == "guest") {
-		const player = new Player(data.user);
-		this.playerGroup.add(player);
-		this.players.set(data.user, player);
-
-		this.omni.sendSetInput("joystick");
-	}
-});
-this.omni.on("server_leave", (data: OmniLeave) => {
-	const player = this.players.get(data.user);
-	if (player) {
-		this.players.delete(data.user);
-		this.playerGroup.remove(player);
-	}
-});
-this.omni.on("server_error", (data: OmniError) => {});
-this.omni.on("movement", (data: Movement) => {
-	let player = this.players.get(data.user);
-	if (player) {
-		player.move(data.x, data.y);
-	}
-});
-
-this.omni.connect();
-*/
