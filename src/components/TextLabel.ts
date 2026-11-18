@@ -27,6 +27,9 @@ export default class TextLabel extends THREE.Mesh<
 	private text: string;
 	private font?: Font;
 	private disposed = false;
+	/** Half width and height of the text after scaling, in parent units. */
+	readonly halfExtents = new THREE.Vector2();
+	onLayout?: () => void;
 
 	constructor(
 		text: string,
@@ -79,6 +82,8 @@ export default class TextLabel extends THREE.Mesh<
 			0,
 		);
 		this.scale.setScalar(width > this.maxWidth ? this.maxWidth / width : 1);
+		this.halfExtents.set(width, height).multiplyScalar(this.scale.x / 2);
+		this.onLayout?.();
 	}
 
 	dispose() {
