@@ -6,11 +6,11 @@ export default class BackgroundSphere extends THREE.Mesh<
 	THREE.MeshBasicMaterial
 > {
 	constructor(
-		assetPath: string,
+		asset: string | THREE.Texture,
 		radius: number,
 		color: THREE.ColorRepresentation = 0xffffff,
 	) {
-		const texture = new THREE.TextureLoader().load(assetPath);
+		const texture = typeof asset === "string" ? new THREE.TextureLoader().load(asset) : asset;
 		texture.colorSpace = THREE.SRGBColorSpace;
 		super(
 			new THREE.SphereGeometry(radius, 64, 64),

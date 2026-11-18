@@ -1,6 +1,6 @@
 import BackgroundSphere from "@/components/BackgroundSphere";
 import * as THREE from "three";
-import backgroundAsset from "@/assets/textures/globe/truecolor.png";
+import backgroundAsset from "@/assets/textures/earth/animated.webm";
 import MeasuringTape from "@/components/MeasuringTape";
 import { UiConfigEvent } from "@/network/socket_ui/protocol";
 import { Renderer } from "@/rendering/Renderer";
@@ -9,11 +9,33 @@ import { SceneId, scenes } from "@/scenes/scenes";
 import { Color } from "@/utils/colors";
 
 export default class MeasuringScene extends BaseScene {
+	private readonly backgroundVideo = document.createElement("video");
 	private readonly measuringTapes: MeasuringTape[];
 
 	constructor() {
 		super();
-		this.add(new BackgroundSphere(backgroundAsset, 2));
+		this.background = new THREE.Color(0x222222);
+		this.add(this.drawings);
+
+		this.backgroundVideo.loop = true;
+		this.backgroundVideo.muted = true;
+		this.backgroundVideo.playsInline = true;
+		this.backgroundVideo.preload = "metadata";
+		this.backgroundVideo.src = backgroundAsset;
+		this.add(new BackgroundSphere(new THREE.VideoTexture(this.backgroundVideo), 2));
+
+		// const overlay = new THREE.Mesh(
+		// 	new THREE.SphereGeometry(1.9, 64, 64),
+		// 	new THREE.MeshBasicMaterial({
+		// 		color: 0x000000,
+		// 		transparent: true,
+		// 		opacity: 1.0,
+		// 		side: THREE.BackSide,
+		// 		depthWrite: false,
+		// 	}),
+		// );
+		// overlay.renderOrder = -1;
+		// this.add(overlay);
 
 		this.measuringTapes = [Color.Red600, Color.Blue600, Color.Green600].map(
 			(color, index) => {
@@ -40,7 +62,14 @@ export default class MeasuringScene extends BaseScene {
 		);
 	}
 
+	override onSceneEnter(renderer: Renderer) {
+		void this.backgroundVideo.play().catch((error: unknown) => {
+			if (this.renderer) console.error("Failed to play measuring background video", error);
+		});
+	}
+
 	override onSceneExit(renderer: Renderer) {
+		this.backgroundVideo.pause();
 		super.onSceneExit(renderer);
 		this.measuringTapes.forEach((tape) => tape.resetInteraction());
 	}
