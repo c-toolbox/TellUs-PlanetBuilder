@@ -126,8 +126,9 @@ class TileManager {
 			case "invisible tiles":
 			case "colored tiles":
 			case "symbol tiles":
+			case "realistic tiles": // Faces are hidden; the shader only needs the tile types
 				return "icon";
-			case "realistic tiles":
+			case "textured tiles":
 				return "ai";
 		}
 	}

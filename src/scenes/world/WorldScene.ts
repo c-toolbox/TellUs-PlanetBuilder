@@ -11,6 +11,7 @@ import { TouchId } from "@/network/tuioProtocol";
 import { Tile, tileManager, Tiles } from "@/scenes/world/TileManager";
 import { UiConfigEvent } from "@/network/socket_ui/protocol";
 import { Polyhedra } from "@/scenes/world/Polyhedra";
+import { RenderedPlanet } from "@/scenes/world/RenderedPlanet";
 import { ORIGIN } from "@/constants";
 import {
 	DistributionType,
@@ -36,6 +37,7 @@ import backgroundAsset from "@/assets/textures/globe/truecolor.png";
 
 export default class WorldScene extends BaseScene {
 	private globe: Polyhedra | null = null;
+	private renderedPlanet: RenderedPlanet | null = null;
 	private activePolyhedraModel: ModelName | null = null;
 
 	private saveCount: number = 0;
@@ -54,7 +56,7 @@ export default class WorldScene extends BaseScene {
 		model: "△ 60",
 		// model: "⭔ 1002",
 		tileEdge: "show borders",
-		tileTexture: "realistic tiles",
+		tileTexture: "textured tiles",
 		distribution: DistributionTypes[0],
 		autoGenerate: false,
 		enabledBiomes: {
@@ -137,12 +139,43 @@ export default class WorldScene extends BaseScene {
 			enabled: () => !this.worldConfig.rotationMode,
 		})).on("click", ({ touchId, direction }) => this.handleRaycast(touchId, direction, "click"));
 
-		// Handle invisible tiles
-		if (this.worldConfig.tileTexture === "invisible tiles") {
-			this.remove(this.globe.faceGroup);
-		}
+		// Handle invisible and realistic tiles
+		this.updateTileTexture();
 
 		this.populatePlanetTiles();
+	}
+
+	private get isRenderedMode() {
+		return this.worldConfig.tileTexture === "realistic tiles";
+	}
+
+	private setRotationMode(value: boolean) {
+		this.worldConfig.rotationMode = value;
+		this.previousDirections.clear();
+		if (this.renderer) this.targetCameraQuaternion.copy(this.renderer.projectionCamera.quaternion);
+	}
+
+	private updateTileTexture() {
+		if (!this.globe) return;
+		const { tileTexture } = this.worldConfig;
+		const rendered = this.isRenderedMode;
+
+		if (tileTexture === "invisible tiles") {
+			this.remove(this.globe.faceGroup);
+		} else if (!this.children.includes(this.globe.faceGroup)) {
+			this.add(this.globe.faceGroup);
+		}
+
+		// Hidden faces are still raycast for touches
+		this.globe.faceGroup.visible = !rendered;
+
+		if (rendered) {
+			this.renderedPlanet ??= new RenderedPlanet();
+			this.renderedPlanet.setTiles(this.globe.tileMeshes);
+			this.add(this.renderedPlanet);
+		} else if (this.renderedPlanet) {
+			this.remove(this.renderedPlanet);
+		}
 	}
 
 	populatePlanetTiles() {
@@ -226,6 +259,8 @@ export default class WorldScene extends BaseScene {
 		this.tileInteraction = undefined;
 
 		this.clear();
+		this.renderedPlanet?.dispose();
+		this.renderedPlanet = null;
 		this.globe = null;
 		this.activePolyhedraModel = null;
 		this.tileMeshes = [];
@@ -307,6 +342,9 @@ export default class WorldScene extends BaseScene {
 	}
 
 	update(delta: number) {
+		if (this.renderer && this.renderedPlanet?.parent === this) {
+			this.renderedPlanet.update(this.renderer, delta);
+		}
 
 		// Smooth camera rotation towards target using quaternion slerp
 		if (this.renderer && this.worldConfig.rotationMode) {
@@ -336,9 +374,7 @@ export default class WorldScene extends BaseScene {
 		});
 
 		this.uiSocket.on("rotation_mode", (value: boolean) => {
-			this.worldConfig.rotationMode = value;
-			this.previousDirections.clear();
-			if (this.renderer) this.targetCameraQuaternion.copy(this.renderer.projectionCamera.quaternion);
+			this.setRotationMode(value);
 			this.sendSocketUiConfig();
 		});
 
@@ -370,7 +406,9 @@ export default class WorldScene extends BaseScene {
 
 		this.uiSocket.on("tile_texture", (value: TileTexture) => {
 			if (!this.globe) return;
+			const wasRendered = this.isRenderedMode;
 			this.worldConfig.tileTexture = value;
+			if (wasRendered !== this.isRenderedMode) this.setRotationMode(this.isRenderedMode);
 			this.markDirty();
 			this.sendSocketUiConfig();
 
@@ -379,14 +417,8 @@ export default class WorldScene extends BaseScene {
 				tileMesh.setTile(tileMesh.tile),
 			);
 
-			// Handle invisible tiles
-			if (value === "invisible tiles") {
-				this.remove(this.globe.faceGroup);
-			} else {
-				if (!this.children.includes(this.globe.faceGroup)) {
-					this.add(this.globe.faceGroup);
-				}
-			}
+			// Handle invisible and realistic tiles
+			this.updateTileTexture();
 		});
 
 		this.uiSocket.on("model", (value: ModelName) => {

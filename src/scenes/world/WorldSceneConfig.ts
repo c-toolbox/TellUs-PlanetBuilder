@@ -86,6 +86,7 @@ export const TileTextures = [
 	"invisible tiles",
 	"colored tiles",
 	"symbol tiles",
+	"textured tiles",
 	"realistic tiles",
 ] as const;
 export type TileTexture = (typeof TileTextures)[number];
