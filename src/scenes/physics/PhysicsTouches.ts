@@ -1,14 +1,25 @@
 import * as THREE from "three";
-import { Body, edgeKey, PhysicsNode, PhysicsPull, PhysicsWorld } from "./PhysicsWorld";
+import { Body, edgeKey, PhysicsEdge, PhysicsNode, PhysicsPull, PhysicsWorld } from "./PhysicsWorld";
 
 export const HOLD_TO_ADD_MS = 400;
 export const TOUCH_SLOP = 0.025;
-export const LINK_DISTANCE = 0.52;
+export const LINK_DISTANCE = 0.4;
 export const BREAK_DISTANCE = LINK_DISTANCE * 2;
 // A body's edge only breaks once stretched noticeably beyond the shape it holds.
 const BODY_BREAK_SLACK = 0.05;
-// Smallest change of a held edge that counts as resizing it.
-const RESIZE_THRESHOLD = 0.02;
+// Stretch range before the break distance over which a held edge thins out to nothing.
+const THINNING_RANGE = LINK_DISTANCE * 0.6;
+
+/** Angular length at which a held edge snaps. */
+export function breakDistance(edge: PhysicsEdge) {
+	return edge.body ? Math.max(BREAK_DISTANCE, edge.restLength + BODY_BREAK_SLACK) : BREAK_DISTANCE;
+}
+
+/** 1 for an edge at normal width, falling to 0 at the length where it snaps. */
+export function edgeThickness(edge: PhysicsEdge, angle: number) {
+	const limit = breakDistance(edge);
+	return Math.min(1, Math.max(0, (limit - angle) / THINNING_RANGE));
+}
 
 interface PhysicsTouch {
 	direction: THREE.Vector3;
@@ -109,8 +120,7 @@ export class PhysicsTouches {
 				const key = edgeKey(a.node!.id, b.node!.id);
 				const edge = this.world.edges.get(key);
 				if (edge) {
-					const stretched = !edge.body || angle > edge.restLength + BODY_BREAK_SLACK;
-					if (angle > BREAK_DISTANCE && stretched) {
+					if (angle > breakDistance(edge)) {
 						this.world.breakEdge(key);
 					} else if (!edge.body) {
 						// While both ends are held, the user sets a loose edge's length.
@@ -164,38 +174,8 @@ export class PhysicsTouches {
 		// The node keeps its velocity, so letting go while moving throws it.
 		node.heldBy = undefined;
 		if (this.world.isBelowFloor(node)) this.world.removeNode(node.id);
-		else if (!this.formShape(node)) this.applyResize(node);
-	}
-
-	/** Letting go of one of two held dots of a shape keeps the edge length between them. */
-	private applyResize(released: PhysicsNode) {
-		const { body } = released;
-		const partner = Array.from(this.touches.values()).find((touch) => touch.node?.body === body && body)?.node;
-		const edge = partner && this.world.edges.get(edgeKey(released.id, partner.id));
-		if (!body || !partner || !edge) return;
-		if (Math.abs(released.position.angleTo(partner.position) - edge.restLength) > RESIZE_THRESHOLD) {
-			this.world.reshapeBody(body);
-		}
-	}
-
-	/** Dots that were joined into a ring while held become a body, or join the body they were added to. */
-	private formShape(released: PhysicsNode) {
-		const joined = (a: PhysicsNode, b: PhysicsNode) => this.world.edges.has(edgeKey(a.id, b.id));
-		const group = [released];
-		for (const { node } of this.touches.values()) {
-			if (node && joined(released, node)) group.push(node);
-		}
-		if (group.length < 3) return false;
-		for (let i = 1; i < group.length; i++) {
-			for (let j = i + 1; j < group.length; j++) if (!joined(group[i], group[j])) return false;
-		}
-		const bodies = new Set(group.map((node) => node.body).filter((body) => body));
-		if (bodies.size === 0) return !!this.world.createBody(group);
-		if (bodies.size > 1) return false;
-		const [body] = bodies;
-		const members = group.filter((node) => node.body === body);
-		const free = group.filter((node) => !node.body);
-		return members.length === 2 && free.length === 1 && this.world.attachNode(body!, free[0], members[0], members[1]);
+		// A shape being edited forms its new polygon once every dot is let go.
+		else if (!node.frozen) this.world.formBody(node);
 	}
 
 	clear(ignoreUntilRelease = true) {

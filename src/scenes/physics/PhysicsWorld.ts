@@ -3,11 +3,11 @@ import { UP } from "@/constants";
 import { Color } from "@/utils/colors";
 import { colorCycle } from "@/utils/functions";
 import { Collider, Contact, collidePair, createCollider, inverseMass, updateCollider } from "./contacts";
-import { arcNormal, convexOrder, isConvexRing } from "./sphericalGeometry";
+import { arcNormal, ringShape, RingShape } from "./sphericalGeometry";
 
 export interface PhysicsModel {
 	vertices: readonly (readonly number[])[];
-	/** Convex outlines as vertex indices, in ring order. */
+	/** Simple (convex or concave) outlines as vertex indices, in ring order. */
 	bodies: readonly (readonly number[])[];
 	/** Loose edges: ropes and platforms. */
 	edges?: readonly (readonly number[])[];
@@ -43,15 +43,22 @@ export interface PhysicsNode {
 	readonly edgeColor: THREE.Color;
 	/** Tailwind 500, for the inside of a shape. */
 	readonly fillColor: THREE.Color;
-	heldBy?: number;	body?: Body;
+	heldBy?: number;
+	/** Part of a shape being edited: it holds still until the edit ends. */
+	frozen: boolean;
+	body?: Body;
 	/** Collision radius, assigned with the collider layout. */
 	radius: number;
 }
 
-/** A rigid convex polygon: its nodes, in ring order, are all joined by edges. */
+/** A rigid polygon, convex or concave: its nodes, in ring order, are all joined by edges. */
 export interface Body {
 	readonly id: number;
 	nodes: PhysicsNode[];
+	/** Triangles covering the polygon, as indices into `nodes`. */
+	triangles: number[][];
+	/** Convex pieces covering the polygon, as indices into `nodes`. */
+	pieces: number[][];
 }
 
 export interface PhysicsEdge {
@@ -81,9 +88,9 @@ export const floorLatitude = (floor: number) => -(Math.PI / 2) * (1 - floor);
 const DELETE_DEPTH = 0.04;
 // Impacts slower than this (rad/s) do not bounce, so resting contacts stay still.
 const BOUNCE_THRESHOLD = 0.2;
-export const NODE_RADIUS = 0.02;
-export const ROD_RADIUS = 0.008;
-const SKIN_RADIUS = 0.004;
+export const NODE_RADIUS = 0.04;
+export const ROD_RADIUS = 0.016;
+const SKIN_RADIUS = 0.012;
 const MAX_BODY_NODES = 12;
 /** Largest and smallest distance between two nodes of a body, in radians. */
 const MAX_BODY_SIZE = 1;
@@ -98,6 +105,8 @@ const HELD_FOLLOW_TIME = 0.015;
 const PULL_TIME = 0.05;
 const PULL_VELOCITY_TIME = 0.006;
 const SPEED_LIMIT = 24;
+// Compression of a held dot's edge (rad) that is tolerated before the dot is pushed back.
+const SQUISH_TOLERANCE = 0.002;
 
 export function edgeKey(a: number, b: number) {
 	return a < b ? `${a}:${b}` : `${b}:${a}`;
@@ -121,6 +130,8 @@ export class PhysicsWorld {
 	private contacts: Contact[] = [];
 	/** Nodes that lost their last edge; they go away as soon as nobody holds them. */
 	private readonly orphans = new Set<number>();
+	/** Shapes taken apart for editing, until none of their nodes is held. */
+	private readonly editGroups: Set<PhysicsNode>[] = [];
 	private topologyVersion = 0;
 	private builtVersion = -1;
 	private nextId = 0;
@@ -156,12 +167,17 @@ export class PhysicsWorld {
 		this.pulls.clear();
 		this.contacts.length = 0;
 		this.orphans.clear();
+		this.editGroups.length = 0;
 		this.topologyVersion++;
 		this.nextId = 0;
 		this.nextBodyId = 0;
 		model.vertices.forEach((vertex) => this.addNode(new THREE.Vector3(...vertex)));
 		model.edges?.forEach(([a, b]) => this.addEdge(a, b));
-		model.bodies.forEach((ids) => this.addBody(ids.map((id) => this.nodes.get(id)!)));
+		model.bodies.forEach((ids) => {
+			const nodes = ids.map((id) => this.nodes.get(id)!);
+			const shape = ringShape(nodes.map((node) => node.position));
+			if (shape) this.addBody(nodes, shape);
+		});
 	}
 
 	addNode(direction: THREE.Vector3) {
@@ -172,7 +188,7 @@ export class PhysicsWorld {
 			previous: position.clone(), velocity: new THREE.Vector3(), approach: new THREE.Vector3(),
 			target: position.clone(),
 			swatch: 0, color: new THREE.Color(), edgeColor: new THREE.Color(), fillColor: new THREE.Color(),
-			radius: NODE_RADIUS,
+			frozen: false, radius: NODE_RADIUS,
 		};
 		this.paint(node, this.colorIndex++);
 		this.nodes.set(node.id, node);
@@ -200,6 +216,11 @@ export class PhysicsWorld {
 		});
 		this.orphans.delete(a);
 		this.orphans.delete(b);
+		// A dot linked to a shape that is being edited is edited along with it.
+		const group = this.editGroups.find((members) => members.has(source) || members.has(target));
+		for (const node of [source, target]) {
+			if (group && !node.body) this.freeze(group, node);
+		}
 		this.topologyVersion++;
 		return true;
 	}
@@ -221,39 +242,106 @@ export class PhysicsWorld {
 		if (body) {
 			body.nodes.splice(body.nodes.indexOf(node), 1);
 			node.body = undefined;
-			if (body.nodes.length < 3) this.dissolveBody(body);
+			const shape = body.nodes.length >= 3 ? ringShape(body.nodes.map((member) => member.position)) : undefined;
+			if (shape) this.setShape(body, shape);
+			else this.dissolveBody(body);
 		}
 		for (const [key, edge] of this.edges) {
 			if (edge.source === node || edge.target === node) this.removeEdge(key);
 		}
 		this.nodes.delete(id);
 		this.orphans.delete(id);
+		for (const group of this.editGroups) group.delete(node);
 		this.topologyVersion++;
 	}
 
-	/** Joins free nodes into one convex body; undefined unless they are in convex position. */
-	createBody(nodes: readonly PhysicsNode[]) {
-		if (nodes.length < 3 || nodes.length > MAX_BODY_NODES || nodes.some((node) => node.body)) return;
-		const order = convexOrder(nodes.map((node) => node.position));
-		return order && this.addBody(order.map((index) => nodes[index]));
-	}
-
-	/** Inserts a free node into a body between two neighbouring nodes, if the result stays convex. */
-	attachNode(body: Body, node: PhysicsNode, a: PhysicsNode, b: PhysicsNode) {
-		const count = body.nodes.length;
-		const i = body.nodes.indexOf(a), j = body.nodes.indexOf(b);
-		if (node.body || count >= MAX_BODY_NODES || i < 0 || j < 0) return false;
-		const at = (i + 1) % count === j ? i + 1 : (j + 1) % count === i ? j + 1 : -1;
-		if (at < 0) return false;
-		const nodes = body.nodes.slice();
-		nodes.splice(at, 0, node);
-		if (!isConvexRing(nodes.map((member) => member.position))) return false;
-		body.nodes = nodes;
-		node.body = body;
-		this.paint(node, a.swatch);
-		for (const other of nodes) if (other !== node) this.joinRigidly(node, other);
-		this.topologyVersion++;
+	/**
+	 * Merges the loose edges that close a cycle, together with the bodies they touch, into one body.
+	 * Only the cycle containing `seed` is considered; false when none exists or it is not a clean simple polygon.
+	 * An edge that does not close a cycle stays a rope.
+	 */
+	formBody(seed: PhysicsNode) {
+		const neighbors = new Map<PhysicsNode, PhysicsNode[]>();
+		const link = (from: PhysicsNode, to: PhysicsNode) => neighbors.set(from, [...(neighbors.get(from) ?? []), to]);
+		for (const { source, target } of this.edges.values()) {
+			link(source, target);
+			link(target, source);
+		}
+		// A loose edge closes a cycle when its ends stay connected without it.
+		const connected = (from: PhysicsNode, to: PhysicsNode) => {
+			const seen = new Set([from]);
+			const queue = [from];
+			for (const node of queue) {
+				for (const next of neighbors.get(node) ?? []) {
+					if ((node === from && next === to) || seen.has(next)) continue;
+					if (next === to) return true;
+					seen.add(next);
+					queue.push(next);
+				}
+			}
+			return false;
+		};
+		const groups: Set<PhysicsNode>[] = [];
+		// Candidate outline edges: loose edges on cycles, plus the outlines of existing bodies.
+		const outline = new Map<PhysicsNode, Set<PhysicsNode>>();
+		const join = (a: PhysicsNode, b: PhysicsNode) => {
+			for (const [from, to] of [[a, b], [b, a]]) {
+				if (!outline.has(from)) outline.set(from, new Set());
+				outline.get(from)!.add(to);
+			}
+		};
+		for (const { source, target } of this.edges.values()) {
+			if (source.body && source.body === target.body) continue;
+			if (!connected(source, target)) continue;
+			join(source, target);
+			const group = new Set([...(source.body?.nodes ?? [source]), ...(target.body?.nodes ?? [target])]);
+			for (let i = groups.length - 1; i >= 0; i--) {
+				if (!Array.from(groups[i]).some((node) => group.has(node))) continue;
+				groups[i].forEach((node) => group.add(node));
+				groups.splice(i, 1);
+			}
+			groups.push(group);
+		}
+		const group = groups.find((members) => members.has(seed));
+		if (!group || group.size > MAX_BODY_NODES) return false;
+		const nodes = Array.from(group);
+		for (const body of new Set(nodes.flatMap((node) => (node.body ? [node.body] : [])))) {
+			body.nodes.forEach((node, i) => join(node, body.nodes[(i + 1) % body.nodes.length]));
+		}
+		const found = this.findRing(nodes, outline);
+		if (!found) return false;
+		const swatch = nodes.find((node) => node.body)?.swatch;
+		for (const node of nodes) if (node.body) this.bodies.delete(node.body.id);
+		this.addBody(found.ring, found.shape, swatch);
 		return true;
+	}
+
+	/** The simple polygon through all nodes along outline edges that covers the most area. */
+	private findRing(nodes: readonly PhysicsNode[], outline: ReadonlyMap<PhysicsNode, ReadonlySet<PhysicsNode>>) {
+		const path = [nodes[0]];
+		const used = new Set(path);
+		let best = undefined as { ring: PhysicsNode[]; shape: RingShape } | undefined;
+		let budget = 50000;
+		const extend = () => {
+			if (budget-- <= 0) return;
+			const last = path[path.length - 1];
+			if (path.length === nodes.length) {
+				if (!outline.get(last)?.has(path[0])) return;
+				const shape = ringShape(path.map((node) => node.position));
+				if (shape && (!best || shape.area > best.shape.area)) best = { ring: [...path], shape };
+				return;
+			}
+			for (const next of outline.get(last) ?? []) {
+				if (used.has(next)) continue;
+				used.add(next);
+				path.push(next);
+				extend();
+				path.pop();
+				used.delete(next);
+			}
+		};
+		extend();
+		return best;
 	}
 
 	clampRestLength(length: number) {
@@ -290,15 +378,6 @@ export class PhysicsWorld {
 		return factor;
 	}
 
-	/** Makes the current spacing of a body's nodes its shape, unless that is no longer a convex polygon. */
-	reshapeBody(body: Body) {
-		const { nodes } = body;
-		if (!isConvexRing(nodes.map((node) => node.position))) return false;
-		if (nodes.some((a) => nodes.some((b) => a.position.angleTo(b.position) > MAX_BODY_SIZE))) return false;
-		this.adoptShape(body);
-		return true;
-	}
-
 	private adoptShape({ nodes }: Body) {
 		for (let i = 0; i < nodes.length; i++) {
 			for (let j = i + 1; j < nodes.length; j++) {
@@ -317,7 +396,15 @@ export class PhysicsWorld {
 		const attached = new Set<number>();
 		this.colliders = [];
 		for (const body of this.bodies.values()) {
-			this.colliders.push(createCollider("polygon", body.nodes, SKIN_RADIUS));
+			const { nodes } = body;
+			for (const piece of body.pieces) {
+				// A piece edge that is not on the outline only separates two pieces.
+				const seams = piece.map((index, k) => {
+					const gap = Math.abs(index - piece[(k + 1) % piece.length]);
+					return gap !== 1 && gap !== nodes.length - 1;
+				});
+				this.colliders.push(createCollider("polygon", piece.map((index) => nodes[index]), SKIN_RADIUS, body, seams));
+			}
 		}
 		for (const edge of this.edgeList) {
 			const { source, target } = edge;
@@ -338,13 +425,11 @@ export class PhysicsWorld {
 		}
 	}
 
-	/** The body under a direction, with the weights of that point over one triangle of its fan. */
+	/** The body under a direction, with the weights of that point over one of its triangles. */
 	pickBody(direction: THREE.Vector3): PhysicsPull | undefined {
 		for (const body of this.bodies.values()) {
-			const { nodes } = body;
-			const a = nodes[0];
-			for (let i = 1; i < nodes.length - 1; i++) {
-				const b = nodes[i], c = nodes[i + 1];
+			for (const triangle of body.triangles) {
+				const [a, b, c] = triangle.map((index) => body.nodes[index]);
 				this.basis.set(
 					a.position.x, b.position.x, c.position.x,
 					a.position.y, b.position.y, c.position.y,
@@ -395,6 +480,7 @@ export class PhysicsWorld {
 		if (!Number.isFinite(dt) || dt <= 0) return;
 		// Bound individual steps even when called outside the scene's accumulator.
 		dt = Math.min(dt, 1 / 60);
+		this.syncEditing();
 		this.pruneOrphans();
 		this.refresh();
 		for (let i = 0; i < SUBSTEPS; i++) this.substep(dt / SUBSTEPS);
@@ -408,6 +494,12 @@ export class PhysicsWorld {
 		for (const node of this.nodeList) {
 			const { position, velocity } = node;
 			node.previous.copy(position);
+			if (node.frozen) {
+				velocity.set(0, 0, 0);
+				node.approach.set(0, 0, 0);
+				if (node.heldBy !== undefined) this.moveToward(position, node.target, followHeld, h);
+				continue;
+			}
 			if (node.heldBy !== undefined) {
 				node.approach.copy(velocity);
 				this.moveToward(node.position, node.target, followHeld, h);
@@ -431,12 +523,31 @@ export class PhysicsWorld {
 			}
 			this.solveFloor(contacts);
 		}
+		this.keepHeldEdgeLengths();
 		for (const node of this.nodeList) {
 			this.slide.subVectors(node.position, node.previous);
 			this.slide.addScaledVector(node.position, -this.slide.dot(node.position));
 			node.velocity.copy(this.slide).divideScalar(h).clampLength(0, SPEED_LIMIT);
 		}
 		this.bounce();
+	}
+
+	/** A held dot cannot be dragged closer to a free neighbour than its edge allows (e.g. into the floor); it would only squish it. */
+	private keepHeldEdgeLengths() {
+		const pushOut = (held: PhysicsNode, other: PhysicsNode, restLength: number) => {
+			if (held.heldBy === undefined || held.frozen || other.heldBy !== undefined || other.frozen) return;
+			const cosine = THREE.MathUtils.clamp(held.position.dot(other.position), -1, 1);
+			const deficit = restLength - Math.acos(cosine);
+			if (deficit < SQUISH_TOLERANCE) return;
+			const toOther = this.direction(held.position, other.position, cosine, this.tangent);
+			held.position.addScaledVector(toOther, -deficit).normalize();
+		};
+		for (let pass = 0; pass < ITERATIONS; pass++) {
+			for (const { source, target, restLength } of this.edgeList) {
+				pushOut(source, target, restLength);
+				pushOut(target, source, restLength);
+			}
+		}
 	}
 
 	/** Gives each contact back part of its impact speed along the contact normal. */
@@ -462,7 +573,7 @@ export class PhysicsWorld {
 					return;
 				}
 				const members = node.body?.nodes ?? [node];
-				const held = members.some((member) => member.heldBy !== undefined);
+				const held = members.some((member) => inverseMass(member) === 0);
 				lumps.set(key, { members, weight: weights[i], inverse: held ? 0 : 1 / members.length });
 			});
 			let total = 0;
@@ -546,7 +657,7 @@ export class PhysicsWorld {
 		for (const node of this.nodeList) {
 			const { position } = node;
 			const limit = Math.sin(latitude + node.radius);
-			if (node.heldBy !== undefined || position.y >= limit) continue;
+			if (node.heldBy !== undefined || node.frozen || position.y >= limit) continue;
 			const ring = Math.hypot(position.x, position.z);
 			const radius = Math.sqrt(1 - limit * limit);
 			if (ring > 1e-6) this.corrected.set((position.x / ring) * radius, limit, (position.z / ring) * radius);
@@ -590,13 +701,13 @@ export class PhysicsWorld {
 		return false;
 	}
 
-	/** Makes a body from nodes already in ring order and joins every pair of them. */
-	private addBody(nodes: PhysicsNode[]) {
-		const body: Body = { id: this.nextBodyId++, nodes: [...nodes] };
+	/** Makes a body from nodes already in ring order and joins every pair of them at its current distance. */
+	private addBody(nodes: PhysicsNode[], shape: RingShape, swatch = this.colorIndex++) {
+		const body: Body = { id: this.nextBodyId++, nodes: [...nodes], triangles: [], pieces: [] };
+		this.setShape(body, shape);
 		for (let i = 0; i < nodes.length; i++) {
 			for (let j = i + 1; j < nodes.length; j++) this.joinRigidly(nodes[i], nodes[j]);
 		}
-		const swatch = this.colorIndex++;
 		for (const node of nodes) {
 			node.body = body;
 			this.paint(node, swatch);
@@ -604,6 +715,12 @@ export class PhysicsWorld {
 		this.bodies.set(body.id, body);
 		this.topologyVersion++;
 		return body;
+	}
+
+	private setShape(body: Body, { triangles, pieces }: RingShape) {
+		body.triangles = triangles;
+		body.pieces = pieces;
+		this.topologyVersion++;
 	}
 
 	/** An edge that holds the pair's current distance. */
@@ -624,6 +741,43 @@ export class PhysicsWorld {
 		}
 		for (const node of nodes) node.body = undefined;
 		this.bodies.delete(body.id);
+		this.topologyVersion++;
+	}
+
+	/** Holding two nodes of a shape takes it apart and freezes it; once all are let go it becomes a new polygon. */
+	private syncEditing() {
+		for (const body of Array.from(this.bodies.values())) {
+			if (body.nodes.filter((node) => node.heldBy !== undefined).length < 2) continue;
+			const group = new Set<PhysicsNode>();
+			for (const node of body.nodes) this.freeze(group, node);
+			// Dots hanging off the shape by an edge are edited along with it.
+			for (const { source, target } of this.edges.values()) {
+				if (group.has(source) && !target.body) this.freeze(group, target);
+				else if (group.has(target) && !source.body) this.freeze(group, source);
+			}
+			this.dissolveBody(body);
+			this.editGroups.push(group);
+		}
+		for (const group of Array.from(this.editGroups)) {
+			if (!Array.from(group).some((node) => node.heldBy !== undefined)) this.endEdit(group);
+		}
+	}
+
+	private freeze(group: Set<PhysicsNode>, node: PhysicsNode) {
+		group.add(node);
+		node.frozen = true;
+		node.velocity.set(0, 0, 0);
+	}
+
+	private endEdit(group: Set<PhysicsNode>) {
+		this.editGroups.splice(this.editGroups.indexOf(group), 1);
+		for (const node of group) node.frozen = false;
+		// The edited spacing is the new rest shape, whether or not it turns into a polygon.
+		for (const edge of this.edges.values()) {
+			if (!group.has(edge.source) || !group.has(edge.target)) continue;
+			edge.restLength = this.clampRestLength(edge.source.position.angleTo(edge.target.position));
+		}
+		for (const node of group) if (!node.body) this.formBody(node);
 		this.topologyVersion++;
 	}
 }

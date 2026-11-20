@@ -1,14 +1,16 @@
 import * as THREE from "three";
 import { Easing, Tween } from "@tweenjs/tween.js";
-import { PhysicsNode, PhysicsWorld, NODE_RADIUS, ROD_RADIUS } from "./PhysicsWorld";
+import { PhysicsNode, PhysicsWorld, NODE_RADIUS, ROD_RADIUS, edgeKey } from "./PhysicsWorld";
 import { arcNormal } from "./sphericalGeometry";
+import { edgeThickness } from "./PhysicsTouches";
 
 // Dots on a body or rod are joints; only a loose node is drawn at its full collision size.
-const JOINT_RADIUS = 0.014;
+const JOINT_RADIUS = 0.028;
 export const HIT_RADIUS = 0.072;
 const ORIGIN = new THREE.Vector3();
 const EDGE_RADIUS = 1.006;
-const OUTLINE_HALF_WIDTH = 0.003;
+const OUTLINE_HALF_WIDTH = 0.009;
+const SEAM_HALF_WIDTH = 0.0025;
 const FILL_RADIUS = 1.002;
 const SKY_RADIUS = 2;
 const FLOOR_RADIUS = 1.9;
@@ -218,9 +220,8 @@ export class PhysicsView extends THREE.Group {
 	}
 
 	private syncFill() {
-		const triangles = Array.from(this.world.bodies.values()).flatMap(({ nodes }) =>
-			// Convex outlines fan out from their first node.
-			nodes.slice(1, -1).map((node, i) => [nodes[0], node, nodes[i + 2]] as const),
+		const triangles = Array.from(this.world.bodies.values()).flatMap(({ nodes, triangles }) =>
+			triangles.map((indices) => indices.map((index) => nodes[index])),
 		).map((corners) => {
 			const [a, b, c] = corners.map((node) => node.position);
 			const widest = Math.max(a.angleTo(b), b.angleTo(c), a.angleTo(c));
@@ -268,13 +269,30 @@ export class PhysicsView extends THREE.Group {
 		this.environment.setFloor(this.world.floorHeight);
 		this.syncNodes();
 		this.syncFill();
+		// The diagonals that cut shapes into triangles are drawn thin; the other hidden edges stay hidden.
+		const seams = new Set<string>();
+		for (const { nodes, triangles } of this.world.bodies.values()) {
+			for (const triangle of triangles) {
+				triangle.forEach((index, k) => {
+					const next = triangle[(k + 1) % triangle.length];
+					const gap = Math.abs(index - next);
+					if (gap !== 1 && gap !== nodes.length - 1) seams.add(edgeKey(nodes[index].id, nodes[next].id));
+				});
+			}
+		}
 		const edges = Array.from(this.world.edges.values())
-			.filter((edge) => !edge.internal)
-			.map((edge) => ({
-				...edge,
-				angle: edge.source.position.angleTo(edge.target.position),
-				halfWidth: edge.body ? OUTLINE_HALF_WIDTH : ROD_RADIUS,
-			}));
+			.filter((edge) => !edge.internal || seams.has(edge.key))
+			.map((edge) => {
+				const angle = edge.source.position.angleTo(edge.target.position);
+				// Only edges with both ends held can snap, so only they thin out.
+				const held = edge.source.heldBy !== undefined && edge.target.heldBy !== undefined;
+				const thickness = held ? edgeThickness(edge, angle) : 1;
+				return {
+					...edge,
+					angle,
+					halfWidth: (edge.internal ? SEAM_HALF_WIDTH : edge.body ? OUTLINE_HALF_WIDTH : ROD_RADIUS) * thickness,
+				};
+			});
 		const required = edges.reduce((sum, edge) => sum + Math.max(1, Math.ceil(edge.angle / 0.07)) * 6, 0);
 		if (required > this.edgeCapacity || !this.edgeGeometry.hasAttribute("position")) {
 			this.edgeCapacity = Math.max(1024, 2 ** Math.ceil(Math.log2(Math.max(1, required))));

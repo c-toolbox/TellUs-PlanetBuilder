@@ -8,18 +8,18 @@ The scene starts with four regular polygons (triangle to hexagon) that drop onto
 
 ## How to use
 
-- **Move and throw dots:** Drag a dot to carry it; it keeps its velocity when you let go. A dot without edges is a small circle.
+- **Move and throw dots:** Drag a dot to carry it; it keeps its velocity when you let go. A dot without edges is a small circle. A held dot cannot be dragged closer to a neighbour than its edge allows, so pulling a dot of a resting shape into the floor does not squish the shape.
 - **Connect dots:** Bring two dots held by different fingers close together ($\le 0.52\text{ rad}$) to join them with a loose edge. Loose edges are rigid rods that act as platforms; chain them for a rope. While both ends are held, their distance sets the rod's length.
-- **Build a shape:** Hold three or more dots within range of each other and let go. They become one convex polygon (concave outlines are rejected) and stay rigid.
-- **Extend a shape:** Hold two neighbouring dots of a shape and bring a third, free dot close to both; when you let go it joins the shape if the result stays convex.
+- **Build a shape:** Connect dots so their edges close a cycle and let go of one of them. The cycle becomes one rigid polygon, convex or concave, as long as its outline does not cross or touch itself. A dot joined to a single dot of a shape is just a rope.
+- **Extend a shape:** Join a free dot to two dots of a shape (or chain ropes between two of its dots) and let go; the cycle merges with the shape if the result is a clean polygon.
 - **Push shapes and rods:** Touch inside a shape, or on a rod, to pull it with a spring. Dots take priority.
 - **Scale a shape:** Touch inside the same shape with two fingers and move them apart or together. The largest distance between two of its dots is capped at $1\text{ rad}$.
-- **Resize an edge:** Hold two dots of a shape and move them; when you let go of one of them, the distance between them becomes that edge's length and the rest of the shape follows, as long as it stays convex.
+- **Edit a shape:** Hold two or more dots of a shape to enter edit mode: the shape loses its fill and physics, turns into plain edges and stays where it is while the held dots move freely, and edges can be resized, joined to new dots or broken. When every dot is let go, the edges are turned into a new polygon (if they form a clean one) that keeps the edited spacing.
 - **Add dots:** Hold empty space still for **375 ms** to spawn and immediately grab a new dot beneath your finger.
-- **Break edges:** Hold both dots of an edge and drag them apart to twice the connection distance ($1.04\text{ rad}$). Breaking any edge of a shape dissolves it into loose edges.
+- **Break edges:** Hold both dots of an edge and drag them apart to twice the connection distance ($1.04\text{ rad}$). Breaking any edge of a shape dissolves it into loose edges. While stretched, the edge thins out over the last $0.31\text{ rad}$ and snaps when its width reaches zero.
 - **Delete dots:** Drag a dot into the floor (it turns red) and let go. A dot left without any edges is deleted as soon as it is not held.
 
-Shapes are rigid because every pair of their dots is joined by an edge; only the outline is drawn. A shape keeps going if one of its dots is deleted and still has three or more dots.
+Shapes are rigid because every pair of their dots is joined by an edge; only the outline is drawn. For collisions and drawing a shape is cut into triangles (ear clipping on the gnomonic projection, where great circles are straight lines) and neighbouring triangles are merged into convex pieces. Pieces of one shape never collide with each other, and the seams between them cannot be touched or pushed through. A shape keeps going if one of its dots is deleted and still has three or more dots forming a clean polygon.
 
 ## How it works
 

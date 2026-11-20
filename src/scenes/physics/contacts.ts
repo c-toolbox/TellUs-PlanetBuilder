@@ -18,6 +18,10 @@ export interface Collider {
 	valid: boolean;
 	/** Segment: plane normal. Polygon: inward normal of every edge i -> i + 1. */
 	readonly normals: THREE.Vector3[];
+	/** Pieces of one concave body share an owner and never collide with each other. */
+	readonly owner?: object;
+	/** Polygon edges that are only seams between pieces of the owner: nothing can touch or leave through them. */
+	readonly seams: readonly boolean[];
 }
 
 /** A touching pair, kept so the solver can bounce it: the relative velocity along `normal` is the sum of weight * velocity. */
@@ -31,15 +35,17 @@ export interface Contact {
 const vector = () => new THREE.Vector3();
 // Separate scratch sets so the nested helpers never overwrite each other.
 const edge = { plane: vector(), foot: vector(), cross: vector(), tangent: vector(), rel: vector(), da: vector(), db: vector() };
-const probe = { foot: vector(), cross: vector(), outward: vector() };
+const probe = { foot: vector(), cross: vector(), outward: vector(), plane: vector() };
 const point = { u: vector(), v: vector() };
 const crossing = { m: vector(), mPrev: vector(), m1: vector(), m2: vector(), choice: vector() };
 
-export const inverseMass = (node: PhysicsNode) => (node.heldBy === undefined ? 1 : 0);
+export const inverseMass = (node: PhysicsNode) => (node.heldBy === undefined && !node.frozen ? 1 : 0);
 
-export function createCollider(kind: Collider["kind"], nodes: readonly PhysicsNode[], radius: number): Collider {
+export function createCollider(
+	kind: Collider["kind"], nodes: readonly PhysicsNode[], radius: number, owner?: object, seams: readonly boolean[] = [],
+): Collider {
 	const normals = kind === "polygon" ? nodes.map(vector) : kind === "segment" ? [vector()] : [];
-	return { kind, nodes, radius, center: vector(), cap: 0, valid: true, normals };
+	return { kind, nodes, radius, center: vector(), cap: 0, valid: true, normals, owner, seams };
 }
 
 function planeNormal(a: THREE.Vector3, b: THREE.Vector3, result: THREE.Vector3) {
@@ -139,38 +145,70 @@ function pushEdge(
 	b.position.addScaledVector(rel, (t * wb) / total).normalize();
 }
 
+/** Angular distance from a point to the arc a-b, whose great circle has the given normal. */
+function distanceToArc(p: THREE.Vector3, a: THREE.Vector3, b: THREE.Vector3, plane: THREE.Vector3) {
+	const side = plane.dot(p);
+	const { foot, cross } = probe;
+	foot.copy(p).addScaledVector(plane, -side);
+	const along = Math.atan2(cross.crossVectors(a, foot).dot(plane), a.dot(foot));
+	if (along >= 0 && along <= a.angleTo(b)) return Math.asin(Math.min(1, Math.abs(side)));
+	return Math.min(p.angleTo(a), p.angleTo(b));
+}
+
+/** Resolves a node (a circle of the given margin around it) against the arc a-b with great circle normal `normal`. */
+function pointVsArc(
+	p: PhysicsNode, a: PhysicsNode, b: PhysicsNode, normal: THREE.Vector3, margin: number, friction: number,
+	contacts?: Contact[],
+) {
+	const side = normal.dot(p.position);
+	if (Math.abs(side) >= margin) return false;
+	const { foot, cross } = probe;
+	foot.copy(p.position).addScaledVector(normal, -side);
+	const along = Math.atan2(cross.crossVectors(a.position, foot).dot(normal), a.position.dot(foot));
+	if (along < 0 || along > a.position.angleTo(b.position)) {
+		return pushApart(p, along < 0 ? a : b, margin, contacts);
+	}
+	const depth = margin - Math.asin(Math.abs(side));
+	if (depth <= 0) return false;
+	pushEdge(p, a, b, probe.outward.copy(normal).multiplyScalar(side < 0 ? -1 : 1), depth, friction, contacts);
+	return true;
+}
+
 /** Resolves a node (a circle of `radius`) against a collider; true when they touched. */
 function pointVsCollider(p: PhysicsNode, radius: number, other: Collider, friction: number, contacts?: Contact[]) {
 	const margin = radius + other.radius;
 	const { nodes, normals } = other;
 	if (other.kind === "point") return pushApart(p, nodes[0], margin, contacts);
+	if (other.kind === "segment") return pointVsArc(p, nodes[0], nodes[1], normals[0], margin, friction, contacts);
 
-	if (other.kind === "segment") {
-		const [a, b] = nodes;
-		const normal = normals[0];
-		const side = normal.dot(p.position);
-		if (Math.abs(side) >= margin) return false;
-		const { foot, cross } = probe;
-		foot.copy(p.position).addScaledVector(normal, -side);
-		const along = Math.atan2(cross.crossVectors(a.position, foot).dot(normal), a.position.dot(foot));
-		if (along < 0 || along > a.position.angleTo(b.position)) {
-			return pushApart(p, along < 0 ? a : b, margin, contacts);
+	if (normals.some((normal) => normal.dot(p.position) < 0)) {
+		// Outside the polygon: only its outline, with a rounded skin, can be touched. Widening the half planes
+		// instead would reach far past sharp corners.
+		let nearest = -1, nearestDistance = margin;
+		for (let i = 0; i < nodes.length; i++) {
+			if (other.seams[i] || !planeNormal(nodes[i].position, nodes[(i + 1) % nodes.length].position, probe.plane)) continue;
+			const distance = distanceToArc(p.position, nodes[i].position, nodes[(i + 1) % nodes.length].position, probe.plane);
+			if (distance < nearestDistance) {
+				nearestDistance = distance;
+				nearest = i;
+			}
 		}
-		const depth = margin - Math.asin(Math.abs(side));
-		if (depth <= 0) return false;
-		pushEdge(p, a, b, probe.outward.copy(normal).multiplyScalar(side < 0 ? -1 : 1), depth, friction, contacts);
-		return true;
+		if (nearest < 0) return false;
+		const a = nodes[nearest], b = nodes[(nearest + 1) % nodes.length];
+		planeNormal(a.position, b.position, probe.plane);
+		return pointVsArc(p, a, b, probe.plane, margin, friction, contacts);
 	}
 
 	let best = Infinity, index = -1;
 	for (let i = 0; i < nodes.length; i++) {
+		if (other.seams[i]) continue;
 		const penetration = Math.asin(THREE.MathUtils.clamp(normals[i].dot(p.position), -1, 1)) + margin;
-		if (penetration <= 0) return false;
 		if (penetration < best) {
 			best = penetration;
 			index = i;
 		}
 	}
+	if (index < 0) return false;
 	// Leave through the nearest edge.
 	pushEdge(
 		p, nodes[index], nodes[(index + 1) % nodes.length], probe.outward.copy(normals[index]).negate(), best, friction,
@@ -224,6 +262,7 @@ function straddles(a1: PhysicsNode, b1: PhysicsNode, a2: PhysicsNode, b2: Physic
 
 export function collidePair(a: Collider, b: Collider, friction: number, contacts?: Contact[]) {
 	if (!a.valid || !b.valid) return;
+	if (a.owner && a.owner === b.owner) return;
 	if (a.center.angleTo(b.center) > a.cap + b.cap) return;
 	// Shapes that share a node are joined together and never collide.
 	if (a.nodes.some((node) => b.nodes.includes(node))) return;
@@ -233,6 +272,7 @@ export function collidePair(a: Collider, b: Collider, friction: number, contacts
 	if (touched) return;
 	for (let i = 0; i < edgeCount(a); i++) {
 		for (let j = 0; j < edgeCount(b); j++) {
+			if (a.seams[i] || b.seams[j]) continue;
 			const a1 = a.nodes[i], b1 = a.nodes[(i + 1) % a.nodes.length];
 			const a2 = b.nodes[j], b2 = b.nodes[(j + 1) % b.nodes.length];
 			if (!straddles(a1, b1, a2, b2)) continue;
