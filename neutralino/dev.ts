@@ -15,7 +15,14 @@ if (process.argv.includes("--setup")) {
 	vite.printUrls();
 
 	if (native) {
-		const neu = exec("neu run --disable-auto-reload -- --window-enable-inspector=true");
+		const nativeEnv = { ...process.env };
+		if (process.platform === "linux" && nativeEnv.WEBKIT_GST_DISABLE_GL_SINK === undefined) {
+			// WebKitGTK's GL video sink can turn decoded frames into noise.
+			// Use its software video sink; scene rendering still uses accelerated WebGL.
+			// Set this variable to 0 explicitly to opt back into the GL video sink.
+			nativeEnv.WEBKIT_GST_DISABLE_GL_SINK = "1";
+		}
+		const neu = exec("neu run", { env: nativeEnv });
 		neu.stdout?.pipe(process.stdout);
 		neu.stderr?.pipe(process.stderr);
 
