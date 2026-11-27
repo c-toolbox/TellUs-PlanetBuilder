@@ -39,6 +39,7 @@ interface SaveState {
 }
 
 import backgroundAsset from "@/assets/textures/globe/truecolor.png";
+import { ColorStr } from "@/utils/colors";
 
 export default class WorldScene extends BaseScene {
 	private globe: Polyhedra | null = null;
@@ -86,7 +87,7 @@ export default class WorldScene extends BaseScene {
 			[Tile.Mountain]: 0,
 		},
 		rotationMode: false,
-		edgeWidth: 0.005,
+		edgeWidth: 0.007,
 		edgeColor: "#000000",
 	};
 
@@ -126,10 +127,15 @@ export default class WorldScene extends BaseScene {
 		this.add(this.globe.edgeGroup);
 		this.add(this.globe.faceGroup);
 		this.tileMeshes = this.globe.tileMeshes;
-		if (this.tileInteraction) this.unregisterTouchInteraction(this.tileInteraction);
-		this.tileInteraction = this.registerTouchInteraction(new TouchInteraction(this.globe.faceGroup, {
-			enabled: () => !this.worldConfig.rotationMode,
-		})).on("click", ({ touchId, direction }) => this.handleRaycast(touchId, direction, "click"));
+		if (this.tileInteraction)
+			this.unregisterTouchInteraction(this.tileInteraction);
+		this.tileInteraction = this.registerTouchInteraction(
+			new TouchInteraction(this.globe.faceGroup, {
+				enabled: () => !this.worldConfig.rotationMode,
+			}),
+		).on("click", ({ touchId, direction }) =>
+			this.handleRaycast(touchId, direction, "click"),
+		);
 
 		// Handle invisible and realistic tiles
 		this.updateTileTexture();
@@ -146,7 +152,8 @@ export default class WorldScene extends BaseScene {
 	}
 
 	private transferPlanet() {
-		if (!this.globe || !this.modelChanged || this.worldConfig.autoGenerate) return;
+		if (!this.globe || !this.modelChanged || this.worldConfig.autoGenerate)
+			return;
 		// Read before createPlanet disposes the old globe
 		this.createPlanet(readTileShapes(this.globe.tileMeshes));
 	}
@@ -180,7 +187,10 @@ export default class WorldScene extends BaseScene {
 	private setRotationMode(value: boolean) {
 		this.worldConfig.rotationMode = value;
 		this.previousDirections.clear();
-		if (this.renderer) this.targetCameraQuaternion.copy(this.renderer.projectionCamera.quaternion);
+		if (this.renderer)
+			this.targetCameraQuaternion.copy(
+				this.renderer.projectionCamera.quaternion,
+			);
 	}
 
 	private updateTileTexture() {
@@ -290,7 +300,8 @@ export default class WorldScene extends BaseScene {
 		this.tileBrushes.forEach((brush) => brush.dispose());
 		this.tileBrushes.clear();
 		this.previousDirections.clear();
-		if (this.tileInteraction) this.unregisterTouchInteraction(this.tileInteraction);
+		if (this.tileInteraction)
+			this.unregisterTouchInteraction(this.tileInteraction);
 		this.tileInteraction = undefined;
 
 		this.clear();
@@ -373,7 +384,9 @@ export default class WorldScene extends BaseScene {
 		if (!current || !this.renderer) return;
 		const previous = this.previousDirections.get(touchId);
 		if (previous) {
-			const rotation = new THREE.Quaternion().setFromUnitVectors(previous, current).invert();
+			const rotation = new THREE.Quaternion()
+				.setFromUnitVectors(previous, current)
+				.invert();
 			this.targetCameraQuaternion.multiply(rotation).normalize();
 		}
 		this.previousDirections.set(touchId, current);
@@ -451,7 +464,8 @@ export default class WorldScene extends BaseScene {
 			if (!this.globe) return;
 			const wasRendered = this.isRenderedMode;
 			this.worldConfig.tileTexture = value;
-			if (wasRendered !== this.isRenderedMode) this.setRotationMode(this.isRenderedMode);
+			if (wasRendered !== this.isRenderedMode)
+				this.setRotationMode(this.isRenderedMode);
 			this.markDirty();
 			this.sendSocketUiConfig();
 
@@ -543,7 +557,6 @@ export default class WorldScene extends BaseScene {
 			}
 		});
 	}
-
 
 	private clearSaveStateListeners() {
 		this.saveStateListeners.forEach((handler, id) => {
@@ -683,52 +696,85 @@ export default class WorldScene extends BaseScene {
 
 				{
 					type: "hr",
-					hint_title: "Planet status",
-				},
-				{
-					type: "text",
-					hint_title: `Tiles (${this.tileMeshes.length} total)`,
-					hint_text: this.tileCountString,
-				},
-
-				{
-					type: "hr",
 					hint_title: "Graphics",
-				},
-				{
-					type: "dropdown",
-					id: "tile_edges",
-					hint_title: "Tile edges",
-					hint_text: "How edges between tiles are displayed",
-					value: this.worldConfig.tileEdge,
-					options: TileEdges,
-				},
-				{
-					type: "dropdown",
-					id: "tile_texture",
-					hint_title: "Tile texture",
-					hint_text: "Texture used for tiles",
-					value: this.worldConfig.tileTexture,
-					options: TileTextures,
 				},
 				{
 					type: "grid",
 					columns: 2,
 					elements: [
 						{
-							type: "slider",
-							id: "edge_width",
-							hint_title: "Edge width",
-							value: this.worldConfig.edgeWidth,
-							min: 0.001,
-							max: 0.025,
-							step: 0.001,
+							type: "dropdown",
+							id: "tile_edges",
+							hint_title: "Edges",
+							value: this.worldConfig.tileEdge,
+							options: TileEdges,
 						},
 						{
-							type: "color",
-							id: "edge_color",
-							hint_title: "Edge color",
-							value: this.worldConfig.edgeColor,
+							type: "dropdown",
+							id: "tile_texture",
+							hint_title: "Tiles",
+							value: this.worldConfig.tileTexture,
+							options: TileTextures,
+						},
+						// {
+						// 	type: "slider",
+						// 	id: "edge_width",
+						// 	hint_title: "Edge width",
+						// 	value: this.worldConfig.edgeWidth,
+						// 	min: 0.001,
+						// 	max: 0.025,
+						// 	step: 0.001,
+						// },
+						// {
+						// 	type: "color",
+						// 	id: "edge_color",
+						// 	hint_title: "Edge color",
+						// 	value: this.worldConfig.edgeColor,
+						// },
+					],
+				},
+
+				{
+					type: "hr",
+					hint_title: "Planet model",
+				},
+				{
+					type: "grid",
+					columns: 2,
+					elements: [
+						{
+							type: "text",
+							hint_title: `Tiles (${this.tileMeshes.length} total)`,
+							hint_text: this.tileCountString,
+						},
+						{
+							type: "dropdown",
+							id: "model",
+							hint_title: "Planet size",
+							hint_text: "Specify the shape and number of tiles",
+							value: this.worldConfig.model,
+							options: ModelNames,
+						},
+					],
+				},
+				{
+					type: "grid",
+					columns: 2,
+					elements: [
+						{
+							type: "button",
+							id: "clear_planet",
+							text: "Empty",
+							hint_text: "Create a blank planet with no biomes",
+							color: ColorStr.Rose700,
+						},
+						{
+							type: "button",
+							id: "transfer_planet",
+							text: "Transfer",
+							hint_text:
+								"Rebuild the planet with the selected model, keeping biomes in the same places",
+							color: this.modelChanged ? ColorStr.Rose700 : "#77777777",
 						},
 					],
 				},
@@ -736,6 +782,29 @@ export default class WorldScene extends BaseScene {
 				{
 					type: "hr",
 					hint_title: "Planet creation",
+				},
+				{
+					type: "grid",
+					columns: 2,
+					elements: [
+						{
+							type: "switch",
+							id: "auto_generate",
+							hint_title: "Auto-generate planet",
+							hint_text:
+								"Automatically creates a new planet when settings change",
+							value: this.worldConfig.autoGenerate,
+							color: ColorStr.Rose700,
+						},
+						{
+							type: "button",
+							id: "new_planet",
+							text: "Create",
+							hint_title: "Generate planet",
+							hint_text: "Create a new planet with the current settings",
+							color: ColorStr.Rose700,
+						},
+					],
 				},
 				{
 					type: "grid",
@@ -802,52 +871,11 @@ export default class WorldScene extends BaseScene {
 				},
 				{
 					type: "dropdown",
-					id: "model",
-					hint_title: "Planet model",
-					hint_text: "Defines the planet's shape and number of tiles",
-					value: this.worldConfig.model,
-					options: ModelNames,
-				},
-				{
-					type: "dropdown",
 					id: "distribution",
 					hint_title: "Distribution",
 					hint_text: "How tiles are arranged across the planet",
 					value: this.worldConfig.distribution,
 					options: DistributionTypes,
-				},
-				{
-					type: "switch",
-					id: "auto_generate",
-					hint_title: "Auto-generate planet",
-					hint_text: "Automatically creates a new planet when settings change",
-					value: this.worldConfig.autoGenerate,
-					color: "#c70036",
-				},
-				{
-					type: "button",
-					id: "new_planet",
-					text: "Generate",
-					hint_title: "Generate planet",
-					hint_text: "Create a new planet with the current settings",
-					color: "#c70036",
-				},
-				{
-					type: "button",
-					id: "transfer_planet",
-					text: "Transfer",
-					hint_title: "Transfer planet",
-					hint_text:
-						"Rebuild the planet with the selected model, keeping biomes in the same places",
-					color: this.modelChanged ? "#c70036" : "#77777777",
-				},
-				{
-					type: "button",
-					id: "clear_planet",
-					text: "Clear planet",
-					hint_title: "Empty planet",
-					hint_text: "Create a blank planet with empty tiles",
-					color: "#c70036",
 				},
 
 				{
@@ -877,7 +905,7 @@ export default class WorldScene extends BaseScene {
 						{
 							id: `delete_planet_${index}`,
 							text: "Delete",
-							color: "#c70036",
+							color: ColorStr.Rose700,
 						},
 					],
 					hint_title: state.id,
