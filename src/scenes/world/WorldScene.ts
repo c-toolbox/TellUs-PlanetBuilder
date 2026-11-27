@@ -19,14 +19,13 @@ import {
 	transferBiomes,
 } from "@/scenes/world/PlanetBiomeTransfer";
 import { ORIGIN } from "@/constants";
+import { PolyhedraModels, PolyhedronTypes } from "./PolyhedronModels";
 import {
 	DistributionType,
 	DistributionTypes,
 	TileTexture,
 	TileTextures,
 	ModelName,
-	ModelNames,
-	PolyhedraModels,
 	WorldUiConfig,
 	TileEdges,
 	TileEdge,
@@ -62,8 +61,7 @@ export default class WorldScene extends BaseScene {
 	private cameraRotationSmoothing: number = 0.12;
 
 	private worldConfig: WorldUiConfig = {
-		model: "△ 60",
-		// model: "⭔ 1002",
+		model: PolyhedraModels[0].name,
 		tileEdge: "show borders",
 		tileTexture: "textured tiles",
 		distribution: DistributionTypes[0],
@@ -665,6 +663,10 @@ export default class WorldScene extends BaseScene {
 	}
 
 	get socketUiConfig(): UiConfigEvent {
+		const selectedModel = PolyhedraModels.find(
+			({ name }) => name === this.worldConfig.model,
+		)!;
+
 		return {
 			type: "config",
 			title: "Planet builder",
@@ -742,9 +744,9 @@ export default class WorldScene extends BaseScene {
 							type: "dropdown",
 							id: "model",
 							hint_title: "Planet size",
-							hint_text: "Specify the shape and number of tiles",
+							hint_text: `${PolyhedronTypes[selectedModel.type].name}, ${selectedModel.count} tiles`,
 							value: this.worldConfig.model,
-							options: ModelNames,
+							options: PolyhedraModels.map(({ name }) => name),
 						},
 					],
 				},

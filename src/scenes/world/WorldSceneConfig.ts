@@ -1,11 +1,8 @@
 import type { Tile } from "@/scenes/world/TileManager";
-import { PolyhedraModels } from "./PolyhedronModels";
-
-export { PolyhedraModels };
+import type { PolyhedraModels } from "./PolyhedronModels";
 
 // Model
 export type ModelName = (typeof PolyhedraModels)[number]["name"];
-export const ModelNames = PolyhedraModels.map(({ name }) => name);
 
 // Tile lines
 export const TileEdges = ["hide all", "show all", "show borders"] as const;
