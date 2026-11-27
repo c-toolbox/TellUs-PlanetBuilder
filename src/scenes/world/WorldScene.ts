@@ -1,4 +1,5 @@
 import { TileBrush } from "./TileBrush";
+import { TileChangeAnimation } from "./TileChangeAnimation";
 import { TouchInteraction } from "@/network/TouchInteraction";
 import BackgroundSphere from "@/components/BackgroundSphere";
 import * as THREE from "three";
@@ -53,6 +54,7 @@ export default class WorldScene extends BaseScene {
 	private planetDirty: boolean = true;
 	private readonly raycaster = new THREE.Raycaster();
 	private tileMeshes: TileMesh[] = [];
+	private readonly tileChanges = new TileChangeAnimation();
 	private tileInteraction?: TouchInteraction;
 	private readonly tileBrushes = new Map<TouchId, TileBrush>();
 	private readonly previousDirections = new Map<TouchId, THREE.Vector3>();
@@ -112,6 +114,8 @@ export default class WorldScene extends BaseScene {
 		this.activePolyhedraModel = polyhedra.name;
 
 		// Remove existing globe
+		this.tileChanges.dispose();
+		this.add(this.tileChanges);
 		this.tileMeshes = [];
 		this.globe?.dispose();
 
@@ -197,6 +201,8 @@ export default class WorldScene extends BaseScene {
 		if (!this.globe) return;
 		const { tileTexture } = this.worldConfig;
 		const rendered = this.isRenderedMode;
+		this.tileChanges.dispose();
+		this.tileChanges.visible = !rendered && tileTexture !== "invisible tiles";
 
 		if (tileTexture === "invisible tiles") {
 			this.remove(this.globe.faceGroup);
@@ -218,6 +224,7 @@ export default class WorldScene extends BaseScene {
 
 	populatePlanetTiles() {
 		if (!this.globe) return;
+		this.tileChanges.dispose();
 
 		const tilePositions = this.globe.faceGroup.children.map(
 			(mesh) => mesh.position,
@@ -238,6 +245,7 @@ export default class WorldScene extends BaseScene {
 
 	clearPlanetTiles() {
 		if (!this.globe) return;
+		this.tileChanges.dispose();
 		this.globe.tileMeshes.forEach((tileMesh, index) => {
 			tileMesh.setTile(Tile.None);
 		});
@@ -304,6 +312,7 @@ export default class WorldScene extends BaseScene {
 			this.unregisterTouchInteraction(this.tileInteraction);
 		this.tileInteraction = undefined;
 
+		this.tileChanges.dispose();
 		this.clear();
 		this.backgroundSphere?.dispose();
 		this.backgroundSphere = null;
@@ -355,7 +364,9 @@ export default class WorldScene extends BaseScene {
 				}
 
 				if (tileMesh.tile != brush.tile) {
-					tileMesh.setTile(brush.tile);
+					if (this.tileChanges.visible)
+						this.tileChanges.setTile(tileMesh, brush.tile);
+					else tileMesh.setTile(brush.tile);
 					this.markDirty();
 					this.sendSocketUiConfig();
 				}
@@ -393,6 +404,7 @@ export default class WorldScene extends BaseScene {
 	}
 
 	update(delta: number) {
+		this.tileChanges.update(delta);
 		if (this.renderer && this.renderedPlanet?.parent === this) {
 			this.renderedPlanet.update(this.renderer, delta);
 		}
@@ -404,16 +416,6 @@ export default class WorldScene extends BaseScene {
 				this.cameraRotationSmoothing,
 			);
 		}
-
-		// const time = ((this as any).time ?? 0) + (delta / 1000) * 5;
-		// (this as any).time = time;
-
-		// this.tileMeshes.slice(0,1).forEach((mesh) => {
-		// 	const tileMesh = mesh as TileMesh;
-		// 	const scale = 1 + Math.sin((this as any).time) * 0.5;
-		// 	tileMesh.position.copy(tileMesh.center.clone().multiplyScalar(scale));
-		// 	// tileMesh.scale.set(scale, scale, scale);
-		// });
 	}
 
 	/* Socket UI */
