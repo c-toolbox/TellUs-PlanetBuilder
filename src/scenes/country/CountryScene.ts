@@ -1,58 +1,73 @@
 import * as THREE from "three";
 import earcut from "earcut";
+import { Easing, Tween } from "@tweenjs/tween.js";
+import { Line2 } from "three/examples/jsm/lines/Line2.js";
+import { LineGeometry } from "three/examples/jsm/lines/LineGeometry.js";
+import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
+import BackgroundSphere from "@/components/BackgroundSphere";
+import backgroundAsset from "@/assets/textures/earth/animated.webm";
 import BaseScene from "@/scenes/BaseScene";
 import { SceneId, scenes } from "@/scenes/scenes";
 
-import { TouchId } from "@/network/tuioProtocol";
+import { TouchInteraction } from "@/network/TouchInteraction";
 import { UiConfigEvent } from "@/network/socket_ui/protocol";
-import { ORIGIN } from "@/constants";
+import type { Renderer } from "@/rendering/Renderer";
 
 import countriesGeodata from "./countries.json";
 
+interface CountryHighlight {
+	material: THREE.MeshBasicMaterial;
+	interaction: TouchInteraction;
+	active: boolean;
+	tween?: Tween<THREE.MeshBasicMaterial>;
+}
+
 export default class CountryScene extends BaseScene {
-	private readonly raycaster = new THREE.Raycaster();
-	private countryMeshes: {
-		mesh: THREE.Mesh;
-		feature: any;
-	}[] = [];
+	private readonly backgroundVideo = document.createElement("video");
+	private readonly countryHighlights: CountryHighlight[] = [];
 
 	constructor() {
 		super();
 
+		this.backgroundVideo.loop = true;
+		this.backgroundVideo.muted = true;
+		this.backgroundVideo.playsInline = true;
+		this.backgroundVideo.preload = "metadata";
+		this.backgroundVideo.src = backgroundAsset;
+		this.add(new BackgroundSphere(new THREE.VideoTexture(this.backgroundVideo), 2));
+
 		this.drawCountries();
+	}
+
+	override onSceneEnter(renderer: Renderer) {
+		super.onSceneEnter(renderer);
+		void this.backgroundVideo.play().catch((error: unknown) => {
+			if (this.renderer) console.error("Failed to play country background video", error);
+		});
+	}
+
+	override onSceneExit(renderer: Renderer) {
+		this.backgroundVideo.pause();
+		super.onSceneExit(renderer);
+		for (const country of this.countryHighlights) {
+			country.material.opacity = 0;
+			country.active = false;
+			country.tween = undefined;
+		}
 	}
 
 	/* Touch input */
 
-	protected onTouch(touchId: TouchId, vector: THREE.Vector3) {
-		this.onClick(touchId, vector);
-	}
-
-	protected onClick(touchId: TouchId, vector: THREE.Vector3) {
-		// Use raycasting to detect which country was clicked
-		this.raycaster.set(ORIGIN, vector);
-
-		const clickableMeshes = this.countryMeshes.map((entry) => entry.mesh);
-		const intersects = this.raycaster.intersectObjects(clickableMeshes);
-
-		if (intersects.length > 0) {
-			const hitMesh = intersects[0].object as THREE.Mesh;
-
-			const countryEntry = this.countryMeshes.find(
-				(entry) => entry.mesh === hitMesh,
-			);
-
-			if (countryEntry) {
-				console.log("Clicked country:", countryEntry.feature.properties.name);
-
-				const material = hitMesh.material as THREE.MeshBasicMaterial;
-				material.color.set(Math.random() * 0xffffff);
-			}
-
-			return;
-		}
-
-		console.log("No country hit");
+	private updateCountryHighlight(country: CountryHighlight) {
+		const active = country.interaction.activeTouchIds.size > 0;
+		if (country.active === active) return;
+		country.active = active;
+		country.tween?.stop();
+		country.tween = this.createTween(country.material)
+			.to({ opacity: active ? 0.75 : 0 }, active ? 200 : 1200)
+			.easing(active ? Easing.Back.Out : Easing.Cubic.Out)
+			.onComplete(() => (country.tween = undefined))
+			.start();
 	}
 
 	/* Coordinates */
@@ -60,27 +75,41 @@ export default class CountryScene extends BaseScene {
 	drawCountries() {
 		countriesGeodata.features.forEach((countryData) => {
 			const { type, coordinates } = countryData.geometry;
-			const outlineColor = 0x000000;
-			const color = Math.random() * 0xffffff;
-			// const color = 0xffffff;
+			const group = new THREE.Group();
+			group.name = countryData.properties.name;
+			this.add(group);
+			const material = new THREE.MeshBasicMaterial({
+				color: 0xffffff,
+				side: THREE.DoubleSide,
+				transparent: true,
+				opacity: 0,
+				depthWrite: false,
+			});
+			const interaction = this.registerTouchInteraction(new TouchInteraction(group));
+			const country: CountryHighlight = { material, interaction, active: false };
+			this.countryHighlights.push(country);
+			const updateHighlight = () => this.updateCountryHighlight(country);
+			interaction.on("enter", updateHighlight);
+			interaction.on("leave", updateHighlight);
+			interaction.on("release", updateHighlight);
 
 			if (type == "Polygon") {
 				this.drawCountryOutline(
 					coordinates as [number, number][][],
-					outlineColor,
+					0xffffff,
 				);
 				this.drawCountry(
 					coordinates as [number, number][][],
-					color,
-					countryData,
+					material,
+					group,
 				);
 			} else if (type == "MultiPolygon") {
 				coordinates.forEach((coords) => {
-					this.drawCountryOutline(coords as [number, number][][], outlineColor);
+					this.drawCountryOutline(coords as [number, number][][], 0xffffff);
 					this.drawCountry(
 						coords as [number, number][][],
-						color,
-						countryData,
+						material,
+						group,
 					);
 				});
 			}
@@ -97,19 +126,20 @@ export default class CountryScene extends BaseScene {
 			points.push(this.latLonToVector3(lat, lon, 0.99)); // slight offset to avoid z-fighting
 		});
 
-		const geometry = new THREE.BufferGeometry().setFromPoints(points);
-		// geometry.scale(0.5, 0.5, 0.5);
+		if (points.length < 2) return;
+		if (!points[0].equals(points[points.length - 1])) points.push(points[0].clone());
+		const geometry = new LineGeometry().setPositions(points.flatMap((point) => point.toArray()));
 
-		const material = new THREE.LineBasicMaterial({ color });
+		const material = new LineMaterial({ color, linewidth: 2 });
 
-		const line = new THREE.LineLoop(geometry, material);
+		const line = new Line2(geometry, material);
 		this.add(line);
 	}
 
 	drawCountry(
 		coordinates: [number, number][][],
-		color: THREE.ColorRepresentation,
-		feature: any,
+		material: THREE.MeshBasicMaterial,
+		group: THREE.Group,
 	) {
 		const vertices: number[] = [];
 		const holes: number[] = [];
@@ -150,15 +180,9 @@ export default class CountryScene extends BaseScene {
 		);
 		geometry.computeVertexNormals();
 
-		const material = new THREE.MeshBasicMaterial({
-			color,
-			side: THREE.DoubleSide,
-		});
-
 		const mesh = new THREE.Mesh(geometry, material);
 
-		this.add(mesh);
-		this.countryMeshes.push({ mesh, feature });
+		group.add(mesh);
 	}
 
 	latLonToVector3(lat: number, lon: number, radius = 1): THREE.Vector3 {
@@ -180,7 +204,6 @@ export default class CountryScene extends BaseScene {
 			this.sceneManager.setScene(id);
 		});
 	}
-
 
 	get socketUiConfig(): UiConfigEvent {
 		return {
