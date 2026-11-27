@@ -18,4 +18,10 @@ export default class BackgroundSphere extends THREE.Mesh<
 		);
 		this.scale.x = -1;
 	}
+
+	dispose() {
+		this.geometry.dispose();
+		this.material.map?.dispose();
+		this.material.dispose();
+	}
 }

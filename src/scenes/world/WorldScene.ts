@@ -38,6 +38,7 @@ import backgroundAsset from "@/assets/textures/globe/truecolor.png";
 export default class WorldScene extends BaseScene {
 	private globe: Polyhedra | null = null;
 	private renderedPlanet: RenderedPlanet | null = null;
+	private backgroundSphere: BackgroundSphere | null = null;
 	private activePolyhedraModel: ModelName | null = null;
 
 	private saveCount: number = 0;
@@ -84,17 +85,6 @@ export default class WorldScene extends BaseScene {
 		edgeColor: "#000000",
 	};
 
-	constructor() {
-		super();
-
-		// Lighting
-		const hemi = new THREE.HemisphereLight(0xffffff, 0x000000, 0.9);
-		this.add(hemi);
-		const dir = new THREE.DirectionalLight(0xffffff, 0.6);
-		dir.position.set(5, 10, 7);
-		this.add(dir);
-	}
-
 	public applyRendererSettings(renderer: Renderer): void {
 		super.applyRendererSettings(renderer);
 		renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -116,11 +106,7 @@ export default class WorldScene extends BaseScene {
 
 		// Remove existing globe
 		this.tileMeshes = [];
-		if (this.globe) {
-			this.remove(this.globe.vertexGroup);
-			this.remove(this.globe.edgeGroup);
-			this.remove(this.globe.faceGroup);
-		}
+		this.globe?.dispose();
 
 		// Create new globe
 		this.globe = new Polyhedra({
@@ -240,7 +226,14 @@ export default class WorldScene extends BaseScene {
 		this.previousDirections.clear();
 		super.onSceneEnter(renderer);
 
-		this.add(new BackgroundSphere(backgroundAsset, 2));
+		// Scene is cleared on exit, so lights are recreated on every enter
+		this.add(new THREE.HemisphereLight(0xffffff, 0x000000, 0.9));
+		const dir = new THREE.DirectionalLight(0xffffff, 0.6);
+		dir.position.set(5, 10, 7);
+		this.add(dir);
+
+		this.backgroundSphere = new BackgroundSphere(backgroundAsset, 2);
+		this.add(this.backgroundSphere);
 
 		// Set tileManager variables
 		tileManager.worldConfig = this.worldConfig;
@@ -259,8 +252,11 @@ export default class WorldScene extends BaseScene {
 		this.tileInteraction = undefined;
 
 		this.clear();
+		this.backgroundSphere?.dispose();
+		this.backgroundSphere = null;
 		this.renderedPlanet?.dispose();
 		this.renderedPlanet = null;
+		this.globe?.dispose();
 		this.globe = null;
 		this.activePolyhedraModel = null;
 		this.tileMeshes = [];

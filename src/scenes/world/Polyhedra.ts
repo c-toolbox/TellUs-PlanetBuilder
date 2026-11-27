@@ -24,6 +24,8 @@ export class Polyhedra {
 	public edgeGroup: THREE.Group;
 	public faceGroup: THREE.Group;
 
+	private circleTexture: THREE.Texture | null = null;
+
 	constructor({
 		vertices,
 		edges,
@@ -60,6 +62,7 @@ export class Polyhedra {
 	initVertices() {
 		const textureLoader = new THREE.TextureLoader();
 		const circleTexture = textureLoader.load(circle);
+		this.circleTexture = circleTexture;
 		const material = new THREE.MeshBasicMaterial({
 			map: circleTexture,
 			color: this.vertexColor,
@@ -366,6 +369,22 @@ export class Polyhedra {
 				edgeIndex,
 			});
 		}
+	}
+
+	// Face textures are shared via tileManager and are not disposed here
+	dispose() {
+		[this.vertexGroup, this.edgeGroup, this.faceGroup].forEach((group) => {
+			group.traverse((object) => {
+				if (object instanceof THREE.InstancedMesh) object.dispose();
+				if (!(object instanceof THREE.Mesh)) return;
+				object.geometry.dispose();
+				(object.material as THREE.Material).dispose();
+			});
+			group.removeFromParent();
+			group.clear();
+		});
+		this.circleTexture?.dispose();
+		this.circleTexture = null;
 	}
 
 	setVertexVisible(vertexIndex: number, visible: boolean) {
