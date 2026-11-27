@@ -107,13 +107,16 @@ export class TouchHandler extends EventEmitter {
 	}
 
 	updateTouch(touchId: TouchId, pitch: number, yaw: number) {
-		let object = this.touchPoints.get(touchId);
-		if (!object) return console.warn("Unknown touch id:", touchId);
-
 		// Scale pitch to account for the globe's FOV constraint.
 		// Only the central FOVbelt is visible (e.g. 320 of 360 degrees),
 		// so we contract input pitch to that portion of the sphere.
-		const scaledPitch = pitch * (GLOBE_FOV_DEGREES / 360);
+		this.updateTouchDirection(touchId, pitch * (GLOBE_FOV_DEGREES / 360), yaw);
+	}
+
+	/** Update a touch from a scene-space pitch, without TUIO FOV scaling. */
+	updateTouchDirection(touchId: TouchId, scaledPitch: number, yaw: number) {
+		let object = this.touchPoints.get(touchId);
+		if (!object) return console.warn("Unknown touch id:", touchId);
 
 		// Convert to camera-local spherical coordinates
 		const direction = new THREE.Vector3(

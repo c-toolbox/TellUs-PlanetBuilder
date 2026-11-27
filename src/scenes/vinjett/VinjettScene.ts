@@ -17,7 +17,7 @@ import {
 	locations,
 } from "@/scenes/vinjett/locations";
 import { species, SpeciesKey } from "@/scenes/vinjett/species";
-import { LocationTransition } from "./LocationTransition";
+import { LocationWipe } from "./LocationWipe";
 
 type Language = "english" | "swedish";
 
@@ -59,10 +59,8 @@ export default class VinjettScene extends BaseScene {
 		location: "Home",
 		language: "swedish",
 	};
-	private backgroundCube?: THREE.Mesh<
-		THREE.BoxGeometry,
-		THREE.MeshBasicMaterial[]
-	>;
+	private backgroundCube?: THREE.Mesh<THREE.BoxGeometry, THREE.Material[]>;
+	private backgroundMaterials?: THREE.MeshBasicMaterial[];
 	private circleButtons: CircleButton[] = [];
 	private pinTexture = new THREE.TextureLoader().load(pinIcon);
 	private homeTexture = new THREE.TextureLoader().load(homeIcon);
@@ -78,7 +76,7 @@ export default class VinjettScene extends BaseScene {
 	private transitionElapsed = 0;
 	private transitionTarget?: LocationKey;
 	private transitionOrigin = new THREE.Vector3(0, 0, 1);
-	private locationTransition?: LocationTransition;
+	private locationWipe?: LocationWipe;
 	private pendingBackground?: THREE.MeshBasicMaterial[];
 	private outgoingButtons: CircleButton[] = [];
 	private outgoingScales = new Map<THREE.Object3D, number>();
@@ -110,8 +108,8 @@ export default class VinjettScene extends BaseScene {
 			button.visible = true;
 			button.scale.setScalar(1);
 		});
-		this.locationTransition?.dispose();
-		this.locationTransition = undefined;
+		this.locationWipe?.dispose();
+		this.locationWipe = undefined;
 		super.onSceneExit(renderer);
 	}
 
@@ -360,6 +358,14 @@ export default class VinjettScene extends BaseScene {
 		this.transitionOrigin.copy(origin);
 		const background = this.getBackground(locationKey);
 		this.pendingBackground = background.materials;
+		if (this.backgroundCube && this.backgroundMaterials) {
+			this.locationWipe = new LocationWipe(
+				this.backgroundMaterials,
+				background.materials,
+				origin,
+			);
+			this.backgroundCube.material = this.locationWipe.materials;
+		}
 		this.transitionPhase = "wipe";
 		this.transitionElapsed = 0;
 		this.loadingSpecies.clear();
@@ -451,6 +457,9 @@ export default class VinjettScene extends BaseScene {
 	}
 
 	private applyBackground(materials: THREE.MeshBasicMaterial[]) {
+		this.backgroundMaterials = materials;
+		this.locationWipe?.dispose();
+		this.locationWipe = undefined;
 		if (this.backgroundCube) {
 			this.backgroundCube.material = materials;
 			return;
@@ -507,6 +516,9 @@ export default class VinjettScene extends BaseScene {
 
 	private updateTransitionObjects() {
 		const transitionElapsed = this.easedTransitionElapsed;
+		this.locationWipe?.setProgress(
+			Math.min(transitionElapsed / WIPE_DURATION, 1),
+		);
 		this.outgoingScales.forEach((initialScale, object) => {
 			const arrivalElapsed = this.getWipeArrivalElapsed(object.position);
 			const duration = Math.min(
@@ -554,26 +566,6 @@ export default class VinjettScene extends BaseScene {
 				this.transitionElapsed = 0;
 			}
 		}
-	}
-
-	override renderScene(renderer: Renderer) {
-		if (
-			this.transitionPhase !== "wipe" ||
-			!this.backgroundCube ||
-			!this.pendingBackground
-		) {
-			renderer.renderProjection(this);
-			return;
-		}
-		this.locationTransition ??= new LocationTransition();
-		this.locationTransition.render(
-			renderer,
-			this,
-			this.backgroundCube,
-			this.pendingBackground,
-			this.transitionOrigin,
-			Math.min(this.easedTransitionElapsed / WIPE_DURATION, 1),
-		);
 	}
 
 	// applyRendererSettings(renderer: Renderer) {

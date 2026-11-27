@@ -1,20 +1,13 @@
 precision highp float;
-uniform sampler2D projectionMap;
-uniform float globeFovDegrees;
+uniform samplerCube envMap;
 varying vec3 vDirection;
 
 void main() {
-	vec3 dir = normalize(vDirection);
-	float pitch = acos(clamp(dir.y, -1.0, 1.0));
-	float maxPitch = 3.141592653589793 * (globeFovDegrees / 360.0);
-	if (pitch > maxPitch) {
-		gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
-		return;
-	}
+	// The globe's +Y pole matches the camera-local +Z axis.
+	vec3 dir = vec3(vDirection.x, vDirection.z, vDirection.y);
+	vec4 color = textureCube(envMap, dir);
 
-	// Inverse of azimuthal.frag, with the globe's +Y pole matching cube +Z.
-	vec2 radial = vec2(-dir.x, dir.z);
-	vec2 uv = 0.5 + 0.5 * (pitch / maxPitch)
-		* radial / max(length(radial), 0.000001);
-	gl_FragColor = texture2D(projectionMap, uv);
+	// Match the display gamma applied by azimuthal.frag.
+	color.rgb = pow(color.rgb, vec3(1.0 / 1.9));
+	gl_FragColor = color;
 }

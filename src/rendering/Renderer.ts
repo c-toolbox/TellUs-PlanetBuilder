@@ -3,7 +3,6 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GlobeProjection } from "@/rendering/GlobeProjection";
 import type BaseScene from "../scenes/BaseScene";
 import { globalServices } from "@/network/GlobalServices";
-import { GLOBE_FOV_DEGREES } from "@/constants";
 
 export enum ViewMode {
 	GlobePreview = "globe_preview",
@@ -149,20 +148,11 @@ export class Renderer extends THREE.WebGLRenderer {
 		this.resize();
 	}
 
-	// Destination for a scene's final azimuthal image, including its effects.
-	get projectionOutputTarget(): THREE.WebGLRenderTarget | null {
-		return this.viewMode === ViewMode.GlobePreview
-			? this.projection.globePreviewTarget
-			: null;
-	}
-
-	renderProjection(scene: THREE.Scene, target = this.projectionOutputTarget) {
-		this.projection.render(
-			this,
-			scene,
-			this.projectionCamera,
-			target,
-		);
+	renderProjection(scene: THREE.Scene) {
+		this.projection.capture(this, scene, this.projectionCamera);
+		if (this.viewMode !== ViewMode.GlobePreview) {
+			this.projection.renderAzimuthal(this);
+		}
 	}
 
 	// Simulate sphere touches in globe preview and release them when focus is lost.
@@ -217,10 +207,8 @@ export class Renderer extends THREE.WebGLRenderer {
 			globeDirection.y,
 		);
 		const scaledPitch = Math.acos(THREE.MathUtils.clamp(direction.z, -1, 1));
-		if (scaledPitch > Math.PI * (GLOBE_FOV_DEGREES / 360)) return undefined;
-		const pitch = scaledPitch / (GLOBE_FOV_DEGREES / 360);
 		const yaw = Math.atan2(-direction.y, direction.x);
-		return { pitch, yaw };
+		return { pitch: scaledPitch, yaw };
 	}
 
 	private handleGlobePointerDown(event: PointerEvent) {
@@ -243,7 +231,7 @@ export class Renderer extends THREE.WebGLRenderer {
 		this.activeGlobePointers.set(event.pointerId, touchId);
 		globalServices.touchHandler.addTouch(touchId);
 		this.domElement.setPointerCapture(event.pointerId);
-		globalServices.touchHandler.updateTouch(
+		globalServices.touchHandler.updateTouchDirection(
 			touchId,
 			position.pitch,
 			position.yaw,
@@ -258,7 +246,7 @@ export class Renderer extends THREE.WebGLRenderer {
 		event.stopImmediatePropagation();
 		const position = this.getGlobeTouchPosition(event);
 		if (position) {
-			globalServices.touchHandler.updateTouch(
+			globalServices.touchHandler.updateTouchDirection(
 				touchId,
 				position.pitch,
 				position.yaw,

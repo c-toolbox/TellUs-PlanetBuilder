@@ -9,7 +9,6 @@ import globeFragmentShader from "./shaders/globeDisplay.frag?raw";
 import { GLOBE_FOV_DEGREES } from "@/constants";
 
 const CUBE_RESOLUTION = 4096;
-const PROJECTION_RESOLUTION = 4096;
 
 export class GlobeProjection {
 	private azimuthalMaterial!: THREE.ShaderMaterial;
@@ -23,26 +22,30 @@ export class GlobeProjection {
 		1,
 	);
 	private readonly azimuthalScene = new THREE.Scene();
-	readonly globePreviewTarget: THREE.WebGLRenderTarget;
 	readonly globePreviewScene = new THREE.Scene();
 	readonly globePreviewMesh: THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial>;
 
 	constructor() {
 		this.cubeCamera = this.createCubeCamera();
-		this.globePreviewTarget = this.createGlobePreviewTarget();
 		this.setupAzimuthalProjection();
 		this.globePreviewMesh = this.createGlobePreviewMesh();
 		this.setupGlobePreviewScene();
 	}
 
-	render(
+	capture(
 		renderer: THREE.WebGLRenderer,
 		scene: THREE.Scene,
 		camera: THREE.PerspectiveCamera,
-		target: THREE.WebGLRenderTarget | null,
 	) {
-		this.captureScene(renderer, scene, camera);
-		this.renderOutput(renderer, target);
+		this.cubeCamera.position.copy(camera.position);
+		this.cubeCamera.quaternion.copy(camera.quaternion);
+		this.cubeCamera.update(renderer, scene);
+	}
+
+	/** Draw the captured cube map as the projector's azimuthal image. */
+	renderAzimuthal(renderer: THREE.WebGLRenderer) {
+		renderer.setRenderTarget(null);
+		renderer.render(this.azimuthalScene, this.screenCamera);
 	}
 
 	private createCubeCamera() {
@@ -52,17 +55,6 @@ export class GlobeProjection {
 		});
 		target.texture.colorSpace = THREE.SRGBColorSpace;
 		return new THREE.CubeCamera(0.01, 1000, target);
-	}
-
-	private createGlobePreviewTarget() {
-		const target = new THREE.WebGLRenderTarget(
-			PROJECTION_RESOLUTION,
-			PROJECTION_RESOLUTION,
-			{ depthBuffer: false },
-		);
-		// The projection shader already applies display gamma. Preserve it in the preview.
-		target.texture.colorSpace = THREE.NoColorSpace;
-		return target;
 	}
 
 	private setupAzimuthalProjection() {
@@ -87,8 +79,7 @@ export class GlobeProjection {
 			new THREE.SphereGeometry(1, 128, 64),
 			new THREE.ShaderMaterial({
 				uniforms: {
-					projectionMap: { value: this.globePreviewTarget.texture },
-					globeFovDegrees: { value: GLOBE_FOV_DEGREES },
+					envMap: { value: this.cubeCamera.renderTarget.texture },
 				},
 				vertexShader: globeVertexShader,
 				fragmentShader: globeFragmentShader,
@@ -148,19 +139,5 @@ export class GlobeProjection {
 		const fillLight = new THREE.DirectionalLight(0xffffff, 0.5);
 		fillLight.position.set(-5, 2, -5);
 		this.globePreviewScene.add(fillLight);
-	}
-
-	private captureScene(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.PerspectiveCamera) {
-		this.cubeCamera.position.copy(camera.position);
-		this.cubeCamera.quaternion.copy(camera.quaternion);
-		this.cubeCamera.update(renderer, scene);
-	}
-
-	private renderOutput(
-		renderer: THREE.WebGLRenderer,
-		target: THREE.WebGLRenderTarget | null,
-	) {
-		renderer.setRenderTarget(target);
-		renderer.render(this.azimuthalScene, this.screenCamera);
 	}
 }
