@@ -12,6 +12,11 @@ import { Tile, tileManager, Tiles } from "@/scenes/world/TileManager";
 import { UiConfigEvent } from "@/network/socket_ui/protocol";
 import { Polyhedra } from "@/scenes/world/Polyhedra";
 import { RenderedPlanet } from "@/scenes/world/RenderedPlanet";
+import {
+	BiomeTileShape,
+	readTileShapes,
+	transferBiomes,
+} from "@/scenes/world/PlanetBiomeTransfer";
 import { ORIGIN } from "@/constants";
 import {
 	DistributionType,
@@ -91,7 +96,8 @@ export default class WorldScene extends BaseScene {
 		renderer.toneMapping = THREE.NoToneMapping;
 	}
 
-	createPlanet() {
+	// With a source, the new planet copies its biomes instead of generating new ones
+	createPlanet(source?: BiomeTileShape[]) {
 		tileManager.refreshNoiseSeed();
 
 		// Find model from config
@@ -128,7 +134,43 @@ export default class WorldScene extends BaseScene {
 		// Handle invisible and realistic tiles
 		this.updateTileTexture();
 
-		this.populatePlanetTiles();
+		if (source) this.applyTransfer(source);
+		else this.populatePlanetTiles();
+	}
+
+	private get modelChanged() {
+		return (
+			this.activePolyhedraModel !== null &&
+			this.activePolyhedraModel !== this.worldConfig.model
+		);
+	}
+
+	private transferPlanet() {
+		if (!this.globe || !this.modelChanged || this.worldConfig.autoGenerate) return;
+		// Read before createPlanet disposes the old globe
+		this.createPlanet(readTileShapes(this.globe.tileMeshes));
+	}
+
+	private applyTransfer(source: BiomeTileShape[]) {
+		if (!this.globe) return;
+
+		const tiles = transferBiomes(source, readTileShapes(this.globe.tileMeshes));
+		this.globe.tileMeshes.forEach((tileMesh, index) => {
+			tileMesh.setTile(tiles[index]);
+		});
+
+		// Keep the ratio sliders in step with what was copied (empty tiles are not a biome)
+		const counts = this.getTileCount();
+		const biomes = Object.values(Tile).filter((tile) => tile !== Tile.None);
+		if (biomes.some((tile) => counts[tile] > 0)) {
+			biomes.forEach((tile) => {
+				this.worldConfig.biomeCount[tile] = counts[tile];
+			});
+			this.redistributeBiomes();
+		}
+
+		this.updateEdgeVisibility();
+		this.markDirty();
 	}
 
 	private get isRenderedMode() {
@@ -384,6 +426,11 @@ export default class WorldScene extends BaseScene {
 
 		this.uiSocket.on("new_planet", () => {
 			this.createPlanet();
+			this.sendSocketUiConfig();
+		});
+
+		this.uiSocket.on("transfer_planet", () => {
+			this.transferPlanet();
 			this.sendSocketUiConfig();
 		});
 
@@ -784,6 +831,15 @@ export default class WorldScene extends BaseScene {
 					hint_title: "Generate planet",
 					hint_text: "Create a new planet with the current settings",
 					color: "#c70036",
+				},
+				{
+					type: "button",
+					id: "transfer_planet",
+					text: "Transfer",
+					hint_title: "Transfer planet",
+					hint_text:
+						"Rebuild the planet with the selected model, keeping biomes in the same places",
+					color: this.modelChanged ? "#c70036" : "#77777777",
 				},
 				{
 					type: "button",
