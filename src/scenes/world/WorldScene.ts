@@ -11,6 +11,7 @@ import { TileMesh } from "@/scenes/world/TileMesh";
 import { TouchId } from "@/network/tuioProtocol";
 import { Tile, tileManager, Tiles } from "@/scenes/world/TileManager";
 import { UiConfigEvent } from "@/network/socket_ui/protocol";
+import { ScreenshotButton } from "@/network/socket_ui/ScreenshotButton";
 import { Polyhedra } from "@/scenes/world/Polyhedra";
 import { RenderedPlanet } from "@/scenes/world/RenderedPlanet";
 import {
@@ -53,6 +54,8 @@ export default class WorldScene extends BaseScene {
 	private planetDirty: boolean = true;
 	private tileUiDirty = false;
 	private tileUiCooldown = 0;
+	private readonly screenshotButton = new ScreenshotButton();
+
 	private readonly raycaster = new THREE.Raycaster();
 	private tileMeshes: TileMesh[] = [];
 	private readonly tileChanges = new TileChangeAnimation();
@@ -226,9 +229,7 @@ export default class WorldScene extends BaseScene {
 		if (!this.globe) return;
 		this.tileChanges.dispose();
 
-		const tilePositions = this.globe.tileMeshes.map(
-			(mesh) => mesh.position,
-		);
+		const tilePositions = this.globe.tileMeshes.map((mesh) => mesh.position);
 
 		const tiles = tileManager.populateTiles(
 			tilePositions,
@@ -300,6 +301,8 @@ export default class WorldScene extends BaseScene {
 		super.onSceneExit(renderer);
 		this.tileUiDirty = false;
 		this.tileUiCooldown = 0;
+		this.screenshotButton.disconnect();
+
 		this.tileBrushes.forEach((brush) => brush.dispose());
 		this.tileBrushes.clear();
 		this.previousDirections.clear();
@@ -395,7 +398,8 @@ export default class WorldScene extends BaseScene {
 
 	update(delta: number) {
 		this.tileUiCooldown = Math.max(0, this.tileUiCooldown - delta);
-		if (this.tileUiDirty && this.tileUiCooldown === 0) this.sendSocketUiConfig();
+		if (this.tileUiDirty && this.tileUiCooldown === 0)
+			this.sendSocketUiConfig();
 		this.tileChanges.update(delta);
 		if (this.renderer && this.renderedPlanet?.parent === this) {
 			this.renderedPlanet.update(this.renderer, delta);
@@ -556,6 +560,12 @@ export default class WorldScene extends BaseScene {
 				this.sendSocketUiConfig();
 			}
 		});
+
+		if (this.renderer) {
+			this.screenshotButton.connect(this.renderer, this.uiSocket, () =>
+				this.sendSocketUiConfig(),
+			);
+		}
 	}
 
 	private clearSaveStateListeners() {
@@ -691,11 +701,18 @@ export default class WorldScene extends BaseScene {
 					options: scenes.map((scene) => scene.id),
 				},
 				{
-					type: "switch",
-					id: "rotation_mode",
-					hint_title: "Rotation mode",
-					hint_text: "Disable building and use touch to rotate the globe",
-					value: this.worldConfig.rotationMode,
+					type: "grid",
+					columns: 2,
+					elements: [
+						this.screenshotButton.config,
+						{
+							type: "switch",
+							id: "rotation_mode",
+							hint_title: "Rotation mode",
+							hint_text: "Make touch rotate the planet",
+							value: this.worldConfig.rotationMode,
+						},
+					],
 				},
 
 				{
