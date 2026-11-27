@@ -51,6 +51,8 @@ export default class WorldScene extends BaseScene {
 	private saveStates: SaveState[] = [];
 	private saveStateListeners = new Map<string, (...args: any[]) => void>();
 	private planetDirty: boolean = true;
+	private tileUiDirty = false;
+	private tileUiCooldown = 0;
 	private readonly raycaster = new THREE.Raycaster();
 	private tileMeshes: TileMesh[] = [];
 	private readonly tileChanges = new TileChangeAnimation();
@@ -296,6 +298,8 @@ export default class WorldScene extends BaseScene {
 	// On exiting scene
 	override onSceneExit(renderer: Renderer) {
 		super.onSceneExit(renderer);
+		this.tileUiDirty = false;
+		this.tileUiCooldown = 0;
 		this.tileBrushes.forEach((brush) => brush.dispose());
 		this.tileBrushes.clear();
 		this.previousDirections.clear();
@@ -352,13 +356,12 @@ export default class WorldScene extends BaseScene {
 			brush.setTile(tileManager.getNextTile(tileMesh.tile));
 		}
 
-		if (tileMesh.tile != brush.tile) {
-			if (this.tileChanges.visible)
-				this.tileChanges.setTile(tileMesh, brush.tile);
-			else tileMesh.setTile(brush.tile);
-			this.markDirty();
-			this.sendSocketUiConfig();
-		}
+		if (tileMesh.tile === brush.tile) return;
+		if (this.tileChanges.visible)
+			this.tileChanges.setTile(tileMesh, brush.tile);
+		else tileMesh.setTile(brush.tile);
+		this.markDirty();
+		this.tileUiDirty = true;
 
 		if (this.worldConfig.tileEdge == "show borders") {
 			tileMesh.neighbors.forEach(({ mesh, edgeIndex }) => {
@@ -391,6 +394,8 @@ export default class WorldScene extends BaseScene {
 	}
 
 	update(delta: number) {
+		this.tileUiCooldown = Math.max(0, this.tileUiCooldown - delta);
+		if (this.tileUiDirty && this.tileUiCooldown === 0) this.sendSocketUiConfig();
 		this.tileChanges.update(delta);
 		if (this.renderer && this.renderedPlanet?.parent === this) {
 			this.renderedPlanet.update(this.renderer, delta);
@@ -406,6 +411,12 @@ export default class WorldScene extends BaseScene {
 	}
 
 	/* Socket UI */
+
+	protected override sendSocketUiConfig() {
+		this.tileUiDirty = false;
+		this.tileUiCooldown = 100;
+		super.sendSocketUiConfig();
+	}
 
 	registerSocketUiListeners() {
 		super.registerSocketUiListeners();

@@ -40,6 +40,8 @@ export class Renderer extends THREE.WebGLRenderer {
 		? ViewMode.GlobePreview
 		: ViewMode.ProjectorOutput;
 	private globeRaycaster = new THREE.Raycaster();
+	private readonly globeTouchSphere = new THREE.Sphere(new THREE.Vector3(), 1);
+	private readonly globeTouchPosition = new THREE.Vector3();
 	private activeGlobePointers = new Map<number, number>();
 	private nextSimulatedTouchId = -1;
 
@@ -240,12 +242,14 @@ export class Renderer extends THREE.WebGLRenderer {
 			-((event.clientY - bounds.top) / bounds.height) * 2 + 1,
 		);
 		this.globeRaycaster.setFromCamera(pointer, this.globePreviewCamera);
-		const [intersection] = this.globeRaycaster.intersectObject(
-			this.projection.globePreviewMesh,
+		// The preview is a unit sphere; avoid testing its display triangles per finger.
+		const intersection = this.globeRaycaster.ray.intersectSphere(
+			this.globeTouchSphere,
+			this.globeTouchPosition,
 		);
 		if (!intersection) return undefined;
 
-		const globeDirection = intersection.point.clone().normalize();
+		const globeDirection = intersection.normalize();
 		const direction = new THREE.Vector3(
 			globeDirection.x,
 			globeDirection.z,

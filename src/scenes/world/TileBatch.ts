@@ -4,6 +4,13 @@ import type { TileMesh } from "./TileMesh";
 
 const TILE_TYPES = Object.values(Tile);
 
+interface PickNode {
+	bounds: THREE.Box3;
+	left?: PickNode;
+	right?: PickNode;
+	tiles?: number[];
+}
+
 /** One shared vertex buffer, with at most one draw per biome texture. */
 export class TileBatch extends THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial[]> {
 	private readonly firstVertex: number[] = [];
@@ -12,6 +19,9 @@ export class TileBatch extends THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicM
 	private readonly triangleTiles: Uint32Array;
 	private readonly slots: Uint8Array;
 	private readonly colors: THREE.BufferAttribute;
+	private readonly pickTree: PickNode;
+	private readonly pickRay = new THREE.Ray();
+	private readonly pickInverse = new THREE.Matrix4();
 	private dirty = true;
 
 	constructor(private readonly tiles: TileMesh[]) {
@@ -62,8 +72,16 @@ export class TileBatch extends THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicM
 			for (let i = 0; i < index.count; i++) {
 				this.sourceIndices[this.firstIndex[tileIndex] + i] = start + index.getX(i);
 			}
+			// Picking uses the original tile order, independent of texture grouping.
+			this.triangleTiles.fill(tileIndex, this.firstIndex[tileIndex] / 3, this.firstIndex[tileIndex + 1] / 3);
 			tile.onAppearanceChange = () => this.updateTile(tileIndex);
 		});
+
+		const bounds = tiles.map(tile => {
+			tile.geometry.computeBoundingBox();
+			return tile.geometry.boundingBox!.clone().applyMatrix4(tile.matrix);
+		});
+		this.pickTree = this.buildPickTree(tiles.map((_, index) => index), bounds);
 
 		this.geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
 		this.geometry.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
@@ -110,7 +128,6 @@ export class TileBatch extends THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicM
 			const source = this.sourceIndices.subarray(this.firstIndex[tile], this.firstIndex[tile + 1]);
 			const offset = offsets[slot];
 			indices.set(source, offset);
-			this.triangleTiles.fill(tile, offset / 3, (offset + source.length) / 3);
 			offsets[slot] += source.length;
 		});
 		index.needsUpdate = true;
@@ -122,8 +139,50 @@ export class TileBatch extends THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicM
 	}
 
 	override raycast(raycaster: THREE.Raycaster, intersections: THREE.Intersection[]) {
-		this.flush();
-		super.raycast(raycaster, intersections);
+		// Painting changes texture groups, but never the geometry used for picking.
+		// Keep those buffer rebuilds out of the input path.
+		this.pickInverse.copy(this.matrixWorld).invert();
+		this.pickRay.copy(raycaster.ray).applyMatrix4(this.pickInverse);
+		this.raycastNode(this.pickTree, raycaster, intersections);
+	}
+
+	private buildPickTree(tiles: number[], bounds: THREE.Box3[]): PickNode {
+		const box = new THREE.Box3();
+		for (const tile of tiles) box.union(bounds[tile]);
+		if (tiles.length <= 8) return { bounds: box, tiles };
+
+		const size = box.getSize(new THREE.Vector3());
+		const axis = size.x >= size.y && size.x >= size.z ? "x" : size.y >= size.z ? "y" : "z";
+		tiles.sort((a, b) =>
+			(bounds[a].min[axis] + bounds[a].max[axis])
+			- (bounds[b].min[axis] + bounds[b].max[axis]),
+		);
+		const middle = Math.floor(tiles.length / 2);
+		return {
+			bounds: box,
+			left: this.buildPickTree(tiles.slice(0, middle), bounds),
+			right: this.buildPickTree(tiles.slice(middle), bounds),
+		};
+	}
+
+	private raycastNode(node: PickNode, raycaster: THREE.Raycaster, intersections: THREE.Intersection[]) {
+		if (!this.pickRay.intersectsBox(node.bounds)) return;
+		if (node.tiles) {
+			for (const index of node.tiles) {
+				const tile = this.tiles[index];
+				tile.matrixWorld.multiplyMatrices(this.matrixWorld, tile.matrix);
+				const start = intersections.length;
+				tile.raycast(raycaster, intersections);
+				for (let i = start; i < intersections.length; i++) {
+					const hit = intersections[i];
+					hit.object = this;
+					hit.faceIndex = this.firstIndex[index] / 3 + (hit.faceIndex ?? 0);
+				}
+			}
+		} else {
+			if (node.left) this.raycastNode(node.left, raycaster, intersections);
+			if (node.right) this.raycastNode(node.right, raycaster, intersections);
+		}
 	}
 
 	pick(raycaster: THREE.Raycaster): TileMesh | undefined {
