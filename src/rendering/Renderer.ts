@@ -8,12 +8,14 @@ export enum ViewMode {
 	GlobePreview = "globe_preview",
 	ProjectorOutput = "azimuthal",
 	Scene3D = "3d_scene",
+	Equirectangular = "equirectangular",
 }
 
 export const viewModes = [
 	{ id: ViewMode.GlobePreview, title: "Globe preview" },
 	{ id: ViewMode.ProjectorOutput, title: "Projector output" },
 	{ id: ViewMode.Scene3D, title: "3D scene" },
+	{ id: ViewMode.Equirectangular, title: "Equirectangular" },
 ] as const;
 
 const MAX_GLOBE_TOUCHES = 64;
@@ -150,7 +152,9 @@ export class Renderer extends THREE.WebGLRenderer {
 
 	renderProjection(scene: THREE.Scene) {
 		this.projection.capture(this, scene, this.projectionCamera);
-		if (this.viewMode !== ViewMode.GlobePreview) {
+		if (this.viewMode === ViewMode.Equirectangular) {
+			this.projection.renderEquirectangular(this);
+		} else if (this.viewMode !== ViewMode.GlobePreview) {
 			this.projection.renderAzimuthal(this);
 		}
 	}
@@ -325,8 +329,14 @@ export class Renderer extends THREE.WebGLRenderer {
 
 	resize() {
 		const size = Math.min(window.innerWidth, window.innerHeight);
-		const width = this.viewMode === ViewMode.ProjectorOutput ? size : window.innerWidth;
-		const height = this.viewMode === ViewMode.ProjectorOutput ? size : window.innerHeight;
+		let width = window.innerWidth;
+		let height = window.innerHeight;
+		if (this.viewMode === ViewMode.ProjectorOutput) {
+			width = height = size;
+		} else if (this.viewMode === ViewMode.Equirectangular) {
+			width = Math.min(window.innerWidth, window.innerHeight * 2);
+			height = width / 2;
+		}
 		this.setSize(width, height);
 
 		this.projectionCamera.aspect = 1 / 1;

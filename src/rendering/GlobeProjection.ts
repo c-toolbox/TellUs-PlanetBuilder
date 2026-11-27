@@ -4,6 +4,7 @@ import pufferTouchUrl from "@/assets/models/puffertouch.glb?url";
 import silhouettesUrl from "@/assets/textures/silhouettes.png?url";
 import azimuthalVertexShader from "./shaders/basic.vert?raw";
 import azimuthalFragmentShader from "./shaders/azimuthal.frag?raw";
+import equirectangularFragmentShader from "./shaders/equirectangular.frag?raw";
 import globeVertexShader from "./shaders/globeDisplay.vert?raw";
 import globeFragmentShader from "./shaders/globeDisplay.frag?raw";
 import { GLOBE_FOV_DEGREES } from "@/constants";
@@ -22,12 +23,14 @@ export class GlobeProjection {
 		1,
 	);
 	private readonly azimuthalScene = new THREE.Scene();
+	private readonly equirectangularScene = new THREE.Scene();
 	readonly globePreviewScene = new THREE.Scene();
 	readonly globePreviewMesh: THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial>;
 
 	constructor() {
 		this.cubeCamera = this.createCubeCamera();
 		this.setupAzimuthalProjection();
+		this.setupEquirectangularProjection();
 		this.globePreviewMesh = this.createGlobePreviewMesh();
 		this.setupGlobePreviewScene();
 	}
@@ -46,6 +49,16 @@ export class GlobeProjection {
 	renderAzimuthal(renderer: THREE.WebGLRenderer) {
 		renderer.setRenderTarget(null);
 		renderer.render(this.azimuthalScene, this.screenCamera);
+	}
+
+	/** Draw the captured cube map as a 2:1 equirectangular map to the canvas or a render target. */
+	renderEquirectangular(
+		renderer: THREE.WebGLRenderer,
+		target: THREE.WebGLRenderTarget | null = null,
+	) {
+		renderer.setRenderTarget(target);
+		renderer.render(this.equirectangularScene, this.screenCamera);
+		renderer.setRenderTarget(null);
 	}
 
 	private createCubeCamera() {
@@ -71,6 +84,19 @@ export class GlobeProjection {
 		this.azimuthalScene.add(new THREE.Mesh(
 			new THREE.PlaneGeometry(2, 2),
 			this.azimuthalMaterial,
+		));
+	}
+
+	private setupEquirectangularProjection() {
+		this.equirectangularScene.add(new THREE.Mesh(
+			new THREE.PlaneGeometry(2, 2),
+			new THREE.ShaderMaterial({
+				uniforms: { envMap: { value: this.cubeCamera.renderTarget.texture } },
+				vertexShader: azimuthalVertexShader,
+				fragmentShader: equirectangularFragmentShader,
+				depthTest: false,
+				depthWrite: false,
+			}),
 		));
 	}
 
