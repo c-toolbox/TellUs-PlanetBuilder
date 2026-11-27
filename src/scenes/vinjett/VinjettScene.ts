@@ -17,6 +17,7 @@ import {
 	locations,
 } from "@/scenes/vinjett/locations";
 import { species, SpeciesKey } from "@/scenes/vinjett/species";
+import { LocationTransition } from "./LocationTransition";
 
 type Language = "english" | "swedish";
 
@@ -77,6 +78,7 @@ export default class VinjettScene extends BaseScene {
 	private transitionElapsed = 0;
 	private transitionTarget?: LocationKey;
 	private transitionOrigin = new THREE.Vector3(0, 0, 1);
+	private locationTransition?: LocationTransition;
 	private pendingBackground?: THREE.MeshBasicMaterial[];
 	private outgoingButtons: CircleButton[] = [];
 	private outgoingScales = new Map<THREE.Object3D, number>();
@@ -108,6 +110,8 @@ export default class VinjettScene extends BaseScene {
 			button.visible = true;
 			button.scale.setScalar(1);
 		});
+		this.locationTransition?.dispose();
+		this.locationTransition = undefined;
 		super.onSceneExit(renderer);
 	}
 
@@ -553,23 +557,23 @@ export default class VinjettScene extends BaseScene {
 	}
 
 	override renderScene(renderer: Renderer) {
-		if (this.transitionPhase !== "wipe" || !this.backgroundCube || !this.pendingBackground) {
+		if (
+			this.transitionPhase !== "wipe" ||
+			!this.backgroundCube ||
+			!this.pendingBackground
+		) {
 			renderer.renderProjection(this);
 			return;
 		}
-		const { projection, projectionCamera } = renderer;
-		projection.captureScene(renderer, this, projectionCamera);
-		const currentBackground = this.backgroundCube.material;
-		try {
-			this.backgroundCube.material = this.pendingBackground;
-			projection.captureTransitionScene(renderer, this, projectionCamera);
-		} finally {
-			this.backgroundCube.material = currentBackground;
-		}
-		projection.renderOutput(renderer, renderer.projectionOutputTarget, {
-			progress: Math.min(this.easedTransitionElapsed / WIPE_DURATION, 1),
-			origin: this.transitionOrigin.clone().applyQuaternion(projectionCamera.quaternion.clone().invert()),
-		});
+		this.locationTransition ??= new LocationTransition();
+		this.locationTransition.render(
+			renderer,
+			this,
+			this.backgroundCube,
+			this.pendingBackground,
+			this.transitionOrigin,
+			Math.min(this.easedTransitionElapsed / WIPE_DURATION, 1),
+		);
 	}
 
 	// applyRendererSettings(renderer: Renderer) {

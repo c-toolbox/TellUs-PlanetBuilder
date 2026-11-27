@@ -11,14 +11,8 @@ import { GLOBE_FOV_DEGREES } from "@/constants";
 const CUBE_RESOLUTION = 4096;
 const PROJECTION_RESOLUTION = 4096;
 
-export interface ProjectionTransition {
-	progress: number;
-	origin: THREE.Vector3;
-}
-
 export class GlobeProjection {
 	private azimuthalMaterial!: THREE.ShaderMaterial;
-	private transitionCubeCamera?: THREE.CubeCamera;
 	private readonly cubeCamera: THREE.CubeCamera;
 	private readonly screenCamera = new THREE.OrthographicCamera(
 		-1,
@@ -76,11 +70,6 @@ export class GlobeProjection {
 			uniforms: {
 				envMap: { value: this.cubeCamera.renderTarget.texture },
 				globeFovDegrees: { value: GLOBE_FOV_DEGREES },
-				transitionEnvMap: { value: this.cubeCamera.renderTarget.texture },
-				transitionEnabled: { value: false },
-				transitionProgress: { value: 0 },
-				transitionOrigin: { value: new THREE.Vector3(0, 0, 1) },
-				transitionBorderWidth: { value: THREE.MathUtils.degToRad(1) },
 			},
 			vertexShader: azimuthalVertexShader,
 			fragmentShader: azimuthalFragmentShader,
@@ -161,31 +150,16 @@ export class GlobeProjection {
 		this.globePreviewScene.add(fillLight);
 	}
 
-	captureScene(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.PerspectiveCamera) {
+	private captureScene(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.PerspectiveCamera) {
 		this.cubeCamera.position.copy(camera.position);
 		this.cubeCamera.quaternion.copy(camera.quaternion);
 		this.cubeCamera.update(renderer, scene);
 	}
 
-	captureTransitionScene(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.PerspectiveCamera) {
-		// Allocate a second cube map only for scenes that use a projected wipe.
-		this.transitionCubeCamera ??= this.createCubeCamera();
-		this.transitionCubeCamera.position.copy(camera.position);
-		this.transitionCubeCamera.quaternion.copy(camera.quaternion);
-		this.transitionCubeCamera.update(renderer, scene);
-		this.azimuthalMaterial.uniforms.transitionEnvMap.value = this.transitionCubeCamera.renderTarget.texture;
-	}
-
-	renderOutput(
+	private renderOutput(
 		renderer: THREE.WebGLRenderer,
 		target: THREE.WebGLRenderTarget | null,
-		transition?: ProjectionTransition,
 	) {
-		this.azimuthalMaterial.uniforms.transitionEnabled.value = Boolean(transition && this.transitionCubeCamera);
-		if (transition) {
-			this.azimuthalMaterial.uniforms.transitionProgress.value = transition.progress;
-			this.azimuthalMaterial.uniforms.transitionOrigin.value.copy(transition.origin);
-		}
 		renderer.setRenderTarget(target);
 		renderer.render(this.azimuthalScene, this.screenCamera);
 	}
