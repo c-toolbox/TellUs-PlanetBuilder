@@ -1,5 +1,6 @@
 import { viewModes, type Renderer, type ViewMode } from "@/rendering/Renderer";
 import type { SceneManager } from "@/scenes/SceneManager";
+import { savePngToDownloads } from "@/utils/screenshot";
 
 export function setupHtmlDebugControls(renderer: Renderer, sceneManager: SceneManager): void {
 	const sceneOptions = document.getElementById("scene-options") as HTMLDivElement;
@@ -32,6 +33,28 @@ export function setupHtmlDebugControls(renderer: Renderer, sceneManager: SceneMa
 		setSelectedOption(viewModeOptions, mode);
 	}
 	setViewMode(renderer.getViewMode());
+
+	const saveButton = document.getElementById("save-image") as HTMLButtonElement;
+	const saveButtonLabel = saveButton.textContent;
+	let resetLabelTimeout: number | undefined;
+	saveButton.addEventListener("click", async () => {
+		window.clearTimeout(resetLabelTimeout);
+		saveButton.disabled = true;
+		saveButton.textContent = "Saving...";
+		try {
+			const location = await savePngToDownloads(await renderer.captureEquirectangularImage());
+			console.log(`Screenshot saved: ${location}`);
+			saveButton.textContent = "Saved!";
+			resetLabelTimeout = window.setTimeout(() => {
+				saveButton.textContent = saveButtonLabel;
+			}, 2000);
+		} catch (error) {
+			console.error("Failed to save screenshot", error);
+			saveButton.textContent = saveButtonLabel;
+		} finally {
+			saveButton.disabled = false;
+		}
+	});
 }
 
 function setSelectedOption(options: HTMLElement, value: string): void {

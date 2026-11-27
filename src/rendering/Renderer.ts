@@ -18,6 +18,9 @@ export const viewModes = [
 	{ id: ViewMode.Equirectangular, title: "Equirectangular" },
 ] as const;
 
+export const SCREENSHOT_WIDTH = 4096;
+export const SCREENSHOT_HEIGHT = 2048;
+
 const MAX_GLOBE_TOUCHES = 64;
 
 export class Renderer extends THREE.WebGLRenderer {
@@ -157,6 +160,44 @@ export class Renderer extends THREE.WebGLRenderer {
 		} else if (this.viewMode !== ViewMode.GlobePreview) {
 			this.projection.renderAzimuthal(this);
 		}
+	}
+
+	/** Render the current scene as a 4096x2048 equirectangular PNG. */
+	async captureEquirectangularImage(): Promise<Blob> {
+		if (!this.currentScene) throw new Error("No active scene to capture");
+		if (this.viewMode === ViewMode.Scene3D) {
+			// The cube map is only refreshed in the other modes.
+			this.projection.capture(this, this.currentScene, this.projectionCamera);
+		}
+
+		const width = SCREENSHOT_WIDTH;
+		const height = SCREENSHOT_HEIGHT;
+		const target = new THREE.WebGLRenderTarget(width, height);
+		const pixels = new Uint8Array(width * height * 4);
+		try {
+			this.projection.renderEquirectangular(this, target);
+			await this.readRenderTargetPixelsAsync(target, 0, 0, width, height, pixels);
+		} finally {
+			target.dispose();
+		}
+
+		// GL rows run bottom-up; image rows run top-down.
+		const image = new ImageData(width, height);
+		const rowBytes = width * 4;
+		for (let y = 0; y < height; y++) {
+			const source = (height - 1 - y) * rowBytes;
+			image.data.set(pixels.subarray(source, source + rowBytes), y * rowBytes);
+		}
+		const canvas = document.createElement("canvas");
+		canvas.width = width;
+		canvas.height = height;
+		canvas.getContext("2d")!.putImageData(image, 0, 0);
+		return new Promise((resolve, reject) => {
+			canvas.toBlob(
+				(blob) => (blob ? resolve(blob) : reject(new Error("PNG encoding failed"))),
+				"image/png",
+			);
+		});
 	}
 
 	// Simulate sphere touches in globe preview and release them when focus is lost.

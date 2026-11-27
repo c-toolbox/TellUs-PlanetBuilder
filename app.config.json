@@ -4,7 +4,7 @@
   "description": "TellUs Planet Builder",
   "version": "0.1.0",
   "neutralino": {
-    "allow": [],
+    "allow": ["os.getPath", "filesystem.writeBinaryFile"],
     "window": {
       "width": 3840,
       "height": 2400,
