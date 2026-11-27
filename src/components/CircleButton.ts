@@ -17,6 +17,8 @@ export interface CircleButtonOptions {
 	radius?: number;
 	texture?: THREE.Texture | string;
 	color?: THREE.ColorRepresentation;
+	/** Tints the outline and the (white) icon. */
+	accentColor?: THREE.ColorRepresentation;
 	label?: string;
 }
 
@@ -28,6 +30,8 @@ export default class CircleButton extends THREE.Mesh<
 	private readonly backgroundMaterial: THREE.MeshBasicMaterial;
 	private readonly clickCallback?: () => void;
 	private readonly radius: number;
+	private readonly accentColor: THREE.Color;
+	private readonly outlineMaterial: THREE.MeshBasicMaterial;
 	private pressTouchId?: TouchId;
 	private clickTouchId?: TouchId;
 	private held = false;
@@ -43,6 +47,7 @@ export default class CircleButton extends THREE.Mesh<
 		radius = 0.08,
 		texture,
 		color = 0xffffff,
+		accentColor = 0xffffff,
 		label,
 	}: CircleButtonOptions) {
 		const map =
@@ -73,6 +78,7 @@ export default class CircleButton extends THREE.Mesh<
 
 		this.clickCallback = onClick;
 		this.radius = radius;
+		this.accentColor = new THREE.Color(accentColor);
 		this.touchInteraction = new TouchInteraction(this, { clickDuration: Infinity });
 		this.touchInteraction.on("press", ({ touchId }) => {
 			if (this.pressTouchId !== undefined) return;
@@ -101,15 +107,16 @@ export default class CircleButton extends THREE.Mesh<
 		this.position.copy(position);
 		this.lookAt(ORIGIN);
 
+		this.outlineMaterial = new THREE.MeshBasicMaterial({
+			color: this.accentColor,
+			map: circleTexture,
+			transparent: true,
+			alphaTest: 0.01,
+			side: THREE.FrontSide,
+		});
 		const outline = new THREE.Mesh(
 			new THREE.PlaneGeometry(radius * 2.3, radius * 2.3),
-			new THREE.MeshBasicMaterial({
-				color: 0xffffff,
-				map: circleTexture,
-				transparent: true,
-				alphaTest: 0.01,
-				side: THREE.FrontSide,
-			}),
+			this.outlineMaterial,
 		);
 		outline.position.z = -0.001;
 		outline.raycast = () => {};
@@ -143,6 +150,12 @@ export default class CircleButton extends THREE.Mesh<
 		this.backgroundMaterial.color.set(color);
 	}
 
+	setAccentColor(color: THREE.ColorRepresentation) {
+		this.accentColor.set(color);
+		this.outlineMaterial.color.copy(this.accentColor);
+		this.icon?.material.color.copy(this.accentColor);
+	}
+
 	setLabelVisible(visible: boolean) {
 		if (this.textLabel) this.textLabel.visible = visible;
 	}
@@ -158,6 +171,7 @@ export default class CircleButton extends THREE.Mesh<
 		this.icon = new THREE.Mesh(
 			new THREE.PlaneGeometry(this.radius * 2, this.radius * 2),
 			new THREE.MeshBasicMaterial({
+				color: this.accentColor,
 				map: texture,
 				alphaMap: circleMask,
 				transparent: true,

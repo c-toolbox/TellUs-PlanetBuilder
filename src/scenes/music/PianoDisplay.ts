@@ -4,6 +4,7 @@ import TextLabel from "@/components/TextLabel";
 import type { TouchInteraction } from "@/network/TouchInteraction";
 import { createPanelCurve, type PanelCurve } from "@/utils/curvePanel";
 import arrowUrl from "@/assets/textures/icons/arrow.png";
+import { Color } from "@/utils/colors";
 
 // Piano-space layout on the black back panel above the keys.
 const DISPLAY_Y = 0.5;
@@ -12,20 +13,20 @@ const DISPLAY_Z = 0.27;
 const LAYER = 0.002;
 const LCD_WIDTH = 2.5;
 const LCD_HEIGHT = 0.26;
-const BEZEL_MARGIN = 0.04;
+const BEZEL_MARGIN = 0.01;
 const TEXT_SIZE = 0.09;
 // Approximate cap height ratio, to vertically center the baseline-anchored text.
 const CAP_HEIGHT_RATIO = 0.72;
-const TEXT_PADDING = 0.12;
-const BUTTON_RADIUS = 0.055;
-const BUTTON_X = -1.45;
+const TEXT_PADDING = 0.1;
+const BUTTON_RADIUS = 0.06;
+const BUTTON_X = -1.4;
 const BUTTON_Y = 0.08;
 const TEXT_SEGMENT_WIDTH = 0.05;
 const PLANE_SEGMENT_WIDTH = 0.1;
 
-const BEZEL_COLOR = 0x1c1d22;
+const BEZEL_COLOR = Color.Stone500;
 const LCD_COLOR = 0x0d2b2c;
-const BUTTON_COLOR = 0x2b3345;
+const BUTTON_COLOR = LCD_COLOR;
 const TEXT_COLOR = 0xffffff;
 const ERROR_COLOR = 0xff7a7a;
 
@@ -100,6 +101,7 @@ export class PianoDisplay {
 				radius: BUTTON_RADIUS,
 				texture,
 				color: BUTTON_COLOR,
+				accentColor: BEZEL_COLOR,
 				onClick: () => onStep(step),
 			});
 			registerInteraction(button.touchInteraction);
