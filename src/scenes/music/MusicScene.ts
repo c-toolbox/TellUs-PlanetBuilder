@@ -23,11 +23,21 @@ export default class MusicScene extends BaseScene {
 		this.add(this.piano.object);
 		this.piano.on("noteOn", this.audio.noteOn);
 		this.piano.on("noteOff", this.audio.noteOff);
+		this.piano.on("instrumentStep", (delta) => this.audio.stepInstrument(delta));
 		this.audio.on("change", () => {
+			this.updateDisplay();
 			if (this.audio.isActive) this.sendSocketUiConfig();
 		});
+		this.audio.on("status", () => this.updateDisplay());
 		this.audio.on("loadError", (error) =>
 			console.error("Failed to load music audio", error),
+		);
+	}
+
+	private updateDisplay() {
+		this.piano.display.setText(
+			this.audio.statusText ?? this.audio.instrumentText ?? "",
+			this.audio.hasError,
 		);
 	}
 

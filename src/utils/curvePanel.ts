@@ -1,26 +1,33 @@
 import * as THREE from "three";
 
 interface CurvePanelOptions {
-	/** Cylinder axis is Y; its center is at (0, 0, radius) in panel space. */
-	radius: number;
 	/** Maximum horizontal triangle span before bending, in panel units. */
 	maxSegmentWidth?: number;
 }
 
-/** Bend a static model around Y, preserving mesh identities for raycasting.
- * Call once after positioning/scaling the model inside its panel group.
+export interface PanelCurve {
+	/** Bend around a cylinder with axis Y, centered at (0, 0, radius) in panel space. */
+	setRadius(radius: number): void;
+}
+
+/** Capture a static model's flat shape so it can be bent around Y at any radius,
+ * preserving mesh identities for raycasting.
+ * Call after positioning/scaling the model inside its panel group; the meshes'
+ * transforms relative to the panel must stay fixed afterwards.
  * Panel +Z faces the viewer; the plane z=0 becomes a cylinder of radius R.
+ * Only meshes under `root` are bent; it defaults to the whole panel.
+ * Nothing is bent until setRadius is called.
  */
-export function curvePanel(panel: THREE.Object3D, {
-	radius,
+export function createPanelCurve(panel: THREE.Object3D, {
 	maxSegmentWidth = 0.04,
-}: CurvePanelOptions): void {
-	if (radius <= 0 || maxSegmentWidth <= 0) {
-		throw new Error("Panel radius and segment width must be positive");
+}: CurvePanelOptions = {}, root: THREE.Object3D = panel): PanelCurve {
+	if (maxSegmentWidth <= 0) {
+		throw new Error("Panel segment width must be positive");
 	}
+	const bends: ((radius: number) => void)[] = [];
 	panel.updateWorldMatrix(true, true);
 	const panelInverse = panel.matrixWorld.clone().invert();
-	panel.traverse((object) => {
+	root.traverse((object) => {
 		if (!(object instanceof THREE.Mesh)) return;
 		const original = object.geometry;
 		const source = original.index ? original.toNonIndexed() : original.clone();
@@ -97,26 +104,37 @@ export function curvePanel(panel: THREE.Object3D, {
 		}
 		const positions = geometry.getAttribute("position");
 		const normals = geometry.getAttribute("normal");
+		const flatPositions = Float32Array.from(positions.array);
+		const flatNormals = normals && Float32Array.from(normals.array);
 		const normal = new THREE.Vector3();
-		for (let i = 0; i < positions.count; i++) {
-			const angle = positions.getX(i) / radius;
-			const radialDistance = radius - positions.getZ(i);
-			const sin = Math.sin(angle), cos = Math.cos(angle);
-			positions.setXYZ(i, radialDistance * sin, positions.getY(i), radius - radialDistance * cos);
-			if (normals) {
-				// Inverse transpose of the warp Jacobian keeps authored hard edges
-				// while producing smooth lighting across subdivided curved faces.
-				normal.fromBufferAttribute(normals, i);
-				const nx = normal.x * radius / radialDistance;
-				normal.set(cos * nx - sin * normal.z, normal.y, sin * nx + cos * normal.z).normalize();
-				normals.setXYZ(i, normal.x, normal.y, normal.z);
+		bends.push((radius) => {
+			for (let i = 0; i < positions.count; i++) {
+				const x = flatPositions[i * 3], y = flatPositions[i * 3 + 1], z = flatPositions[i * 3 + 2];
+				const angle = x / radius;
+				const radialDistance = radius - z;
+				const sin = Math.sin(angle), cos = Math.cos(angle);
+				positions.setXYZ(i, radialDistance * sin, y, radius - radialDistance * cos);
+				if (normals && flatNormals) {
+					// Inverse transpose of the warp Jacobian keeps authored hard edges
+					// while producing smooth lighting across subdivided curved faces.
+					const nx = flatNormals[i * 3] * radius / radialDistance;
+					const ny = flatNormals[i * 3 + 1], nz = flatNormals[i * 3 + 2];
+					normal.set(cos * nx - sin * nz, ny, sin * nx + cos * nz).normalize();
+					normals.setXYZ(i, normal.x, normal.y, normal.z);
+				}
 			}
-		}
-		geometry.applyMatrix4(fromPanel);
-		geometry.computeBoundingBox();
-		geometry.computeBoundingSphere();
+			geometry.applyMatrix4(fromPanel);
+			geometry.computeBoundingBox();
+			geometry.computeBoundingSphere();
+		});
 		object.geometry = geometry;
 		source.dispose();
 		// The source asset may share geometries between meshes; leave originals alone.
 	});
+	return {
+		setRadius(radius) {
+			if (radius <= 0) throw new Error("Panel radius must be positive");
+			for (const bend of bends) bend(radius);
+		},
+	};
 }

@@ -7,6 +7,7 @@ import { AUDIO_SETTINGS, SOUND_FONTS, SoundFontConfig } from "./soundFonts";
 
 interface SoundFontPlayerEvents {
 	change: [];
+	status: [text: string | undefined];
 	loadError: [error: unknown];
 }
 
@@ -31,6 +32,7 @@ export class SoundFontPlayer extends EventEmitter<SoundFontPlayerEvents> {
 	private fontChange = Promise.resolve();
 	private selectionVersion = 0;
 	private loading = false;
+	private loadStage = "";
 	private loadError?: string;
 	private failedSoundFont?: SoundFontConfig;
 	private active = false;
@@ -50,6 +52,29 @@ export class SoundFontPlayer extends EventEmitter<SoundFontPlayerEvents> {
 
 	get isActive() {
 		return this.active;
+	}
+
+	/** Human-readable load progress or error; undefined when ready. */
+	get statusText(): string | undefined {
+		if (this.loadError) return `MIDI failed to load: ${this.loadError}`;
+		return this.loading ? this.loadStage : undefined;
+	}
+
+	get hasError() {
+		return !!this.loadError;
+	}
+
+	/** The selected instrument as shown on the piano display. */
+	get instrumentText(): string | undefined {
+		if (!this.instrument) return;
+		const number = this.instruments.indexOf(this.instrument) + 1;
+		return `${String(number).padStart(3, "0")} ${this.instrument.name}`;
+	}
+
+	private setStage(stage: string) {
+		if (stage === this.loadStage) return;
+		this.loadStage = stage;
+		this.emit("status", this.statusText);
 	}
 
 	activate() {
@@ -84,23 +109,23 @@ export class SoundFontPlayer extends EventEmitter<SoundFontPlayerEvents> {
 		this.loading = true;
 		this.loadError = undefined;
 		this.failedSoundFont = undefined;
+		this.loadStage = `Loading MIDI (${font.name})...`;
 		this.stopPlayingNotes();
 		this.emit("change");
+		this.emit("status", this.statusText);
 
 		// The worklet has one sound-bank response slot. Serialize changes and skip
 		// superseded requests so rapid dropdown changes cannot mix fonts or presets.
 		this.fontChange = this.fontChange.then(async () => {
 			if (version !== this.selectionVersion) return;
 			try {
+				this.setStage("Starting audio engine...");
 				await this.initializeAudio();
-				const response = await fetch(font.url);
-				if (!response.ok) {
-					throw new Error(
-						`Failed to load ${font.name}: HTTP ${response.status}`,
-					);
-				}
-				const buffer = await response.arrayBuffer();
 				if (version !== this.selectionVersion) return;
+				this.setStage(`Downloading ${font.name}...`);
+				const buffer = await this.fetchSoundFont(font, version);
+				if (version !== this.selectionVersion) return;
+				this.setStage(`Decoding ${font.name}...`);
 				const synth = this.synth!;
 				// Replacing one ID prevents presets from previous fonts leaking through.
 				await this.withSoundBankErrors(synth, () =>
@@ -131,6 +156,7 @@ export class SoundFontPlayer extends EventEmitter<SoundFontPlayerEvents> {
 					this.loading = false;
 					this.playHeldNotes();
 					this.emit("change");
+					this.emit("status", this.statusText);
 				}
 			}
 		});
@@ -153,6 +179,14 @@ export class SoundFontPlayer extends EventEmitter<SoundFontPlayerEvents> {
 		this.applyInstrument();
 		this.playHeldNotes();
 		this.emit("change");
+	}
+
+	stepInstrument(delta: number) {
+		if (this.loading || !this.instrument) return;
+		const count = this.instruments.length;
+		const index = this.instruments.indexOf(this.instrument);
+		const next = this.instruments[(((index + delta) % count) + count) % count];
+		this.selectInstrument(instrumentLabel(next));
 	}
 
 	retry() {
@@ -195,6 +229,38 @@ export class SoundFontPlayer extends EventEmitter<SoundFontPlayerEvents> {
 			});
 		}
 		return elements;
+	}
+
+	private async fetchSoundFont(font: SoundFontConfig, version: number) {
+		const response = await fetch(font.url);
+		if (!response.ok) {
+			throw new Error(`Failed to load ${font.name}: HTTP ${response.status}`);
+		}
+		const total = Number(response.headers.get("content-length"));
+		if (!response.body || !total) return response.arrayBuffer();
+
+		const reader = response.body.getReader();
+		const chunks: Uint8Array[] = [];
+		let received = 0;
+		for (;;) {
+			const { done, value } = await reader.read();
+			if (done) break;
+			if (version !== this.selectionVersion) {
+				void reader.cancel();
+				break;
+			}
+			chunks.push(value);
+			received += value.length;
+			const percent = Math.min(100, Math.round((received / total) * 100));
+			this.setStage(`Downloading ${font.name}... ${percent}%`);
+		}
+		const buffer = new Uint8Array(received);
+		let offset = 0;
+		for (const chunk of chunks) {
+			buffer.set(chunk, offset);
+			offset += chunk.length;
+		}
+		return buffer.buffer;
 	}
 
 	private initializeAudio() {
