@@ -8,6 +8,7 @@ export class TileMesh extends THREE.Mesh {
 	public center: THREE.Vector3 | null = null;
 
 	public neighbors: { mesh: TileMesh; edgeIndex: number }[] = [];
+	public onAppearanceChange?: () => void;
 
 	constructor(
 		geometry: THREE.BufferGeometry,
@@ -30,11 +31,13 @@ export class TileMesh extends THREE.Mesh {
 
 			if (tile == Tile.None) this.material.color.set(Tiles[tile].color);
 		}
+		this.onAppearanceChange?.();
 	}
 
 	setColor(color: THREE.Color) {
 		this.material.map = tileManager.getTexture(Tile.None);
 		this.material.color.set(color);
+		this.onAppearanceChange?.();
 	}
 
 	recenterToGeometryCenter() {

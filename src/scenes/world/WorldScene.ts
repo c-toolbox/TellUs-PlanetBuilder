@@ -121,7 +121,7 @@ export default class WorldScene extends BaseScene {
 
 		// Create new globe
 		this.globe = new Polyhedra({
-			...polyhedra.model,
+			...polyhedra.getModel(),
 			edgeSize: this.worldConfig.edgeWidth,
 			edgeColor: this.worldConfig.edgeColor,
 		});
@@ -167,7 +167,7 @@ export default class WorldScene extends BaseScene {
 
 		const tiles = transferBiomes(source, readTileShapes(this.globe.tileMeshes));
 		this.globe.tileMeshes.forEach((tileMesh, index) => {
-			tileMesh.setTile(tiles[index]);
+			tileMesh.setTile(tiles[index] ?? Tile.None);
 		});
 
 		// Keep the ratio sliders in step with what was copied (empty tiles are not a biome)
@@ -226,7 +226,7 @@ export default class WorldScene extends BaseScene {
 		if (!this.globe) return;
 		this.tileChanges.dispose();
 
-		const tilePositions = this.globe.faceGroup.children.map(
+		const tilePositions = this.globe.tileMeshes.map(
 			(mesh) => mesh.position,
 		);
 
@@ -235,7 +235,7 @@ export default class WorldScene extends BaseScene {
 			this.worldConfig.biomeCount,
 		);
 		this.globe.tileMeshes.forEach((tileMesh, index) => {
-			tileMesh.setTile(tiles[index]);
+			tileMesh.setTile(tiles[index] ?? Tile.None);
 		});
 
 		this.updateEdgeVisibility();
@@ -257,14 +257,7 @@ export default class WorldScene extends BaseScene {
 
 	updateEdgeVisibility() {
 		if (!this.globe) return;
-		this.globe.tileMeshes.forEach((tileMesh) => {
-			tileMesh.neighbors.forEach(({ mesh, edgeIndex }) => {
-				this.toggleEdge(
-					edgeIndex,
-					tileMesh.tile == mesh.tile && mesh.tile != Tile.None,
-				);
-			});
-		});
+		this.globe.updateEdgeVisibility(this.worldConfig.tileEdge);
 	}
 
 	toggleEdge(edgeIndex: number, sameEdge: boolean) {
@@ -353,40 +346,36 @@ export default class WorldScene extends BaseScene {
 			this.tileBrushes.set(touchId, brush);
 		}
 
-		const intersects = this.raycaster.intersectObjects(this.tileMeshes, true);
-		if (intersects.length > 0) {
-			const tileMesh = intersects[0].object as TileMesh;
-			if (tileMesh) {
-				if (type == "touch" && brush.tile == Tile.None) {
-					brush.setTile(tileMesh.tile);
-				} else if (type == "click") {
-					brush.setTile(tileManager.getNextTile(tileMesh.tile));
-				}
+		const tileMesh = this.globe?.pickTile(this.raycaster);
+		if (!tileMesh) return;
+		if (type == "touch" && brush.tile == Tile.None) {
+			brush.setTile(tileMesh.tile);
+		} else if (type == "click") {
+			brush.setTile(tileManager.getNextTile(tileMesh.tile));
+		}
 
-				if (tileMesh.tile != brush.tile) {
-					if (this.tileChanges.visible)
-						this.tileChanges.setTile(tileMesh, brush.tile);
-					else tileMesh.setTile(brush.tile);
-					this.markDirty();
-					this.sendSocketUiConfig();
-				}
+		if (tileMesh.tile != brush.tile) {
+			if (this.tileChanges.visible)
+				this.tileChanges.setTile(tileMesh, brush.tile);
+			else tileMesh.setTile(brush.tile);
+			this.markDirty();
+			this.sendSocketUiConfig();
+		}
 
-				if (this.worldConfig.tileEdge == "show borders") {
-					tileMesh.neighbors.forEach(({ mesh, edgeIndex }) => {
-						this.toggleEdge(
-							edgeIndex,
-							tileMesh.tile == mesh.tile && mesh.tile != Tile.None,
-						);
-					});
-				}
+		if (this.worldConfig.tileEdge == "show borders") {
+			tileMesh.neighbors.forEach(({ mesh, edgeIndex }) => {
+				this.toggleEdge(
+					edgeIndex,
+					tileMesh.tile == mesh.tile && mesh.tile != Tile.None,
+				);
+			});
+		}
 
-				if (this.worldConfig.autoGenerate) {
-					const counts = this.getTileCount();
-					Object.entries(counts).forEach(([tile, count]) => {
-						this.worldConfig.biomeCount[tile as Tile] = count;
-					});
-				}
-			}
+		if (this.worldConfig.autoGenerate) {
+			const counts = this.getTileCount();
+			Object.entries(counts).forEach(([tile, count]) => {
+				this.worldConfig.biomeCount[tile as Tile] = count;
+			});
 		}
 	}
 

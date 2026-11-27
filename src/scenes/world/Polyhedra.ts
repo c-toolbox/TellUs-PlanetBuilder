@@ -6,14 +6,26 @@ import { Tile } from "./TileManager";
 
 import { VERTEX_DISTANCE, EDGE_DISTANCE, FACE_DISTANCE } from "./constants";
 import { TileMesh } from "./TileMesh";
+import { TileBatch } from "./TileBatch";
+import type { TileEdge } from "./WorldSceneConfig";
 
 export class Polyhedra {
 	private vertices: THREE.Vector3[];
 	private edges: [number, number][];
 	private faces: number[][];
 
-	private vertexEdges: Map<number, number[]> = new Map();
 	private edgeMap: Map<string, number> = new Map<string, number>();
+	private readonly tiles: TileMesh[] = [];
+	private faceBatch!: TileBatch;
+	private vertexInstances!: THREE.InstancedMesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
+	private edgeInstances!: THREE.InstancedMesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
+	private vertexTransforms!: Float32Array;
+	private edgeTransforms!: Float32Array;
+	private visibleEdges!: Uint8Array;
+	private visibleVertices!: Uint8Array;
+	private visibleEdgeCounts!: Int32Array;
+	private visibleEdgeTotal = 0;
+	private edgeFaces: number[][] = [];
 
 	private edgeSize: number;
 	private edgeColor: string;
@@ -58,7 +70,7 @@ export class Polyhedra {
 		this.buildNeighbors();
 	}
 
-	// Create a sphere on every vertex
+	// Every dot shares one geometry, material, and instanced draw.
 	initVertices() {
 		const textureLoader = new THREE.TextureLoader();
 		const circleTexture = textureLoader.load(circle);
@@ -74,35 +86,35 @@ export class Polyhedra {
 
 		const geometry = new THREE.PlaneGeometry(1, 1);
 
-		for (const vertex of this.vertices) {
-			const mesh = new THREE.Mesh(geometry, material);
-
-			// Position on sphere
-			const pos = vertex.clone().setLength(VERTEX_DISTANCE);
-			mesh.position.copy(pos);
-
-			// Make it face origin
-			mesh.lookAt(new THREE.Vector3(0, 0, 0));
-
-			// Scale with distance so angular size is constant
-			mesh.scale.setScalar(this.vertexSize * VERTEX_DISTANCE);
-
-			this.vertexGroup.add(mesh);
-		}
+		this.vertexInstances = new THREE.InstancedMesh(geometry, material, this.vertices.length);
+		this.vertexInstances.frustumCulled = false;
+		this.vertexInstances.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+		this.vertexTransforms = new Float32Array(this.vertices.length * 16);
+		this.visibleVertices = new Uint8Array(this.vertices.length).fill(1);
+		this.visibleEdgeCounts = new Int32Array(this.vertices.length);
+		const temporary = new THREE.Object3D();
+		this.vertices.forEach((vertex, i) => {
+			temporary.position.copy(vertex).setLength(VERTEX_DISTANCE);
+			temporary.lookAt(0, 0, 0);
+			temporary.updateMatrix();
+			temporary.matrix.toArray(this.vertexTransforms, i * 16);
+		});
+		this.vertexInstances.instanceMatrix.array.set(this.vertexTransforms);
+		this.updateVertexSizes();
+		this.vertexGroup.add(this.vertexInstances);
 	}
 
 	// Create a cylinder on every edge
 	// Create billboarded quads for edges (always face the origin)
 	initEdges() {
+		this.visibleEdges = new Uint8Array(this.edges.length).fill(1);
+		this.visibleEdgeTotal = this.edges.length;
+		this.edgeFaces = this.edges.map(() => []);
 		for (let i = 0; i < this.edges.length; i++) {
 			const [ia, ib] = this.edges[i];
 
-			// Store vertex -> edges
-			if (!this.vertexEdges.has(ia)) this.vertexEdges.set(ia, []);
-			this.vertexEdges.get(ia)!.push(i);
-
-			if (!this.vertexEdges.has(ib)) this.vertexEdges.set(ib, []);
-			this.vertexEdges.get(ib)!.push(i);
+			this.visibleEdgeCounts[ia]++;
+			this.visibleEdgeCounts[ib]++;
 		}
 
 		/* Set up edge instanced mesh */
@@ -119,6 +131,9 @@ export class Polyhedra {
 			material,
 			this.edges.length,
 		);
+		this.edgeInstances = instanced;
+		instanced.frustumCulled = false;
+		instanced.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 
 		const tmp = new THREE.Object3D();
 
@@ -170,21 +185,19 @@ export class Polyhedra {
 			);
 
 			// Scale: width = edge length, height = angular thickness
-			const thickness = this.edgeSize * EDGE_DISTANCE;
-			tmp.scale.set(length, thickness, 1);
+			tmp.scale.set(length, 1, 1);
 
 			tmp.updateMatrix();
 			instanced.setMatrixAt(i, tmp.matrix);
 		}
 
-		instanced.instanceMatrix.needsUpdate = true;
+		this.edgeTransforms = new Float32Array(instanced.instanceMatrix.array);
+		this.updateEdgeSizes();
 		this.edgeGroup.add(instanced);
 	}
 
 	// Create textured polygons for every face
 	initFaces() {
-		const worldUp = new THREE.Vector3(0, 1, 0);
-
 		this.faces.forEach((face) => {
 			const vertices = face.map((i) => this.vertices[i]);
 
@@ -192,8 +205,10 @@ export class Polyhedra {
 
 			mesh.setTile(Tile.None);
 
-			this.faceGroup.add(mesh);
+			this.tiles.push(mesh);
 		});
+		this.faceBatch = new TileBatch(this.tiles);
+		this.faceGroup.add(this.faceBatch);
 	}
 
 	createMesh(vertices: THREE.Vector3[]): TileMesh {
@@ -206,14 +221,9 @@ export class Polyhedra {
 		center.divideScalar(vertices.length);
 		const normal = center.clone().normalize().negate();
 
-		const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(
-			normal,
-			new THREE.Vector3(0, 0, 0),
-		);
-
 		// Step 2: Create 2D plane coordinate system
 		let tangentY = new THREE.Vector3(0, 1, 0);
-		if (Math.abs(normal.dot(tangentY)) > 0.999) tangentY.set(0, 1, 0);
+		if (Math.abs(normal.dot(tangentY)) > 0.999) tangentY.set(0, 0, 1);
 		tangentY = tangentY.clone().projectOnPlane(normal).normalize();
 		const tangentX = new THREE.Vector3()
 			.crossVectors(tangentY, normal)
@@ -221,10 +231,8 @@ export class Polyhedra {
 
 		// Step 3: Project vertices to plane and compute 2D coordinates
 		const points2D: THREE.Vector2[] = vertices.map((v) => {
-			const projected = new THREE.Vector3();
-			plane.projectPoint(v, projected);
-			const x = projected.dot(tangentX);
-			const y = projected.dot(tangentY);
+			const x = v.dot(tangentX);
+			const y = v.dot(tangentY);
 			return new THREE.Vector2(x, y);
 		});
 
@@ -304,7 +312,6 @@ export class Polyhedra {
 		geometry.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
 
 		geometry.setIndex(indices);
-		geometry.computeVertexNormals();
 
 		// Step 7: Create mesh
 		const material = new THREE.MeshBasicMaterial({
@@ -339,6 +346,7 @@ export class Polyhedra {
 					console.warn("Edge not found in edgeMap:", key);
 					continue;
 				}
+				this.edgeFaces[edgeIndex].push(faceIndex);
 
 				if (!edgeToData.has(key)) {
 					edgeToData.set(key, {
@@ -352,7 +360,7 @@ export class Polyhedra {
 		}
 
 		// Step 2: Assign neighbors
-		const meshes = this.faceGroup.children as TileMesh[];
+		const meshes = this.tiles;
 
 		for (const { faces, edgeIndex } of edgeToData.values()) {
 			if (faces.length !== 2) continue;
@@ -371,154 +379,107 @@ export class Polyhedra {
 		}
 	}
 
-	// Face textures are shared via tileManager and are not disposed here
+	// Geometry belongs to the globe; biome textures belong to TileManager.
 	dispose() {
-		[this.vertexGroup, this.edgeGroup, this.faceGroup].forEach((group) => {
-			group.traverse((object) => {
-				if (object instanceof THREE.InstancedMesh) object.dispose();
-				if (!(object instanceof THREE.Mesh)) return;
-				object.geometry.dispose();
-				(object.material as THREE.Material).dispose();
-			});
+		this.faceBatch.dispose();
+		for (const tile of this.tiles) {
+			tile.geometry.dispose();
+			tile.material.dispose();
+		}
+		for (const mesh of [this.vertexInstances, this.edgeInstances]) {
+			mesh.dispose();
+			mesh.geometry.dispose();
+			mesh.material.dispose();
+		}
+		for (const group of [this.vertexGroup, this.edgeGroup, this.faceGroup]) {
 			group.removeFromParent();
 			group.clear();
-		});
+		}
 		this.circleTexture?.dispose();
 		this.circleTexture = null;
 	}
 
-	setVertexVisible(vertexIndex: number, visible: boolean) {
-		const vertexMesh = this.vertexGroup.children[vertexIndex];
-		if (vertexMesh) vertexMesh.visible = visible;
+	setVertexVisible(index: number, visible: boolean) {
+		if (this.visibleVertices[index] === Number(visible)) return;
+		this.visibleVertices[index] = Number(visible);
+		this.writeVertexScale(index);
+		this.vertexInstances.instanceMatrix.needsUpdate = true;
 	}
 
-	setEdgeVisible(edgeIndex: number, visible: boolean) {
-		const matrix = new THREE.Matrix4();
-		this.edgeInstancedMesh.getMatrixAt(edgeIndex, matrix);
+	setEdgeVisible(index: number, visible: boolean) {
+		if (this.visibleEdges[index] === Number(visible)) return;
+		this.visibleEdges[index] = Number(visible);
+		const delta = visible ? 1 : -1;
+		this.visibleEdgeTotal += delta;
+		this.writeEdgeWidth(index);
+		this.edgeInstances.instanceMatrix.needsUpdate = true;
+		for (const vertex of this.edges[index]) {
+			this.visibleEdgeCounts[vertex] += delta;
+			this.setVertexVisible(vertex, this.visibleEdgeCounts[vertex] > 0);
+		}
+		this.edgeInstances.visible = this.visibleEdgeTotal > 0;
+		this.vertexInstances.visible = this.visibleEdgeTotal > 0;
+	}
 
-		const pos = new THREE.Vector3();
-		const quat = new THREE.Quaternion();
-		const scale = new THREE.Vector3();
-
-		matrix.decompose(pos, quat, scale);
-
-		scale.y = visible ? this.edgeSize * EDGE_DISTANCE : 0.00001;
-
-		matrix.compose(pos, quat, scale);
-		this.edgeInstancedMesh.setMatrixAt(edgeIndex, matrix);
-		this.edgeInstancedMesh.instanceMatrix.needsUpdate = true;
-
-		// --- Vertex update ---
-		const [ia, ib] = this.edges[edgeIndex];
-
-		[ia, ib].forEach((vIdx) => {
-			const connectedEdges = this.vertexEdges.get(vIdx)!;
-			// if all connected edges are invisible, hide vertex
-			const anyVisible = connectedEdges.some((eIdx) => {
-				const tmpMatrix = new THREE.Matrix4();
-				this.edgeInstancedMesh.getMatrixAt(eIdx, tmpMatrix);
-				const s = new THREE.Vector3();
-				tmpMatrix.decompose(new THREE.Vector3(), new THREE.Quaternion(), s);
-				return s.y > 0.0001; // visible threshold
-			});
-			this.setVertexVisible(vIdx, anyVisible);
+	updateEdgeVisibility(mode: TileEdge) {
+		this.edgeFaces.forEach((faces, edge) => {
+			const sameBiome = faces.length === 2
+				&& this.tiles[faces[0]].tile !== Tile.None
+				&& this.tiles[faces[0]].tile === this.tiles[faces[1]].tile;
+			this.setEdgeVisible(edge, mode !== "hide all" && (mode === "show all" || !sameBiome));
 		});
 	}
 
 	setEdgeSize(size: number) {
 		this.edgeSize = size;
-		this.vertexSize = size; // Share size with vertices
+		this.vertexSize = size;
 		this.updateEdgeSizes();
 		this.updateVertexSizes();
 	}
 
 	setEdgeColor(color: string) {
 		this.edgeColor = color;
-		this.vertexColor = color; // Share color with vertices
-		(this.edgeInstancedMesh.material as THREE.MeshBasicMaterial).color.setStyle(
-			color,
-		);
-		this.updateVertexColors();
+		this.vertexColor = color;
+		this.edgeInstances.material.color.setStyle(color);
+		this.vertexInstances.material.color.setStyle(color);
+	}
+
+	private writeEdgeWidth(index: number) {
+		const offset = index * 16;
+		const width = this.visibleEdges[index] ? this.edgeSize * EDGE_DISTANCE : 0;
+		const target = this.edgeInstances.instanceMatrix.array;
+		for (let row = 4; row < 7; row++) {
+			target[offset + row] = this.edgeTransforms[offset + row] * width;
+		}
 	}
 
 	private updateEdgeSizes() {
-		const tmp = new THREE.Object3D();
-		for (let i = 0; i < this.edges.length; i++) {
-			const [ia, ib] = this.edges[i];
+		for (let i = 0; i < this.edges.length; i++) this.writeEdgeWidth(i);
+		this.edgeInstances.instanceMatrix.needsUpdate = true;
+	}
 
-			// Place endpoints on the sphere of radius EDGE_DISTANCE
-			const a = this.vertices[ia].clone().setLength(EDGE_DISTANCE);
-			const b = this.vertices[ib].clone().setLength(EDGE_DISTANCE);
-
-			// Midpoint in world space
-			const mid = a.clone().add(b).multiplyScalar(0.5);
-
-			// Vector along the edge
-			const edgeDir = b.clone().sub(a);
-			const length = edgeDir.length();
-			if (length === 0) continue;
-
-			// Radial direction (outward from origin)
-			const radial = mid.clone().normalize();
-
-			// Project edge direction into tangent plane at midpoint
-			let tangent = edgeDir.clone().projectOnPlane(radial);
-			if (tangent.lengthSq() < 1e-10) {
-				// Fallback if edge is nearly radial
-				tangent = new THREE.Vector3(1, 0, 0).projectOnPlane(radial);
-				if (tangent.lengthSq() < 1e-10) {
-					tangent = new THREE.Vector3(0, 1, 0).projectOnPlane(radial);
-				}
+	private writeVertexScale(index: number) {
+		const offset = index * 16;
+		const scale = this.visibleVertices[index] ? this.vertexSize * VERTEX_DISTANCE : 0;
+		const target = this.vertexInstances.instanceMatrix.array;
+		for (let column = 0; column < 3; column++) {
+			for (let row = 0; row < 3; row++) {
+				const component = offset + column * 4 + row;
+				target[component] = this.vertexTransforms[component] * scale;
 			}
-			tangent.normalize();
-
-			// Construct an orthonormal basis:
-			const x = tangent;
-			const z = radial.clone().negate();
-			const y = new THREE.Vector3().crossVectors(z, x).normalize();
-
-			// Fix x = y × z to ensure orthogonality
-			x.copy(new THREE.Vector3().crossVectors(y, z).normalize());
-
-			// Get current matrix
-			const matrix = new THREE.Matrix4();
-			this.edgeInstancedMesh.getMatrixAt(i, matrix);
-			const pos = new THREE.Vector3();
-			const quat = new THREE.Quaternion();
-			const scale = new THREE.Vector3();
-			matrix.decompose(pos, quat, scale);
-
-			// Update scale
-			const thickness = this.edgeSize * EDGE_DISTANCE;
-			scale.y = scale.y > 0.0001 ? thickness : 0.00001; // preserve visibility
-
-			matrix.compose(pos, quat, scale);
-			this.edgeInstancedMesh.setMatrixAt(i, matrix);
 		}
-		this.edgeInstancedMesh.instanceMatrix.needsUpdate = true;
 	}
 
 	private updateVertexSizes() {
-		for (const mesh of this.vertexGroup.children) {
-			const vertexMesh = mesh as THREE.Mesh;
-			vertexMesh.scale.setScalar(this.vertexSize * VERTEX_DISTANCE);
-		}
+		for (let i = 0; i < this.vertices.length; i++) this.writeVertexScale(i);
+		this.vertexInstances.instanceMatrix.needsUpdate = true;
 	}
 
-	private updateVertexColors() {
-		for (const mesh of this.vertexGroup.children) {
-			const vertexMesh = mesh as THREE.Mesh;
-			(vertexMesh.material as THREE.MeshBasicMaterial).color.setStyle(
-				this.vertexColor,
-			);
-		}
-	}
-
-	get edgeInstancedMesh() {
-		return this.edgeGroup.children[0] as THREE.InstancedMesh;
+	pickTile(raycaster: THREE.Raycaster): TileMesh | undefined {
+		return this.faceBatch.pick(raycaster);
 	}
 
 	get tileMeshes(): TileMesh[] {
-		return this.faceGroup.children as TileMesh[];
+		return this.tiles;
 	}
 }
