@@ -25,6 +25,7 @@ export default class CircleButton extends THREE.Mesh<
 	THREE.MeshBasicMaterial
 > {
 	private readonly visuals = new THREE.Group();
+	private readonly backgroundMaterial: THREE.MeshBasicMaterial;
 	private readonly clickCallback?: () => void;
 	private readonly radius: number;
 	private pressTouchId?: TouchId;
@@ -54,15 +55,16 @@ export default class CircleButton extends THREE.Mesh<
 			new THREE.MeshBasicMaterial({ visible: false }),
 		);
 
+		this.backgroundMaterial = new THREE.MeshBasicMaterial({
+			color,
+			map: circleTexture,
+			transparent: true,
+			alphaTest: 0.01,
+			side: THREE.FrontSide,
+		});
 		const background = new THREE.Mesh(
 			new THREE.PlaneGeometry(radius * 2, radius * 2),
-			new THREE.MeshBasicMaterial({
-				color,
-				map: circleTexture,
-				transparent: true,
-				alphaTest: 0.01,
-				side: THREE.FrontSide,
-			}),
+			this.backgroundMaterial,
 		);
 		background.raycast = () => {};
 		background.onBeforeRender = () => { this.scaleTween?.update(); };
@@ -135,6 +137,10 @@ export default class CircleButton extends THREE.Mesh<
 			0.003,
 		);
 		this.visuals.add(this.textLabel);
+	}
+
+	setColor(color: THREE.ColorRepresentation) {
+		this.backgroundMaterial.color.set(color);
 	}
 
 	setLabelVisible(visible: boolean) {

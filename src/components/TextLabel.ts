@@ -3,20 +3,32 @@ import {
 	Font,
 	FontLoader,
 } from "three/examples/jsm/loaders/FontLoader.js";
-import latoBoldFontUrl from "@/assets/fonts/Lato/Bold.json?url";
+import blackFontUrl from "@/assets/fonts/Lato/Black.json?url";
+import boldFontUrl from "@/assets/fonts/Lato/Bold.json?url";
+import lightFontUrl from "@/assets/fonts/Lato/Light.json?url";
+import regularFontUrl from "@/assets/fonts/Lato/Regular.json?url";
+import thinFontUrl from "@/assets/fonts/Lato/Thin.json?url";
 
-let fontPromise: Promise<Font> | undefined;
+export type FontWeight = "Thin" | "Light" | "Regular" | "Bold" | "Black";
 
-function loadFont() {
-	fontPromise ??= new Promise<Font>((resolve, reject) => {
-		new FontLoader().load(
-			latoBoldFontUrl,
-			resolve,
-			undefined,
-			reject,
-		);
-	});
-	return fontPromise;
+const fontUrls: Record<FontWeight, string> = {
+	Thin: thinFontUrl,
+	Light: lightFontUrl,
+	Regular: regularFontUrl,
+	Bold: boldFontUrl,
+	Black: blackFontUrl,
+};
+const fontPromises = new Map<FontWeight, Promise<Font>>();
+
+function loadFont(weight: FontWeight) {
+	let promise = fontPromises.get(weight);
+	if (!promise) {
+		promise = new Promise<Font>((resolve, reject) => {
+			new FontLoader().load(fontUrls[weight], resolve, undefined, reject);
+		});
+		fontPromises.set(weight, promise);
+	}
+	return promise;
 }
 
 export default class TextLabel extends THREE.Mesh<
@@ -36,6 +48,9 @@ export default class TextLabel extends THREE.Mesh<
 		size: number,
 		private readonly alignment: "center" | "left" = "center",
 		private readonly maxWidth = Infinity,
+		/** "baseline" keeps the text's baseline at y=0 so glyphs with descenders don't shift it. */
+		private readonly verticalAnchor: "center" | "baseline" = "center",
+		weight: FontWeight = "Bold",
 	) {
 		super(
 			new THREE.ShapeGeometry([]),
@@ -48,7 +63,7 @@ export default class TextLabel extends THREE.Mesh<
 		this.size = size;
 		this.text = text;
 		this.raycast = () => {};
-		loadFont().then(
+		loadFont(weight).then(
 			(font) => {
 				if (this.disposed) return;
 				this.font = font;
@@ -78,7 +93,7 @@ export default class TextLabel extends THREE.Mesh<
 		const height = bounds.max.y - bounds.min.y;
 		this.geometry.translate(
 			-(bounds.min.x + (this.alignment === "center" ? width / 2 : 0)),
-			-(bounds.min.y + height / 2),
+			this.verticalAnchor === "center" ? -(bounds.min.y + height / 2) : 0,
 			0,
 		);
 		this.scale.setScalar(width > this.maxWidth ? this.maxWidth / width : 1);
