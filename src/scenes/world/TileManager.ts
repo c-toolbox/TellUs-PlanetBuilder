@@ -111,8 +111,8 @@ class TileManager {
 	): THREE.Texture {
 		const asset = Tiles[tile].texture[set];
 		const texture = loader.load(asset);
-		texture.wrapS = THREE.ClampToEdgeWrapping;
-		texture.wrapT = THREE.ClampToEdgeWrapping;
+		texture.wrapS = THREE.MirroredRepeatWrapping;
+		texture.wrapT = THREE.MirroredRepeatWrapping;
 		texture.colorSpace = THREE.SRGBColorSpace;
 		return texture;
 	}
